@@ -1,0 +1,61 @@
+<nav class="nav">
+  <a *ngFor="let item of menu()" [routerLink]="item.route" routerLinkActive="active">
+    {{ item.label }}
+  </a>
+</nav>
+
+
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">SY</div>
+      <div class="title">SYGEPEC</div>
+    </div>
+
+    <div class="tenant">
+      <div class="label">Context</div>
+      <button class="pill" (click)="setPersonal()" [class.active]="isPersonal()">Personal (SYGEPEC)</button>
+
+      <div class="label" style="margin-top:10px;">Organizations</div>
+      <ng-container *ngIf="orgs$ | async as orgs">
+        <button class="pill" *ngFor="let o of orgs" (click)="setOrg(o.orgId)" [class.active]="isOrg(o.orgId)">
+          {{ o.orgName || o.orgId }}
+        </button>
+        <div class="hint" *ngIf="orgs.length === 0">No organization assigned.</div>
+      </ng-container>
+    </div>
+
+    <nav class="nav">
+      <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Overview</a>
+      <a routerLink="/dashboard/immigration" routerLinkActive="active">Immigration</a>
+      <a routerLink="/dashboard/training" routerLinkActive="active">Training</a>
+      <a routerLink="/dashboard/jobs" routerLinkActive="active">Jobs</a>
+      <a routerLink="/dashboard/travel" routerLinkActive="active">Travel</a>
+      <a routerLink="/dashboard/support" routerLinkActive="active">Support</a>
+      <a *ngIf="isAdmin()" routerLink="/dashboard/admin" routerLinkActive="active">Admin</a>
+    </nav>
+
+    <div class="footer">
+      <div class="user" *ngIf="user() as u">
+        <div class="name">{{ u.displayName || u.email }}</div>
+        <div class="role">{{ u.globalRole }} <span *ngIf="u.plan">• {{ u.plan }}</span></div>
+        <div class="ctx">tenant: {{ tenantId() }} <span *ngIf="orgId()">• org: {{ orgId() }}</span></div>
+      </div>
+      <button class="btn" (click)="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <div class="breadcrumb">Dashboard</div>
+      <div class="actions">
+        <button class="btn-outline">Help</button>
+      </div>
+    </header>
+
+    <section class="page">
+      <router-outlet />
+    </section>
+  </main>
+</div>
