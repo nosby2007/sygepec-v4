@@ -1,0 +1,35 @@
+<mat-toolbar>
+  <mat-icon>work</mat-icon>
+  <span>Emplois</span>
+</mat-toolbar>
+
+<div class="wrap">
+  @if (isOrgUser()) {
+    <mat-card>
+      <mat-card-title>Offres de l'organisation</mat-card-title>
+      <mat-card-content>
+        @for (job of orgJobs(); track trackByJobId($index, job)) {
+          <div class="job-row">
+            <a [routerLink]="['/jobs', job.id]">{{ job.title }}</a>
+            <span class="status">{{ job.status }}</span>
+          </div>
+        } @empty {
+          <p>Aucune offre pour le moment.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <mat-card>
+      <mat-card-title>Offres disponibles</mat-card-title>
+      <mat-card-content>
+        @for (job of publicJobsRecent(); track trackByJobId($index, job)) {
+          <div class="job-row">
+            <a [routerLink]="['/jobs', job.id]">{{ job.title }}</a>
+          </div>
+        } @empty {
+          <p>Aucune offre disponible.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

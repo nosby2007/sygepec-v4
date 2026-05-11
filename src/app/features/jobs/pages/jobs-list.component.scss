@@ -1,0 +1,10 @@
+.jobs-page { padding: 0; }
+.page-header { background: #0B1F3A; color: #fff; }
+.spacer { flex: 1; }
+.content { padding: 24px; max-width: 900px; margin: 0 auto; }
+.filters { margin-bottom: 16px; }
+.jobs-list { display: flex; flex-direction: column; gap: 16px; }
+.job-card { cursor: pointer; }
+.tags { display: flex; gap: 8px; margin-top: 8px; }
+.tag { background: #e8f0fe; color: #1E63D6; border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+.empty { color: #5E6B7A; text-align: center; padding: 40px; }

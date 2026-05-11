@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "sygepec-v4",
+    "prod": "sygepc"
+  },
+  "targets": {},
+  "etags": {}
+}

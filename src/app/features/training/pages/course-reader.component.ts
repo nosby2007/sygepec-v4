@@ -3,12 +3,12 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { combineLatest, map, switchMap } from 'rxjs';
+import { combineLatest, map, of, switchMap } from 'rxjs';
 
 import { TrainingContextService } from '../data/training-context.service';
 import { CoursesRepository } from '../data/courses.repository';
-import { EnrollmentsRepository } from '../data/enrollments.repository';
-import { Course, Enrollment } from '../data/training.models';
+
+
 
 // Material
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -18,6 +18,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatListModule } from '@angular/material/list';
+import { EnrollmentsRepository, Enrollment } from '../data/EnrollmentsRepository';
+import { Course } from '../data/training.model';
 
 @Component({
   standalone: true,
@@ -80,8 +82,8 @@ import { MatListModule } from '@angular/material/list';
                   <button mat-flat-button class="w100" (click)="enroll()">Enroll</button>
                 } @else {
                   <div class="muted small">Progress</div>
-                  <mat-progress-bar mode="determinate" [value]="enrollment()!.progressPercent"></mat-progress-bar>
-                  <div class="muted small">Last: {{ enrollment()!.lastLessonId || '—' }}</div>
+                  <mat-progress-bar mode="determinate" [value]="enrollment()!.progress ?? 0"></mat-progress-bar>
+                  <div class="muted small">Last: {{ enrollment()!.updatedAt || '—' }}</div>
 
                   <button mat-stroked-button class="w100" (click)="markProgress()">
                     Mark progress (+10%)
@@ -169,8 +171,8 @@ export class CourseReaderComponent {
     combineLatest([this.ctx.userId$, this.route.paramMap]).pipe(
       switchMap(([uid, pm]) => {
         const id = pm.get('courseId') as string;
-        if (!uid || !id) return this.enrollRepo.getEnrollment('__none__', '__none__');
-        return this.enrollRepo.getEnrollment(uid, id);
+        if (!uid || !id) return of(null as Enrollment | null);
+        return this.enrollRepo.getEnrollmentById(id);
       })
     ),
     { initialValue: null as Enrollment | null }
@@ -223,7 +225,7 @@ export class CourseReaderComponent {
     const uid = this.userId();
     const courseId = this.courseId();
     if (!uid || !courseId) return;
-    await this.enrollRepo.enroll(uid, this.tenantId(), courseId);
+    await this.enrollRepo.enroll({ userId: uid, tenantId: this.tenantId(), courseId, status: 'enrolled' });
   }
 
   async markProgress() {
@@ -232,7 +234,7 @@ export class CourseReaderComponent {
     const e = this.enrollment();
     if (!uid || !courseId || !e) return;
 
-    const next = Math.min(100, (e.progressPercent ?? 0) + 10);
-    await this.enrollRepo.setProgress(uid, courseId, next, this.selectedLessonId());
+    const next = Math.min(100, (e.progress ?? 0) + 10);
+    await this.enrollRepo.updateProgress((e as any).id, next);
   }
 }

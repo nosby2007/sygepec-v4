@@ -1,0 +1,421 @@
+<div class="audit-shell">
+
+  <!-- ═══ TOPBAR ═══════════════════════════════════════════════════════ -->
+  <header class="audit-topbar">
+    <a class="audit-brand" routerLink="/public">
+      <span class="brand-mark">S</span>
+      <span class="brand-text">SYGEPEC</span>
+    </a>
+
+    <div class="audit-progress-wrap">
+      <div class="audit-progress-bar">
+        <div
+          class="audit-progress-fill"
+          [style.width.%]="progressPercent()"
+          [style.background]="getReadinessBarColor()">
+        </div>
+      </div>
+      <span class="audit-step-label">Étape {{ displayStepNumber() }} / {{ totalSteps }}</span>
+    </div>
+
+    <button class="exit-btn" (click)="exit()" type="button" aria-label="Quitter">
+      Quitter
+    </button>
+  </header>
+
+  <!-- ═══ MAIN CONTENT ═════════════════════════════════════════════════ -->
+  <main class="audit-main">
+
+    <!-- Desktop profile snapshot -->
+    <aside class="profile-snapshot" aria-label="Aperçu du profil">
+      <div class="snapshot-header">
+        <span class="snapshot-icon">👤</span>
+        <p class="snapshot-title">Ton profil</p>
+      </div>
+      <div class="snapshot-score">
+        <div class="score-ring" [style.--score]="readinessScore()">
+          <span class="score-num">{{ readinessScore() }}</span>
+          <span class="score-label">/ 100</span>
+        </div>
+        <p class="score-category">{{ readinessCategory() }}</p>
+      </div>
+      <ul class="snapshot-items" *ngIf="answers() as ans">
+        <li *ngIf="ans.destinationCountry"><span>🌍</span> {{ ans.destinationCountry | titlecase }}</li>
+        <li *ngIf="ans.immigrationGoal"><span>🎯</span> {{ ans.immigrationGoal | titlecase }}</li>
+        <li *ngIf="ans.fullName"><span>👤</span> {{ ans.fullName }}</li>
+        <li *ngIf="ans.educationLevel"><span>🎓</span> {{ ans.educationLevel | titlecase }}</li>
+        <li *ngIf="ans.profession"><span>💼</span> {{ ans.profession }}</li>
+      </ul>
+    </aside>
+
+    <!-- ─── QUESTION CARD ─────────────────────────────────────────── -->
+    <section class="audit-card-area">
+
+      <!-- ── TYPE: CARDS QUESTION ──────────────────────────────────── -->
+      <div
+        class="audit-card"
+        *ngIf="currentStep().type === 'question' && currentStep().inputType === 'cards'"
+        role="group"
+        [attr.aria-labelledby]="'step-title-' + currentStep().id">
+
+        <p class="step-eyebrow">Étape {{ displayStepNumber() }}</p>
+        <h1 class="step-title" [id]="'step-title-' + currentStep().id">
+          {{ currentStep().title }}
+        </h1>
+        <p class="step-subtitle" *ngIf="currentStep().subtitle">{{ currentStep().subtitle }}</p>
+
+        <div class="cards-grid">
+          <button
+            *ngFor="let opt of currentStep().options; trackBy: trackByValue"
+            class="answer-card"
+            [class.selected]="isCardSelected(currentStep().fieldKey!, opt.value)"
+            (click)="selectCard(currentStep().fieldKey!, opt.value)"
+            type="button"
+            [attr.aria-pressed]="isCardSelected(currentStep().fieldKey!, opt.value)">
+            <span class="card-icon" *ngIf="opt.icon">{{ opt.icon }}</span>
+            <span class="card-label">{{ opt.label }}</span>
+            <span class="card-desc" *ngIf="opt.description">{{ opt.description }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── TYPE: AI INFO SCREEN ──────────────────────────────────── -->
+      <div
+        class="audit-card ai-info-card"
+        *ngIf="currentStep().type === 'ai_info'"
+        role="region"
+        aria-label="Analyse IA">
+
+        <div class="ai-badge">
+          <span class="ai-icon">✦</span>
+          <span>Analyse SYGEPEC</span>
+        </div>
+
+        <h1 class="step-title ai-title">{{ aiInfoTitle() }}</h1>
+
+        <div class="ai-content" [innerHTML]="aiInfoContent()"></div>
+
+        <div class="ai-info-cards" *ngIf="aiInfoCards().length > 0">
+          <div class="ai-info-chip" *ngFor="let card of aiInfoCards()">
+            <span>{{ card.icon }}</span>
+            <span>{{ card.label }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TYPE: FORM ─────────────────────────────────────────────── -->
+      <div
+        class="audit-card"
+        *ngIf="currentStep().type === 'form'"
+        role="group"
+        [attr.aria-labelledby]="'step-title-' + currentStep().id">
+
+        <p class="step-eyebrow">Étape {{ displayStepNumber() }}</p>
+        <h1 class="step-title" [id]="'step-title-' + currentStep().id">{{ currentStep().title }}</h1>
+        <p class="step-subtitle" *ngIf="currentStep().subtitle">{{ currentStep().subtitle }}</p>
+        <p class="step-helper" *ngIf="currentStep().helperText">{{ currentStep().helperText }}</p>
+
+        <div class="form-fields">
+          <ng-container *ngFor="let field of currentStep().fields; trackBy: trackByKey">
+
+            <!-- Text / Email / Phone / Number -->
+            <div
+              class="form-group"
+              *ngIf="field.inputType === 'text' || field.inputType === 'email' || field.inputType === 'phone' || field.inputType === 'number'">
+              <label [for]="field.key">{{ field.label }}</label>
+              <input
+                [id]="field.key"
+                [type]="field.inputType"
+                [placeholder]="field.placeholder || ''"
+                [value]="getFieldValue(field.key)"
+                (input)="updateField(field.key, $any($event.target).value)"
+                autocomplete="off"
+                class="form-input" />
+            </div>
+
+            <!-- Currency -->
+            <div class="form-group" *ngIf="field.inputType === 'currency'">
+              <label [for]="field.key">{{ field.label }}</label>
+              <div class="currency-wrap">
+                <span class="currency-sym">$</span>
+                <input
+                  [id]="field.key"
+                  type="number"
+                  min="0"
+                  [placeholder]="field.placeholder || ''"
+                  [value]="getFieldValue(field.key)"
+                  (input)="updateField(field.key, +$any($event.target).value)"
+                  class="form-input currency-input" />
+              </div>
+            </div>
+
+            <!-- Select -->
+            <div class="form-group" *ngIf="field.inputType === 'select'">
+              <label [for]="field.key">{{ field.label }}</label>
+              <select
+                [id]="field.key"
+                class="form-select"
+                [value]="getFieldValue(field.key)"
+                (change)="updateField(field.key, $any($event.target).value)">
+                <option value="">— Choisir —</option>
+                <option
+                  *ngFor="let opt of field.options; trackBy: trackByValue"
+                  [value]="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Textarea -->
+            <div class="form-group" *ngIf="field.inputType === 'textarea'">
+              <label [for]="field.key">{{ field.label }}</label>
+              <textarea
+                [id]="field.key"
+                [placeholder]="field.placeholder || ''"
+                rows="4"
+                class="form-textarea"
+                [value]="getFieldValue(field.key)"
+                (input)="updateField(field.key, $any($event.target).value)">
+              </textarea>
+            </div>
+
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- ── TYPE: MULTI SELECT ─────────────────────────────────────── -->
+      <div
+        class="audit-card"
+        *ngIf="currentStep().type === 'multi_select'"
+        role="group"
+        [attr.aria-labelledby]="'step-title-' + currentStep().id">
+
+        <p class="step-eyebrow">Étape {{ displayStepNumber() }}</p>
+        <h1 class="step-title" [id]="'step-title-' + currentStep().id">{{ currentStep().title }}</h1>
+        <p class="step-subtitle" *ngIf="currentStep().subtitle">{{ currentStep().subtitle }}</p>
+
+        <div class="multi-grid">
+          <button
+            *ngFor="let opt of currentStep().options; trackBy: trackByValue"
+            class="multi-chip"
+            [class.selected]="isMultiSelected(opt.value)"
+            (click)="toggleMultiSelect(opt.value)"
+            type="button"
+            [attr.aria-pressed]="isMultiSelected(opt.value)">
+            <span *ngIf="opt.icon">{{ opt.icon }}</span>
+            <span>{{ opt.label }}</span>
+            <span class="chip-check" *ngIf="isMultiSelected(opt.value)">✓</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── TYPE: SUMMARY ──────────────────────────────────────────── -->
+      <div
+        class="audit-card summary-card"
+        *ngIf="currentStep().type === 'summary' && summary() as s"
+        role="region"
+        aria-label="Résumé du profil">
+
+        <!-- Case created confirmation -->
+        <div class="case-success" *ngIf="caseCreated()">
+          <span class="success-icon">🎉</span>
+          <h2>Dossier créé avec succès !</h2>
+          <p>Redirection vers ton tableau de bord...</p>
+        </div>
+
+        <ng-container *ngIf="!caseCreated()">
+          <div class="summary-header">
+            <div class="ai-badge">
+              <span class="ai-icon">✦</span>
+              <span>Analyse SYGEPEC</span>
+            </div>
+            <h1 class="step-title">{{ currentStep().title }}</h1>
+            <p class="step-subtitle" *ngIf="currentStep().subtitle">{{ currentStep().subtitle }}</p>
+          </div>
+
+          <!-- Score banner -->
+          <div class="score-banner" [class.score-high]="s.readinessScore >= 81" [class.score-mid]="s.readinessScore >= 61 && s.readinessScore < 81" [class.score-low]="s.readinessScore < 61">
+            <div class="score-big">{{ s.readinessScore }}<span>/100</span></div>
+            <div class="score-cat-label">{{ s.readinessCategory }}</div>
+            <div class="score-bar-track">
+              <div class="score-bar-fill" [style.width.%]="s.readinessScore" [style.background]="getReadinessBarColor()"></div>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+
+            <!-- Destination + Goal -->
+            <div class="summary-section">
+              <h3>📍 Destination choisie</h3>
+              <p>{{ s.destination }}</p>
+            </div>
+            <div class="summary-section">
+              <h3>🎯 Objectif</h3>
+              <p>{{ s.goal }}</p>
+            </div>
+
+            <!-- Strengths -->
+            <div class="summary-section full-width">
+              <h3>✅ Points forts</h3>
+              <ul class="check-list green">
+                <li *ngFor="let item of s.strengths">{{ item }}</li>
+              </ul>
+            </div>
+
+            <!-- Gaps -->
+            <div class="summary-section full-width" *ngIf="s.gaps.length > 0">
+              <h3>⚠️ Points à compléter</h3>
+              <ul class="check-list orange">
+                <li *ngFor="let item of s.gaps">{{ item }}</li>
+              </ul>
+            </div>
+
+            <!-- Missing docs -->
+            <div class="summary-section full-width" *ngIf="s.missingDocuments.length > 0">
+              <h3>📂 Documents manquants</h3>
+              <div class="doc-chips">
+                <span class="doc-chip" *ngFor="let doc of s.missingDocuments">{{ doc }}</span>
+              </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="summary-section full-width">
+              <h3>💡 Formations et actions recommandées</h3>
+              <ul class="check-list blue">
+                <li *ngFor="let rec of s.recommendations">{{ rec }}</li>
+              </ul>
+            </div>
+
+            <!-- Next action -->
+            <div class="summary-section full-width next-action-box">
+              <h3>🚀 Prochaine meilleure action</h3>
+              <p>{{ s.nextAction }}</p>
+            </div>
+
+          </div>
+
+          <!-- CTA Buttons -->
+          <p class="error-text" *ngIf="caseError()" role="alert" style="margin: 12px 0;">
+            ⚠️ {{ caseError() }}
+          </p>
+          <div class="summary-ctas">
+            <button
+              class="cta-primary"
+              (click)="createCase()"
+              [disabled]="isCreatingCase()"
+              type="button">
+              <span *ngIf="!isCreatingCase()">Créer mon dossier SYGEPEC</span>
+              <span *ngIf="isCreatingCase()">Création en cours...</span>
+            </button>
+            <button
+              class="cta-secondary"
+              (click)="persistDraft()"
+              type="button">
+              Sauvegarder mon audit
+            </button>
+            <button
+              class="cta-secondary"
+              (click)="bookReview()"
+              type="button">
+              Réserver une revue humaine
+            </button>
+          </div>
+
+          <p class="compliance-note">
+            SYGEPEC fournit une orientation administrative et éducative. Les résultats ne constituent pas un avis légal ni une garantie d'obtention de visa. Une revue humaine est requise avant toute soumission.
+          </p>
+        </ng-container>
+
+      </div>
+
+      <!-- ── TYPE: ACCOUNT GATE ─────────────────────────────────────── -->
+      <div
+        class="audit-card"
+        *ngIf="currentStep().type === 'account_gate'"
+        role="region"
+        aria-label="Création de compte">
+
+        <p class="step-eyebrow">Dernière étape</p>
+        <h1 class="step-title">{{ currentStep().title }}</h1>
+        <p class="step-subtitle">{{ currentStep().subtitle }}</p>
+
+        <div class="form-fields">
+          <div class="form-group">
+            <label for="fullName">Nom complet</label>
+            <input id="fullName" class="form-input" [value]="getFieldValue('fullName')" (input)="updateField('fullName', $any($event.target).value)" />
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" class="form-input" type="email" [value]="getFieldValue('email')" (input)="updateField('email', $any($event.target).value)" />
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Téléphone / WhatsApp</label>
+            <input id="phone" class="form-input" [value]="getFieldValue('phone')" (input)="updateField('phone', $any($event.target).value)" />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Mot de passe</label>
+            <input id="password" class="form-input" type="password" [value]="getFieldValue('password')" (input)="updateField('password', $any($event.target).value)" />
+          </div>
+
+          <div class="form-group">
+            <label for="confirmPassword">Confirmer le mot de passe</label>
+            <input id="confirmPassword" class="form-input" type="password" [value]="getFieldValue('confirmPassword')" (input)="updateField('confirmPassword', $any($event.target).value)" />
+          </div>
+        </div>
+
+        <label class="consent-row">
+          <input
+            type="checkbox"
+            [checked]="!!getFieldValue('consentAccepted')"
+            (change)="updateField('consentAccepted', $any($event.target).checked)" />
+          <span>J'accepte la politique de traitement du dossier et la sauvegarde sécurisée de mes informations.</span>
+        </label>
+
+        <p class="error-text" *ngIf="accountError()">{{ accountError() }}</p>
+
+        <div class="summary-ctas">
+          <button class="cta-primary" type="button" (click)="registerAndCreateCase()" [disabled]="isRegistering()">
+            {{ isRegistering() ? 'Création en cours...' : 'Créer mon espace et sauvegarder mon dossier' }}
+          </button>
+          <button class="cta-secondary" type="button" (click)="loginAndResume()">J'ai déjà un compte</button>
+          <button class="cta-secondary" type="button" (click)="persistDraft()">Sauvegarder mon audit</button>
+        </div>
+
+        <p class="compliance-note">
+          SYGEPEC fournit une orientation administrative et éducative. Les résultats ne constituent pas un avis légal ni une garantie d'obtention de visa. Une revue humaine est requise avant toute soumission.
+        </p>
+      </div>
+
+      <!-- ─── NAVIGATION BUTTONS ────────────────────────────────────── -->
+      <!--
+        Navigation toujours visible : le bouton "← Retour" doit rester
+        accessible y compris sur le résumé (étape 14) et sur l'écran de
+        création de compte, pour permettre à l'utilisateur de modifier
+        ses réponses sans perdre la saisie (les données sont conservées
+        dans le signal `answers`).
+      -->
+      <nav class="audit-nav" aria-label="Navigation wizard">
+        <button
+          class="nav-back"
+          (click)="back()"
+          [disabled]="currentIndex() === 0"
+          type="button">
+          ← {{ currentStep().type === 'summary' || currentStep().type === 'account_gate' ? 'Modifier mes réponses' : 'Retour' }}
+        </button>
+
+        <button
+          *ngIf="currentStep().type !== 'summary' && currentStep().type !== 'account_gate'"
+          class="nav-next"
+          (click)="next()"
+          [disabled]="!canProceed() && currentStep().required"
+          type="button">
+          {{ currentStep().type === 'ai_info' ? (currentStep().ctaLabel || 'Continuer') : 'Suivant →' }}
+        </button>
+      </nav>
+
+    </section>
+  </main>
+</div>

@@ -1,56 +1,79 @@
 import { Injectable } from '@angular/core';
 import {
-  addDoc,
   collection,
   doc,
-  getDocs,
+  Firestore,
   getFirestore,
-  limit,
+  limit as fsLimit,
+  onSnapshot,
   orderBy,
   query,
-  serverTimestamp
+  Timestamp,
+  where,
+  QueryConstraint,
 } from 'firebase/firestore';
-import { from, map, Observable } from 'rxjs';
-
-export type MessageAuthorRole = 'customer' | 'staff' | 'admin';
+import { Observable } from 'rxjs';
 
 export interface TicketMessage {
   id: string;
-
-  tenantId?: string | null;
+  tenantId: string | null;
   ticketId: string;
 
   authorUid: string;
-  authorName?: string | null;
-  authorRole?: MessageAuthorRole;
+  authorName: string | null;
+  authorRole: 'customer' | 'staff' | 'admin';
 
   body: string;
 
-  createdAt?: any;
+  createdAt: any; // Timestamp | number
 }
 
 @Injectable({ providedIn: 'root' })
 export class MessagesRepository {
-  private db = getFirestore();
+  private readonly db: Firestore = getFirestore();
 
-  private messagesCol(ticketId: string) {
-    return collection(this.db, `tickets/${ticketId}/messages`);
+  /**
+   * REAL-TIME: liste des messages d’un ticket via onSnapshot
+   */
+  listMessages(ticketId: string, max = 200): Observable<TicketMessage[]> {
+    return new Observable<TicketMessage[]>((subscriber) => {
+      const msgsCol = collection(this.db, 'tickets', ticketId, 'messages');
+
+      const q = query(
+        msgsCol,
+        orderBy('createdAt', 'asc'),
+        fsLimit(max)
+      );
+
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const items = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as any),
+          })) as TicketMessage[];
+          subscriber.next(items);
+        },
+        (err) => subscriber.error(err)
+      );
+
+      return () => unsub();
+    });
   }
 
-  listMessages(ticketId: string, max = 300): Observable<TicketMessage[]> {
-    const q = query(this.messagesCol(ticketId), orderBy('createdAt', 'asc'), limit(max));
-    return from(getDocs(q)).pipe(
-      map(s => s.docs.map(d => ({ id: d.id, ...(d.data() as any) } as TicketMessage)))
-    );
-  }
+  /**
+   * Ajout d’un message (pas besoin d’onSnapshot ici)
+   */
+  async addMessage(ticketId: string, data: Omit<TicketMessage, 'id' | 'createdAt'>): Promise<string> {
+    // Impl existante: tu peux garder ta logique (addDoc) si tu l’as déjà.
+    // Ci-dessous: version SDK sans dépendre d’AngularFire.
+    const { addDoc, serverTimestamp } = await import('firebase/firestore');
+    const msgsCol = collection(this.db, 'tickets', ticketId, 'messages');
 
-  async addMessage(ticketId: string, payload: Omit<TicketMessage, 'id' | 'createdAt'>): Promise<string> {
-    const ref = await addDoc(this.messagesCol(ticketId), {
-      ...payload,
-      tenantId: payload.tenantId ?? null,
-      ticketId,
-      createdAt: serverTimestamp()
-    } as any);
+    const ref = await addDoc(msgsCol, {
+      ...data,
+      createdAt: serverTimestamp(),
+    });
 
     return ref.id;
   }

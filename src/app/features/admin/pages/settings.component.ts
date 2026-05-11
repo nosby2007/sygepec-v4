@@ -28,7 +28,7 @@ import { MatIconModule } from '@angular/material/icon';
             Placeholder. Typical next steps:
             <ul>
               <li>Global settings: <code>settings/global</code></li>
-              <li>Tenant settings: <code>organizations/{'{orgId}'}/settings</code></li>
+              <li>Tenant settings: <code>organizations/&#123;orgId&#125;/settings</code></li>
               <li>Branding, feature flags, roles policy, audit configuration</li>
             </ul>
           </div>

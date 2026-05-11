@@ -1,0 +1,25 @@
+<mat-toolbar>
+  <a mat-icon-button routerLink="/jobs"><mat-icon>arrow_back</mat-icon></a>
+  <span>{{ job()?.title ?? 'Détail offre' }}</span>
+</mat-toolbar>
+
+<div class="wrap">
+  @if (job(); as j) {
+    <mat-card>
+      <mat-card-title>{{ j.title }}</mat-card-title>
+      <mat-card-subtitle>{{ j.location }}</mat-card-subtitle>
+      <mat-card-content>
+        <p>{{ j.description }}</p>
+        <p><strong>Type :</strong> {{ j.jobType }}</p>
+        <p><strong>Statut :</strong> {{ j.status }}</p>
+      </mat-card-content>
+      <mat-card-actions>
+        @if (!applying) {
+          <button mat-flat-button color="primary" (click)="applying = true">Postuler</button>
+        }
+      </mat-card-actions>
+    </mat-card>
+  } @else {
+    <p>Chargement…</p>
+  }
+</div>

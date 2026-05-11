@@ -1,29 +1,24 @@
-import { ApplicationConfig, importProvidersFrom } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
-import { provideAnimations } from '@angular/platform-browser/animations';
-import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
-import { provideAuth, getAuth } from '@angular/fire/auth';
-import { provideFirestore, getFirestore } from '@angular/fire/firestore';
-import { provideStorage, getStorage } from '@angular/fire/storage';
-
+import { ApplicationConfig } from '@angular/core';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { routes } from './app.routes';
-
 import { provideFirebaseSdk } from './core/firebase/firebase.providers';
-import { environment } from '../environments/environment.';
+import { provideDataProvider } from './core/data/data-provider.config';
+import { environment } from '../environments/environment.development';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideAnimations(),
-    provideHttpClient(),
-    provideRouter(routes, withComponentInputBinding()),
-    provideFirebaseSdk(),
-    importProvidersFrom(
-      provideFirebaseApp(() => initializeApp(environment.firebase)),
-      provideAuth(() => getAuth()),
-      provideFirestore(() => getFirestore()),
-      provideStorage(() => getStorage()),
-    
+    provideRouter(
+      routes,
+      withInMemoryScrolling({
+        anchorScrolling: 'enabled',
+        scrollPositionRestoration: 'enabled',
+      })
     ),
+    provideFirebaseSdk(),
+    provideDataProvider(environment.dataProvider),
+    // Note: TicketsRepository, MessagesRepository, TimelineRepository, TravelBookingsRepository,
+    // JobsRepository sont déclarés `providedIn: 'root'` dans leurs fichiers riches.
+    // Ne PAS les overrider ici avec les variantes Firestore* qui implémentent un port différent
+    // et perdent des méthodes (listTicketsByTenant / listMyBookings / listPublicJobs / etc.).
   ],
 };

@@ -1,251 +1,246 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { getAuth } from 'firebase/auth';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { from, map, switchMap } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, distinctUntilChanged, from, map, of, startWith, switchMap } from 'rxjs';
 
-import { TravelBookingsRepository, FlightBookingPayload } from '../data/travel-bookings.repository';
+import { AuthContextService } from '../../../core/auth/auth-context.service';
+import { DossierRepository } from '../../../core/repositories/dossier.repository';
+import { TravelBookingRepository } from '../../../core/repositories/travel-booking.repository';
+import { LoggerService } from '../../../core/logging/logger.service';
+import type { Dossier } from '../../../core/models/canonical/dossier.model';
 
-// Material
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { ActivatedRoute } from '@angular/router';
-import { startWith } from 'rxjs';
+interface PageState {
+  loading: boolean;
+  activeDossier: Dossier | null;
+}
 
-type MockFlightResult = FlightBookingPayload & { carrier: string; priceUsd: number };
+const INITIAL: PageState = { loading: true, activeDossier: null };
+
+function pickActiveDossier(list: Dossier[]): Dossier | null {
+  if (!list.length) return null;
+  const active = list.find((d) => d.status !== 'completed' && d.status !== 'cancelled');
+  return active ?? list[0]!;
+}
 
 @Component({
   standalone: true,
   selector: 'app-flights',
-  imports: [
-    CommonModule,
-    RouterLink,
-    ReactiveFormsModule,
-    MatToolbarModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatDividerModule,
-    MatFormFieldModule,
-    MatInputModule
-  ],
+  imports: [CommonModule, RouterLink, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <mat-toolbar>
-      <a mat-icon-button routerLink="/travel" aria-label="Back"><mat-icon>arrow_back</mat-icon></a>
-      <span>Flights</span>
-      <span class="spacer"></span>
-      <a mat-button routerLink="/travel/hotels"><mat-icon>hotel</mat-icon>Hotels</a>
-    </mat-toolbar>
+    <section class="page">
+      <header class="hero">
+        <a routerLink="/travel" class="back">&larr; Retour</a>
+        <span class="badge">Voyage &middot; vols</span>
+        <h1>Demander un devis vol</h1>
+        <p class="lead">
+          Indiquez vos préférences. Notre équipe vous proposera un itinéraire et un tarif
+          négociés sous 24 à 48 heures ouvrées.
+          <strong>Aucun prix n'est affiché tant que la cotation n'est pas validée.</strong>
+        </p>
+        @if (state().activeDossier) {
+          <p class="dossier-tag">
+            Lié au dossier <strong>#{{ state().activeDossier!.id.slice(0, 8) }}</strong>
+          </p>
+        }
+      </header>
 
-    <div class="wrap">
-      <mat-card class="card">
-        <mat-card-title>Search flights</mat-card-title>
-        <mat-card-content>
-          <form class="grid" [formGroup]="form" (ngSubmit)="search()">
-            <mat-form-field appearance="outline">
-              <mat-label>Origin</mat-label>
-              <input matInput formControlName="origin" placeholder="ATL" />
-            </mat-form-field>
+      <article class="card">
+        <h2>Vos préférences de vol</h2>
+        <form class="grid" [formGroup]="form" (ngSubmit)="submit()">
+          <label class="field">
+            <span>Origine (code IATA)</span>
+            <input formControlName="origin" placeholder="ex. ATL" maxlength="3" />
+          </label>
+          <label class="field">
+            <span>Destination (code IATA)</span>
+            <input formControlName="destination" placeholder="ex. YYZ" maxlength="3" />
+          </label>
+          <label class="field">
+            <span>Date de départ</span>
+            <input type="date" formControlName="departDate" />
+          </label>
+          <label class="field">
+            <span>Date de retour (optionnel)</span>
+            <input type="date" formControlName="returnDate" />
+          </label>
+          <label class="field">
+            <span>Passagers</span>
+            <input type="number" min="1" max="9" formControlName="passengers" />
+          </label>
+          <label class="field full">
+            <span>Notes pour le conseiller</span>
+            <textarea formControlName="notes" rows="3"
+              placeholder="Préférences de classe, contraintes horaires, escales tolérées…"></textarea>
+          </label>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Destination</mat-label>
-              <input matInput formControlName="destination" placeholder="YYZ" />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Depart date</mat-label>
-              <input matInput type="date" formControlName="departDate" />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Return date (optional)</mat-label>
-              <input matInput type="date" formControlName="returnDate" />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Passengers</mat-label>
-              <input matInput type="number" min="1" formControlName="passengers" />
-            </mat-form-field>
-
-            <button mat-flat-button type="submit" [disabled]="form.invalid || searching">
-              {{ searching ? 'Searching…' : 'Search' }}
+          <div class="actions full">
+            <button type="submit" class="btn-primary" [disabled]="form.invalid || sending()">
+              {{ sending() ? 'Envoi…' : 'Envoyer la demande de devis' }}
             </button>
-          </form>
-        </mat-card-content>
-      </mat-card>
-
-      <mat-card class="card">
-        <mat-card-title>Results</mat-card-title>
-        <mat-card-content>
-          <div class="muted" *ngIf="results.length === 0">No results yet. Run a search.</div>
-
-          <div class="list" *ngIf="results.length > 0">
-            <div class="row" *ngFor="let r of results; trackBy: trackByCarrier">
-              <div class="main">
-                <div class="title">{{ r.origin }} → {{ r.destination }} · <b>{{ r.carrier }}</b></div>
-                <div class="muted small">
-                  depart: {{ r.departDate }}
-                  <span *ngIf="r.returnDate"> · return: {{ r.returnDate }}</span>
-                  · pax: {{ r.passengers }}
-                  · price: <b>${{ r.priceUsd }}</b>
-                </div>
-              </div>
-              <div class="actions">
-                <button mat-stroked-button type="button" (click)="book(r)" [disabled]="booking">
-                  {{ booking ? 'Booking…' : 'Book' }}
-                </button>
-              </div>
-            </div>
+            @if (success()) {
+              <span class="ok">✓ Demande envoyée. Un conseiller vous recontacte sous 48 h.</span>
+            }
+            @if (submitError()) {
+              <span class="err">{{ submitError() }}</span>
+            }
           </div>
-        </mat-card-content>
-      </mat-card>
-    </div>
+        </form>
+      </article>
+
+      <article class="card info">
+        <h3>Comment ça marche ?</h3>
+        <ol>
+          <li>Vous nous envoyez vos préférences.</li>
+          <li>Un conseiller vérifie disponibilité &amp; tarif (compagnies partenaires).</li>
+          <li>Vous recevez la cotation par e-mail et dans votre espace.</li>
+          <li>Vous validez et nous procédons à la réservation.</li>
+        </ol>
+      </article>
+    </section>
   `,
-  styles: [`
-    .spacer { flex: 1; }
-    .wrap { padding: 16px; display: grid; gap: 16px; }
-    .card { border-radius: 16px; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 1000px) { .grid { grid-template-columns: 1fr 1fr 1fr; } }
-    .muted { opacity: .75; }
-    .small { font-size: 12px; }
-    .list { margin-top: 6px; display: grid; gap: 10px; }
-    .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,.06); }
-    .title { font-weight: 800; }
-    .actions { display: flex; align-items: center; }
-  `]
+  styles: [
+    `
+      .page { max-width: 880px; margin: 0 auto; padding: 24px 20px 48px; display: grid; gap: 20px; }
+      .hero { background: linear-gradient(135deg, #0F4C81 0%, #1E6FB8 60%, #2E8DD9 100%); color: #fff; border-radius: 16px; padding: 28px 28px 32px; box-shadow: 0 8px 28px rgba(15, 76, 129, .25); }
+      .hero .back { color: rgba(255,255,255,.85); text-decoration: none; font-size: 13px; }
+      .hero .back:hover { color: #fff; }
+      .hero .badge { display: inline-block; margin-top: 14px; background: rgba(255,255,255,.18); padding: 4px 12px; border-radius: 999px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+      .hero h1 { margin: 12px 0 6px; font-size: 28px; font-weight: 700; }
+      .hero .lead { margin: 0; opacity: .95; max-width: 620px; line-height: 1.55; font-size: 14.5px; }
+      .hero .dossier-tag { margin: 10px 0 0; opacity: .9; font-size: 13px; }
+      .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 24px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+      .card h2 { margin: 0 0 18px; font-size: 18px; color: #0F172A; }
+      .card.info { background: #F8FAFC; }
+      .card.info h3 { margin: 0 0 10px; font-size: 15px; color: #0F4C81; }
+      .card.info ol { margin: 0; padding-left: 18px; color: #334155; line-height: 1.7; font-size: 14px; }
+      .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+      @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } .field.full, .actions.full { grid-column: 1 / -1; } }
+      .field { display: flex; flex-direction: column; gap: 6px; }
+      .field span { font-size: 12px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
+      .field input, .field textarea { border: 1px solid #CBD5E1; border-radius: 8px; padding: 10px 12px; font: inherit; color: #0F172A; transition: border-color .15s, box-shadow .15s; }
+      .field input:focus, .field textarea:focus { outline: none; border-color: #0F4C81; box-shadow: 0 0 0 3px rgba(15, 76, 129, .15); }
+      .actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+      .btn-primary { background: #0F4C81; color: #fff; border: none; padding: 12px 22px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background .15s, transform .05s; }
+      .btn-primary:hover:not(:disabled) { background: #0A3B66; }
+      .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+      .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+      .ok { color: #16A34A; font-size: 13px; font-weight: 600; }
+      .err { color: #B91C1C; font-size: 13px; font-weight: 600; }
+    `,
+  ],
 })
 export class FlightsComponent {
-  private repo = inject(TravelBookingsRepository);
-  private fb = inject(FormBuilder);
-  private router = inject(Router);
+  private readonly auth = inject(AuthContextService);
+  private readonly repo = inject(TravelBookingRepository);
+  private readonly dossiers = inject(DossierRepository);
+  private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly logger = inject(LoggerService);
 
-  private db = getFirestore();
-  private auth = getAuth();
+  readonly ctx = computed(() => this.auth.context());
+  protected readonly sending = signal(false);
+  protected readonly success = signal(false);
+  protected readonly submitError = signal<string | null>(null);
 
-  searching = false;
-  booking = false;
-  results: MockFlightResult[] = [];
-
-  private route = inject(ActivatedRoute);
-
-readonly dossierCtx = toSignal(
-  this.route.queryParamMap.pipe(
-    map(qp => ({
-      dossierId: qp.get('dossierId'),
-      tripName: qp.get('tripName')
-    })),
-    startWith({ dossierId: null, tripName: null })
-  ),
-  { initialValue: { dossierId: null as string | null, tripName: null as string | null } }
-);
-
-
-  readonly ctx = toSignal(
-    from(Promise.resolve(this.auth.currentUser?.uid ?? null)).pipe(
-      switchMap(uid => {
-        if (!uid) return from(Promise.resolve({ uid: null, tenantId: null, email: null, displayName: null }));
-        return from(getDoc(doc(this.db, 'users', uid))).pipe(
-          map(s => {
-            const data = s.exists() ? (s.data() as any) : {};
-            return {
-              uid,
-              tenantId: (data.tenantId ?? data.organizationId ?? null) as string | null,
-              email: (data.email ?? this.auth.currentUser?.email ?? null) as string | null,
-              displayName: (data.displayName ?? this.auth.currentUser?.displayName ?? null) as string | null
-            };
-          })
-        );
-      })
+  readonly dossierCtx = toSignal(
+    this.route.queryParamMap.pipe(
+      map((qp) => ({ dossierId: qp.get('dossierId'), tripName: qp.get('tripName') })),
+      startWith({ dossierId: null as string | null, tripName: null as string | null }),
     ),
-    { initialValue: { uid: null as string | null, tenantId: null as string | null, email: null as string | null, displayName: null as string | null } }
+    { initialValue: { dossierId: null as string | null, tripName: null as string | null } },
   );
 
-  readonly form = this.fb.group({
-    origin: ['ATL', Validators.required],
-    destination: ['YYZ', Validators.required],
+  private readonly fetchKey = computed(() => ({
+    uid: this.ctx().uid,
+    loading: this.ctx().loading,
+  }));
+  private readonly fetchKey$ = toObservable(this.fetchKey);
+
+  readonly state = toSignal(
+    this.fetchKey$.pipe(
+      distinctUntilChanged((a, b) => a.uid === b.uid && a.loading === b.loading),
+      switchMap(({ uid, loading }) => {
+        if (loading) return of(INITIAL);
+        if (!uid) return of<PageState>({ loading: false, activeDossier: null });
+        return from(this.dossiers.listForOwner(uid, 10)).pipe(
+          map((list) => ({ loading: false, activeDossier: pickActiveDossier(list) } as PageState)),
+          startWith<PageState>(INITIAL),
+          catchError(() => of<PageState>({ loading: false, activeDossier: null })),
+        );
+      }),
+    ),
+    { initialValue: INITIAL },
+  );
+
+  readonly form = this.fb.nonNullable.group({
+    origin: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(3)]],
+    destination: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(3)]],
     departDate: [this.today(), Validators.required],
     returnDate: [''],
-    passengers: [1, [Validators.required, Validators.min(1)]]
+    passengers: [1, [Validators.required, Validators.min(1), Validators.max(9)]],
+    notes: [''],
   });
 
-  async search() {
+  async submit(): Promise<void> {
     if (this.form.invalid) return;
-
-    this.searching = true;
-    try {
-      const v = this.form.value;
-      const base: FlightBookingPayload = {
-        origin: (v.origin || '').toUpperCase().trim(),
-        destination: (v.destination || '').toUpperCase().trim(),
-        departDate: v.departDate!,
-        returnDate: (v.returnDate || '').trim() || null,
-        passengers: Number(v.passengers || 1)
-      };
-
-      // Mock pricing
-      const carriers = ['Delta', 'United', 'Air Canada', 'Lufthansa'];
-      this.results = carriers.map((c, i) => ({
-        ...base,
-        carrier: c,
-        priceUsd: this.mockPrice(base.origin, base.destination, base.passengers, i)
-      }));
-    } finally {
-      this.searching = false;
-    }
-  }
-
-  async book(r: MockFlightResult) {
     const c = this.ctx();
     if (!c.uid) {
-      window.alert('Please sign in to book.');
+      this.router.navigate(['/auth/login'], { queryParams: { returnUrl: '/travel/flights' } });
       return;
     }
 
-    const ok = window.confirm(`Create booking for ${r.origin} → ${r.destination} (${r.carrier}) for $${r.priceUsd}?`);
-    if (!ok) return;
-
-    this.booking = true;
+    this.sending.set(true);
+    this.success.set(false);
+    this.submitError.set(null);
     try {
-      const d = this.dossierCtx();
-      await this.repo.createFlightBooking({
-        tenantId: c.tenantId ?? null,
-        createdByUid: c.uid,
-        createdByEmail: c.email ?? null,
-        createdByName: c.displayName ?? null,
-         dossierId: d.dossierId ?? null,   // NEW
-  tripName: d.tripName ?? null,     // NEW
-        flight: {
-          origin: r.origin,
-          destination: r.destination,
-          departDate: r.departDate,
-          returnDate: r.returnDate ?? null,
-          passengers: r.passengers,
-          carrier: r.carrier,
-          priceUsd: r.priceUsd
+      const v = this.form.getRawValue();
+      const qp = this.dossierCtx();
+      const activeDossierId = this.state().activeDossier?.id ?? null;
+      await this.repo.createFlightRequest({
+        actor: {
+          uid: c.uid,
+          role: c.role ?? null,
+          email: c.email ?? null,
+          displayName: c.displayName ?? null,
         },
-        notes: null
+        tenantId: c.tenantId ?? null,
+        dossierId: qp.dossierId ?? activeDossierId,
+        tripName: qp.tripName ?? null,
+        flight: {
+          origin: v.origin.toUpperCase().trim(),
+          destination: v.destination.toUpperCase().trim(),
+          departDate: v.departDate,
+          returnDate: v.returnDate.trim() || null,
+          passengers: Number(v.passengers || 1),
+        },
+        notes: v.notes.trim() || null,
       });
-
-      this.router.navigate(['/travel']);
+      this.success.set(true);
+      this.form.reset({
+        origin: '',
+        destination: '',
+        departDate: this.today(),
+        returnDate: '',
+        passengers: 1,
+        notes: '',
+      });
+    } catch (err) {
+      this.logger.error('Flight quote request failed', err, { uid: c.uid });
+      const code = (err as { code?: string } | null)?.code;
+      this.submitError.set(
+        code === 'permission-denied'
+          ? 'Vous n\u2019\u00eates pas autoris\u00e9 \u00e0 envoyer cette demande.'
+          : err instanceof Error
+            ? err.message
+            : 'Impossible d\u2019envoyer la demande. R\u00e9essayez.',
+      );
     } finally {
-      this.booking = false;
+      this.sending.set(false);
     }
-  }
-
-  private mockPrice(origin: string, dest: string, pax: number, i: number): number {
-    const seed = (origin.charCodeAt(0) + dest.charCodeAt(0) + origin.length * 13 + dest.length * 7 + i * 19) % 300;
-    const base = 180 + seed;
-    return Math.round((base * pax) / 10) * 10;
   }
 
   private today(): string {
@@ -255,6 +250,4 @@ readonly dossierCtx = toSignal(
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   }
-
-  trackByCarrier(_: number, r: MockFlightResult) { return r.carrier + '_' + r.priceUsd; }
 }

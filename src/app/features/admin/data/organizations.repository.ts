@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { AuditLogsRepository } from './audit-logs.repository';
 import {
   collection,
@@ -71,20 +71,5 @@ export class OrganizationsRepository {
     );
   }
 
-  async createOrg(payload: Omit<Organization, 'id'>, orgId?: string): Promise<string> {
-    const id = orgId ?? crypto.randomUUID();
-    await setDoc(doc(this.db, 'organizations', id), {
-      ...payload,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    } as any);
-    return id;
-  }
-
-  async updateOrg(id: string, patch: Partial<Organization>): Promise<void> {
-    await updateDoc(doc(this.db, 'organizations', id), {
-      ...patch,
-      updatedAt: serverTimestamp()
-    } as any);
-  }
+  
 }

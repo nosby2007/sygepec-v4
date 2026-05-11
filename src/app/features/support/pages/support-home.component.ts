@@ -1,12 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { getAuth } from 'firebase/auth';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { from, map, switchMap } from 'rxjs';
+import { toSignal, toObservable } from '@angular/core/rxjs-interop';
+import { switchMap } from 'rxjs';
 
 import { TicketsRepository, Ticket } from '../data/tickets.repository';
+import { AuthContextService } from '../../../core/auth/auth-context.service';
 
 // Material
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -94,33 +93,21 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class SupportHomeComponent {
   private ticketsRepo = inject(TicketsRepository);
+  private authCtx = inject(AuthContextService);
 
-  private db = getFirestore();
-  private auth = getAuth();
-
-  readonly uid = toSignal(from(Promise.resolve(this.auth.currentUser?.uid ?? null)), { initialValue: null });
-
-  readonly tenantId = toSignal(
-    from(Promise.resolve(this.auth.currentUser?.uid ?? null)).pipe(
-      switchMap(uid => {
-        if (!uid) return from(Promise.resolve(null));
-        return from(getDoc(doc(this.db, 'users', uid))).pipe(
-          map(s => (s.exists() ? ((s.data() as any).tenantId ?? (s.data() as any).organizationId ?? null) : null))
-        );
-      })
-    ),
-    { initialValue: null as string | null }
-  );
+  readonly ctx = this.authCtx.context;
+  readonly uid = computed(() => this.ctx().uid);
+  readonly tenantId = computed(() => this.ctx().tenantId);
 
   readonly tickets = toSignal(
-    this.tenantId.pipe(switchMap(tid => this.ticketsRepo.listTickets({ tenantId: tid ?? null, max: 200 }))),
+    toObservable(this.tenantId).pipe(switchMap(tid => this.ticketsRepo.listTicketsByTenant(tid ?? '__none__', 200))),
     { initialValue: [] as Ticket[] }
   );
 
   readonly recent = computed(() => this.tickets().slice(0, 8));
 
   countByStatus(status: any): number {
-    return this.tickets().filter(t => t.status === status).length;
+    return this.tickets().filter((t: Ticket) => t.status === status).length;
   }
 
   trackById(_: number, t: Ticket) { return t.id; }

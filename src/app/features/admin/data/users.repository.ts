@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import {
   collection,
   doc,
@@ -91,26 +91,5 @@ export class UsersRepository {
       updatedAt: serverTimestamp(),
       createdAt: user.createdAt ?? serverTimestamp()
     } as any, { merge: true });
-  }
-
-  async setRoles(uid: string, roles: UserRole[]): Promise<void> {
-    await updateDoc(doc(this.db, 'users', uid), {
-      roles,
-      updatedAt: serverTimestamp()
-    } as any);
-  }
-
-  async setTenant(uid: string, tenantId: string | null): Promise<void> {
-    await updateDoc(doc(this.db, 'users', uid), {
-      tenantId: tenantId ?? null,
-      updatedAt: serverTimestamp()
-    } as any);
-  }
-
-  async setActive(uid: string, isActive: boolean): Promise<void> {
-    await updateDoc(doc(this.db, 'users', uid), {
-      isActive,
-      updatedAt: serverTimestamp()
-    } as any);
   }
 }

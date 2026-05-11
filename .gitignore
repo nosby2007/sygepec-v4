@@ -41,3 +41,15 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+scripts/service-account.json
+scripts/*-service-account.json
+
+# Phase 4A.1 — dry-run reports (local only, never commit)
+/reports
+
+# Service account JSONs (any location) — NEVER commit
+*-firebase-adminsdk-*.json
+*-service-account*.json
+*service_account*.json
+

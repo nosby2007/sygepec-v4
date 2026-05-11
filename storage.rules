@@ -1,0 +1,119 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function roleValue() {
+      let u = userDoc();
+      return u.role != null ? u.role : null;
+    }
+
+    function rolesValue() {
+      let u = userDoc();
+      return u.roles is list ? u.roles : [];
+    }
+
+    function hasAnyRole(required) {
+      return (roleValue() != null && required.hasAny([roleValue()]))
+        || rolesValue().hasAny(required);
+    }
+
+    function isSuperAdmin() {
+      return signedIn() && (
+        request.auth.token.super_admin == true
+        || request.auth.token.role == 'super_admin'
+        || request.auth.token.role == 'superAdmin'
+        || hasAnyRole(['super_admin', 'superAdmin'])
+      );
+    }
+
+    function myTenantId() {
+      let u = userDoc();
+      return u.tenantId != null
+        ? u.tenantId
+        : (u.orgId != null ? u.orgId : u.organizationId);
+    }
+
+    function isOrgStaffForTenant(tenantId) {
+      return signedIn()
+        && hasAnyRole(['org_admin', 'orgAdmin', 'agent', 'admin', 'staff'])
+        && myTenantId() == tenantId;
+    }
+
+    function dossierData(dossierId) {
+      return firestore.get(/databases/(default)/documents/dossiers/$(dossierId)).data;
+    }
+
+    function dossierExists(dossierId) {
+      return firestore.exists(/databases/(default)/documents/dossiers/$(dossierId));
+    }
+
+    function dossierOwnerMatches(dossierId) {
+      return dossierExists(dossierId) && (
+        dossierData(dossierId).ownerUid == request.auth.uid
+        || dossierData(dossierId).userId == request.auth.uid
+      );
+    }
+
+    function canReadDossier(tenantId, dossierId) {
+      return signedIn() && (
+        isSuperAdmin()
+        || (
+          myTenantId() == tenantId
+          && (
+            isOrgStaffForTenant(tenantId)
+            || dossierOwnerMatches(dossierId)
+          )
+        )
+      );
+    }
+
+    function canWriteDossier(tenantId, dossierId) {
+      return canReadDossier(tenantId, dossierId);
+    }
+
+    // Path-derived ownership : pour les dossiers legacy/migrés dont le
+    // document canonique `dossiers/{id}` peut être absent ou incomplet
+    // (ownerUid non rempli), on s'appuie sur le segment `users/{uid}` du
+    // chemin Storage : si l'auth.uid correspond ET que le tenant matche,
+    // l'accès personnel est autorisé. Staff / super-admin restent gérés
+    // par `canReadDossier` au-dessus.
+    function pathOwnsResource(tenantId, uid) {
+      return signedIn()
+        && uid == request.auth.uid
+        && myTenantId() == tenantId;
+    }
+
+    // New hardened path
+    match /tenants/{tenantId}/users/{uid}/dossiers/{dossierId}/documents/{docId}/{fileName} {
+      allow read: if isSuperAdmin()
+        || isOrgStaffForTenant(tenantId)
+        || pathOwnsResource(tenantId, uid)
+        || canReadDossier(tenantId, dossierId);
+
+      allow write: if (
+          isSuperAdmin()
+          || isOrgStaffForTenant(tenantId)
+          || pathOwnsResource(tenantId, uid)
+          || canWriteDossier(tenantId, dossierId)
+        )
+        && request.resource.size < 15 * 1024 * 1024;
+    }
+
+    // Legacy path kept read-only for backward compatibility.
+    match /tenants/{tenantId}/dossiers/{dossierId}/documents/{docId}/{fileName} {
+      allow read: if canReadDossier(tenantId, dossierId);
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

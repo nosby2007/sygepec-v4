@@ -6,7 +6,7 @@ import { switchMap } from 'rxjs';
 
 import { TrainingContextService } from '../data/training-context.service';
 import { LiveSessionsRepository } from '../data/live-sessions.repository';
-import { LiveSession } from '../data/training.models';
+import { LiveSession } from '../data/training.model';
 
 // Material
 import { MatToolbarModule } from '@angular/material/toolbar';

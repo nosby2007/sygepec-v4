@@ -1,0 +1,287 @@
+<section class="awp">
+  <header class="awp__head">
+    <h1 class="awp__title">Audit immigration premium</h1>
+    <p class="awp__sub">
+      Guidé pas à pas. Tes réponses sont enregistrées automatiquement sur ton espace privé.
+    </p>
+  </header>
+
+  @if (store.loading()) {
+    <p class="awp__loading">Chargement de votre brouillon…</p>
+  } @else if (store.error(); as err) {
+    <p class="awp__error" role="alert">Erreur : {{ err }}</p>
+  } @else if (store.draft()) {
+    <nav class="awp__steps" aria-label="Progression">
+      @for (s of STEPS; track s) {
+        <button
+          type="button"
+          class="awp__step"
+          [class.is-active]="currentStep() === s"
+          [class.is-done]="isStepDone(s)"
+          [disabled]="submitSuccess()"
+          (click)="goToStep(s)">
+          <span class="awp__step-num">{{ $index + 1 }}</span>
+          <span class="awp__step-label">{{ stepLabel(s) }}</span>
+        </button>
+      }
+    </nav>
+
+    @if (submitSuccess()) {
+      <div class="awp__success" role="status">
+        <h2>Audit envoyé ✅</h2>
+        <p>Notre équipe va examiner ton dossier et revenir vers toi avec les prochaines étapes.</p>
+        <a routerLink="/dashboard" class="awp__btn awp__btn--primary">Aller à mon tableau de bord</a>
+      </div>
+    } @else {
+      <!-- ── PROFIL ────────────────────────────────────────────────── -->
+      @if (currentStep() === 'profile') {
+        <form [formGroup]="profileForm" class="awp__form" (ngSubmit)="nextStep()">
+          <h2 class="awp__step-title">1. Ton profil</h2>
+
+          <label class="awp__field">
+            <span>Nom complet *</span>
+            <input type="text" formControlName="fullName" autocomplete="name" />
+          </label>
+
+          <label class="awp__field">
+            <span>Date de naissance</span>
+            <input type="date" formControlName="dateOfBirth" />
+          </label>
+
+          <label class="awp__field">
+            <span>Nationalité *</span>
+            <input type="text" formControlName="nationality" autocomplete="country-name" />
+          </label>
+
+          <label class="awp__field">
+            <span>Pays de résidence *</span>
+            <input type="text" formControlName="countryOfResidence" />
+          </label>
+
+          <label class="awp__field">
+            <span>Téléphone</span>
+            <input type="tel" formControlName="phone" autocomplete="tel" />
+          </label>
+
+          <div class="awp__actions">
+            <button type="submit" class="awp__btn awp__btn--primary">Continuer →</button>
+          </div>
+        </form>
+      }
+
+      <!-- ── OBJECTIF & RISQUES ────────────────────────────────────── -->
+      @if (currentStep() === 'goals') {
+        <form [formGroup]="goalsForm" class="awp__form" (ngSubmit)="nextStep()">
+          <h2 class="awp__step-title">2. Ton objectif d'immigration</h2>
+
+          <label class="awp__field">
+            <span>Objectif principal *</span>
+            <select formControlName="immigrationGoal">
+              <option value="">— Sélectionner —</option>
+              <option value="work">Travail</option>
+              <option value="study">Études</option>
+              <option value="family">Regroupement familial</option>
+              <option value="business">Affaires / Investisseur</option>
+              <option value="visit">Visite</option>
+              <option value="permanent">Résidence permanente</option>
+            </select>
+          </label>
+
+          <label class="awp__field">
+            <span>Pays cible principal *</span>
+            <input type="text" formControlName="destinationCountry" />
+          </label>
+
+          <label class="awp__field">
+            <span>Pays cible secondaire (optionnel)</span>
+            <input type="text" formControlName="secondaryDestinationCountry" />
+          </label>
+
+          <div class="awp__row">
+            <label class="awp__field">
+              <span>Horizon souhaité</span>
+              <select formControlName="preferredTimeline">
+                <option value="asap">Le plus tôt possible</option>
+                <option value="3m">Sous 3 mois</option>
+                <option value="6m">Sous 6 mois</option>
+                <option value="12m">Sous 12 mois</option>
+                <option value="unknown">Pas encore défini</option>
+              </select>
+            </label>
+
+            <label class="awp__field">
+              <span>Niveau d'urgence</span>
+              <select formControlName="urgencyLevel">
+                <option value="low">Faible</option>
+                <option value="normal">Normal</option>
+                <option value="high">Élevé</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+          </div>
+
+          <h3 class="awp__sub-title">Historique de visa</h3>
+
+          <label class="awp__check">
+            <input type="checkbox" formControlName="previousVisaRefusal" />
+            <span>J'ai déjà reçu un refus de visa</span>
+          </label>
+
+          @if (goalsForm.controls.previousVisaRefusal.value) {
+            <label class="awp__field">
+              <span>Détails du refus (pays, motif, année)</span>
+              <textarea formControlName="visaRefusalDetails" rows="2"></textarea>
+            </label>
+          }
+
+          <label class="awp__field">
+            <span>Statut actuel d'immigration (si applicable)</span>
+            <input type="text" formControlName="currentImmigrationStatus" />
+          </label>
+
+          <h3 class="awp__sub-title">Pièces clés</h3>
+
+          <label class="awp__check">
+            <input type="checkbox" formControlName="passportValid" />
+            <span>Mon passeport est en cours de validité</span>
+          </label>
+
+          <label class="awp__field">
+            <span>Date d'expiration du passeport</span>
+            <input type="date" formControlName="passportExpirationDate" />
+          </label>
+
+          <label class="awp__check">
+            <input type="checkbox" formControlName="proofOfFundsAvailable" />
+            <span>Je peux fournir une preuve de fonds</span>
+          </label>
+
+          <label class="awp__check">
+            <input type="checkbox" formControlName="sponsorAvailable" />
+            <span>J'ai un sponsor / garant</span>
+          </label>
+
+          <div class="awp__actions">
+            <button type="button" class="awp__btn" (click)="previousStep()">← Précédent</button>
+            <button type="submit" class="awp__btn awp__btn--primary">Continuer →</button>
+          </div>
+        </form>
+      }
+
+      <!-- ── DOCUMENTS ─────────────────────────────────────────────── -->
+      @if (currentStep() === 'documents') {
+        <div class="awp__form">
+          <h2 class="awp__step-title">3. Documents requis</h2>
+          <p class="awp__hint">
+            Coche les pièces que tu peux fournir maintenant. Tu pourras uploader les fichiers
+            plus tard depuis ton espace dossier (les uploads ne sont pas demandés ici).
+          </p>
+
+          @if (intake().length === 0) {
+            <p class="awp__loading">Calcul de ta liste documentaire…</p>
+          } @else {
+            <ul class="awp__doclist">
+              @for (item of intake(); track item.category) {
+                <li
+                  class="awp__doc"
+                  [class.is-required]="item.required"
+                  [class.is-ready]="item.status === 'ready_to_upload' || item.status === 'uploaded'">
+                  <label class="awp__check">
+                    <input
+                      type="checkbox"
+                      [checked]="item.status === 'ready_to_upload' || item.status === 'uploaded'"
+                      (change)="toggleHave(item)" />
+                    <span>
+                      <strong>{{ item.label }}</strong>
+                      @if (item.required) {
+                        <em class="awp__badge awp__badge--required">Requis</em>
+                      } @else {
+                        <em class="awp__badge">Optionnel</em>
+                      }
+                    </span>
+                  </label>
+                </li>
+              }
+            </ul>
+
+            <p class="awp__count">
+              {{ readyCount() }} / {{ requiredCount() }} pièces requises prêtes
+            </p>
+          }
+
+          <div class="awp__actions">
+            <button type="button" class="awp__btn" (click)="previousStep()">← Précédent</button>
+            <button type="button" class="awp__btn awp__btn--primary" (click)="nextStep()">
+              Voir le résumé →
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ── RÉSUMÉ + SUBMIT ───────────────────────────────────────── -->
+      @if (currentStep() === 'review') {
+        <div class="awp__form">
+          <h2 class="awp__step-title">4. Résumé & soumission</h2>
+
+          <div class="awp__score">
+            <span class="awp__score-num">{{ readinessScore() }}</span>
+            <span class="awp__score-label">/ 100 readiness</span>
+          </div>
+
+          <p class="awp__summary">{{ auditSummary() }}</p>
+
+          @if (riskFlags().length > 0) {
+            <h3 class="awp__sub-title">Risques détectés</h3>
+            <ul class="awp__risks">
+              @for (flag of riskFlags(); track flag.code) {
+                <li class="awp__risk awp__risk--{{ flag.severity }}">
+                  <strong>{{ flag.label }}</strong>
+                  @if (flag.description) {
+                    <span> — {{ flag.description }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="awp__hint">Aucun risque majeur détecté ✨</p>
+          }
+
+          <div class="awp__actions">
+            <button
+              type="button"
+              class="awp__btn"
+              (click)="previousStep()"
+              [disabled]="submitInFlight()">
+              ← Précédent
+            </button>
+            <button
+              type="button"
+              class="awp__btn awp__btn--primary"
+              (click)="submit()"
+              [disabled]="submitInFlight() || store.isSubmitted()">
+              @if (submitInFlight()) {
+                Envoi en cours…
+              } @else {
+                Soumettre mon audit
+              }
+            </button>
+          </div>
+
+          @if (store.error(); as err) {
+            <p class="awp__error" role="alert">Erreur : {{ err }}</p>
+          }
+        </div>
+      }
+    }
+
+    <footer class="awp__foot">
+      @if (store.saving()) {
+        <span class="awp__saving">Enregistrement…</span>
+      } @else if (store.draft()?.lastSavedAt) {
+        <span class="awp__saved">Enregistré</span>
+      }
+    </footer>
+  } @else {
+    <p class="awp__loading">Initialisation…</p>
+  }
+</section>

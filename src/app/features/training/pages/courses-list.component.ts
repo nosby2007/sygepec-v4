@@ -7,8 +7,6 @@ import { debounceTime, distinctUntilChanged, map, startWith, switchMap } from 'r
 
 import { TrainingContextService } from '../data/training-context.service';
 import { CoursesRepository } from '../data/courses.repository';
-import { EnrollmentsRepository } from '../data/enrollments.repository';
-import { CourseSummary, Enrollment } from '../data/training.models';
 
 // Material
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -19,6 +17,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDividerModule } from '@angular/material/divider';
+import { CourseSummary } from '../data/training.model';
+import { EnrollmentsRepository, Enrollment } from '../data/EnrollmentsRepository';
 
 @Component({
   standalone: true,
@@ -137,8 +137,8 @@ export class CoursesListComponent {
   readonly enrollments = toSignal(
     this.ctx.userId$.pipe(
       switchMap(uid => {
-        if (!uid) return this.enrollRepo.listUserEnrollments('__none__', null);
-        return this.ctx.tenantId$.pipe(switchMap(tid => this.enrollRepo.listUserEnrollments(uid, tid)));
+        if (!uid) return this.enrollRepo.listMyEnrollments('__none__');
+        return this.ctx.tenantId$.pipe(switchMap(_tid => this.enrollRepo.listMyEnrollments(uid)));
       })
     ),
     { initialValue: [] as Enrollment[] }
@@ -172,12 +172,12 @@ export class CoursesListComponent {
   });
 
   isEnrolled(courseId: string): boolean {
-    return this.enrollments().some(e => e.courseId === courseId && e.status !== 'dropped');
+    return this.enrollments().some((e: Enrollment) => e.courseId === courseId && e.status !== 'cancelled');
   }
 
   async enroll(courseId: string) {
     const uid = this.userId();
     if (!uid) return;
-    await this.enrollRepo.enroll(uid, this.tenantId(), courseId);
+    await this.enrollRepo.enroll({ userId: uid, tenantId: this.tenantId(), courseId, status: 'enrolled' });
   }
 }

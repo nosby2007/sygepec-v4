@@ -1,0 +1,85 @@
+<!-- Floating bubble -->
+<button class="chat-bubble" (click)="toggleWidget()" [class.open]="isOpen()" aria-label="Ouvrir l'assistant IA">
+  <span class="bubble-icon">{{ isOpen() ? '✕' : '💬' }}</span>
+  <span class="bubble-label" *ngIf="!isOpen()">Commencer ici</span>
+</button>
+
+<!-- Chat Widget Panel -->
+<div class="chat-panel" [class.visible]="isOpen()" role="dialog" aria-label="Assistant SYGEPEC">
+  <!-- Panel Header -->
+  <div class="panel-header">
+    <div class="panel-avatar">🤖</div>
+    <div class="panel-info">
+      <div class="panel-name">Assistant SYGEPEC</div>
+      <div class="panel-status">
+        <span class="status-dot"></span>
+        <span>En ligne</span>
+      </div>
+    </div>
+    <button class="panel-close" (click)="toggleWidget()" aria-label="Fermer">✕</button>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="panel-disclaimer">
+    ℹ️ Cet assistant est un outil d'aide administrative. Toute décision finale est soumise à révision humaine.
+  </div>
+
+  <!-- Messages -->
+  <div class="messages-container" role="log">
+    <div
+      class="message"
+      *ngFor="let msg of messages()"
+      [class.bot]="msg.role === 'bot'"
+      [class.user]="msg.role === 'user'"
+    >
+      <div class="message-avatar" *ngIf="msg.role === 'bot'">🤖</div>
+      <div class="message-bubble">
+        <div class="message-text" [innerText]="msg.text"></div>
+        <div class="quick-replies" *ngIf="msg.role === 'bot' && msg === messages()[messages().length - 1] && state().quickReplies.length > 0">
+          <button
+            class="quick-reply-btn"
+            *ngFor="let reply of state().quickReplies"
+            (click)="selectQuickReply(reply)"
+          >
+            {{ reply }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typing indicator -->
+    <div class="message bot" *ngIf="isTyping()">
+      <div class="message-avatar">🤖</div>
+      <div class="message-bubble">
+        <div class="typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input bar -->
+  <div class="input-bar">
+    <input
+      type="text"
+      class="chat-input"
+      placeholder="Votre réponse..."
+      [value]="userInput()"
+      (input)="userInput.set($any($event.target).value)"
+      (keydown)="onInputKeydown($event)"
+      aria-label="Votre message"
+    />
+    <button
+      class="send-btn"
+      (click)="sendMessage(userInput())"
+      [disabled]="!userInput().trim()"
+      aria-label="Envoyer"
+    >
+      ➤
+    </button>
+  </div>
+
+  <div class="audit-launch" *ngIf="canLaunchAudit()">
+    <a routerLink="/start-audit" class="audit-launch__btn">Start My Audit</a>
+  </div>
+</div>

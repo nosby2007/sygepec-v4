@@ -6,10 +6,12 @@ import {
   getDownloadURL,
   StorageReference
 } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 
 @Injectable({ providedIn: 'root' })
 export class StorageService {
   private storage = getStorage();
+  private auth = getAuth();
 
   private sanitizeFileName(name: string): string {
     return name
@@ -19,15 +21,15 @@ export class StorageService {
   }
 
   private buildPath(params: {
-    tenantId?: string | null;
+    tenantId: string;
+    uploaderUid: string;
     dossierId: string;
     docId: string;
     fileName: string;
   }): string {
     const safe = this.sanitizeFileName(params.fileName);
     const ts = Date.now();
-    const tenantPart = params.tenantId ? `tenants/${params.tenantId}` : 'public';
-    return `${tenantPart}/dossiers/${params.dossierId}/documents/${params.docId}/${ts}_${safe}`;
+    return `tenants/${params.tenantId}/users/${params.uploaderUid}/dossiers/${params.dossierId}/documents/${params.docId}/${ts}_${safe}`;
   }
 
   async uploadDossierDocument(params: {
@@ -42,8 +44,19 @@ export class StorageService {
     contentType: string;
     originalName: string;
   }> {
+    const tenantId = (params.tenantId || '').trim();
+    if (!tenantId) {
+      throw new Error('Missing tenantId for secure upload path.');
+    }
+
+    const uploaderUid = this.auth.currentUser?.uid;
+    if (!uploaderUid) {
+      throw new Error('User must be authenticated to upload documents.');
+    }
+
     const storagePath = this.buildPath({
-      tenantId: params.tenantId ?? null,
+      tenantId,
+      uploaderUid,
       dossierId: params.dossierId,
       docId: params.docId,
       fileName: params.file.name

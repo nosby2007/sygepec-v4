@@ -1,0 +1,715 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && uid != null && request.auth.uid == uid;
+    }
+
+    function userExists() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userData() {
+      return userExists()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : {};
+    }
+
+    function roleValue() {
+      let u = userData();
+      return u.role != null ? u.role : null;
+    }
+
+    function rolesValue() {
+      let u = userData();
+      return u.roles is list ? u.roles : [];
+    }
+
+    function hasAnyRole(required) {
+      return (roleValue() != null && required.hasAny([roleValue()]))
+        || rolesValue().hasAny(required);
+    }
+
+    function isSuperAdmin() {
+      return signedIn() && (
+        request.auth.token.super_admin == true
+        || request.auth.token.role == 'super_admin'
+        || request.auth.token.role == 'superAdmin'
+        || (request.auth.token.roles is list && request.auth.token.roles.hasAny(['super_admin', 'superAdmin']))
+        || hasAnyRole(['super_admin', 'superAdmin'])
+      );
+    }
+
+    function isOrgStaff() {
+      return signedIn() && hasAnyRole(['org_admin', 'orgAdmin', 'agent', 'admin', 'staff']);
+    }
+
+    function myTenantId() {
+      let u = userData();
+      return u.tenantId != null
+        ? u.tenantId
+        : (u.orgId != null ? u.orgId : u.organizationId);
+    }
+
+    function tenantOf(data) {
+      return data.tenantId != null
+        ? data.tenantId
+        : (data.orgId != null ? data.orgId : data.organizationId);
+    }
+
+    function sameTenant(data) {
+      return signedIn()
+        && myTenantId() != null
+        && tenantOf(data) != null
+        && myTenantId() == tenantOf(data);
+    }
+
+    function canReadOwnedOrTenant(data) {
+      return signedIn() && (
+        isSuperAdmin()
+        || (sameTenant(data) && isOrgStaff())
+        || isOwner(data.userId)
+        || isOwner(data.ownerUid)
+        || isOwner(data.createdByUid)
+      );
+    }
+
+    function canWriteOwnedOrTenant(data) {
+      return signedIn() && (
+        isSuperAdmin()
+        || (sameTenant(data) && isOrgStaff())
+        || isOwner(data.userId)
+        || isOwner(data.ownerUid)
+        || isOwner(data.createdByUid)
+      );
+    }
+
+    function isPrivilegedRolePayload(data) {
+      return (data.role != null && ['super_admin', 'superAdmin', 'org_admin', 'orgAdmin', 'agent', 'admin', 'staff', 'reviewer'].hasAny([data.role]))
+        || (data.roles is list && data.roles.hasAny(['super_admin', 'superAdmin', 'org_admin', 'orgAdmin', 'agent', 'admin', 'staff', 'reviewer']))
+        || data.globalRole == 'admin';
+    }
+
+    // -------------------------------------------------------------------
+    // Phase 2 helpers — diff-based field protection
+    // -------------------------------------------------------------------
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).changedKeys();
+    }
+
+    function onlyChanged(allowed) {
+      return changedKeys().hasOnly(allowed);
+    }
+
+    function noneChanged(forbidden) {
+      return !changedKeys().hasAny(forbidden);
+    }
+
+    function tenantUnchanged() {
+      return request.resource.data.tenantId == resource.data.tenantId
+        && (!('orgId' in resource.data) || request.resource.data.orgId == resource.data.orgId);
+    }
+
+    function ownerUnchanged() {
+      return (!('ownerUid' in resource.data) || request.resource.data.ownerUid == resource.data.ownerUid)
+        && (!('userId' in resource.data) || request.resource.data.userId == resource.data.userId)
+        && (!('createdByUid' in resource.data) || request.resource.data.createdByUid == resource.data.createdByUid);
+    }
+
+    function dossierExists(dossierId) {
+      return exists(/databases/$(database)/documents/dossiers/$(dossierId));
+    }
+
+    function dossierData(dossierId) {
+      return get(/databases/$(database)/documents/dossiers/$(dossierId)).data;
+    }
+
+    function isDossierOwner(dossierId) {
+      return dossierExists(dossierId)
+        && (isOwner(dossierData(dossierId).ownerUid) || isOwner(dossierData(dossierId).userId));
+    }
+
+    function canReadDossier(dossierId) {
+      return signedIn() && dossierExists(dossierId) && (
+        isSuperAdmin()
+        || (sameTenant(dossierData(dossierId)) && isOrgStaff())
+        || isDossierOwner(dossierId)
+      );
+    }
+
+    function canWriteDossier(dossierId) {
+      return signedIn() && dossierExists(dossierId) && (
+        isSuperAdmin()
+        || (sameTenant(dossierData(dossierId)) && isOrgStaff())
+        || isDossierOwner(dossierId)
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (
+        isOwner(userId)
+        || isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data))
+      );
+
+      allow create: if signedIn() && (
+        (isOwner(userId) && !isPrivilegedRolePayload(request.resource.data))
+        || isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+      );
+
+      allow update: if signedIn() && (
+        isSuperAdmin()
+        || (
+          isOrgStaff()
+          && sameTenant(resource.data)
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.tenantId == resource.data.tenantId
+          && request.resource.data.orgId == resource.data.orgId
+          && request.resource.data.organizationId == resource.data.organizationId
+        )
+        || (
+          isOwner(userId)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'displayName',
+            'photoURL',
+            'phoneNumber',
+            'locale',
+            'updatedAt'
+          ])
+        )
+      );
+
+      allow delete: if isSuperAdmin();
+
+      match /enrollments/{courseId} {
+        allow read, write: if isOwner(userId) || isSuperAdmin() || (isOrgStaff() && sameTenant(get(/databases/$(database)/documents/users/$(userId)).data));
+      }
+
+      match /progress/{courseId} {
+        allow read, write: if isOwner(userId) || isSuperAdmin() || (isOrgStaff() && sameTenant(get(/databases/$(database)/documents/users/$(userId)).data));
+      }
+
+      // Phase 2 : sous-doc canonique users/{uid}/profile/main
+      match /profile/{slot} {
+        allow read: if isOwner(userId) || isSuperAdmin() || (isOrgStaff() && sameTenant(get(/databases/$(database)/documents/users/$(userId)).data));
+        allow create, update: if isOwner(userId) || isSuperAdmin() || (isOrgStaff() && sameTenant(get(/databases/$(database)/documents/users/$(userId)).data));
+        allow delete: if isSuperAdmin();
+      }
+
+      // Lot C — brouillons d'audit wizard premium.
+      // Path : users/{uid}/auditDrafts/{auditId}
+      // Owner-only en lecture/écriture. Immutable une fois soumis.
+      // Aucune écriture staff/admin : un draft = espace privé du client tant que non soumis.
+      // À la soumission, un service serveur (Cloud Function ou repository) crée les entités
+      // canoniques (Dossier, DossierDocument, Checklist) côté admin SDK.
+      match /auditDrafts/{auditId} {
+        allow read: if isOwner(userId) || isSuperAdmin();
+
+        // L'owner peut créer son draft, en posant uniquement status='draft'.
+        // ownerUid doit correspondre à lui-même, status submittedAt verrouillés.
+        allow create: if isOwner(userId)
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.status == 'draft'
+          && (!('submittedAt' in request.resource.data) || request.resource.data.submittedAt == null);
+
+        // Update :
+        //  - tant que status == 'draft' : owner peut tout muter sauf passer à 'submitted' s'il a déjà ce status.
+        //  - status peut passer 'draft' → 'submitted' ou 'draft' → 'abandoned'.
+        //  - une fois 'submitted' ou 'abandoned' : strictement immutable côté client.
+        allow update: if isOwner(userId)
+          && resource.data.status == 'draft'
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status in ['draft', 'submitted', 'abandoned'];
+
+        // L'owner peut supprimer son draft uniquement s'il n'a pas encore été soumis.
+        allow delete: if (isOwner(userId) && resource.data.status != 'submitted')
+          || isSuperAdmin();
+      }
+    }
+
+    match /organizations/{orgId} {
+      allow read: if signedIn() && (isSuperAdmin() || (isOrgStaff() && sameTenant(resource.data)));
+      allow create, update: if signedIn() && (isSuperAdmin() || (isOrgStaff() && sameTenant(request.resource.data)));
+      allow delete: if isSuperAdmin();
+    }
+
+    match /orgMembers/{memberId} {
+      allow read: if signedIn() && (
+        isSuperAdmin()
+        || isOwner(resource.data.uid)
+        || (isOrgStaff() && sameTenant(resource.data))
+      );
+      allow create, update, delete: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+      );
+    }
+
+    match /dossiers/{dossierId} {
+      allow read: if canReadOwnedOrTenant(resource.data);
+
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (
+          sameTenant(request.resource.data)
+          && (
+            isOrgStaff()
+            || isOwner(request.resource.data.ownerUid)
+            || isOwner(request.resource.data.userId)
+          )
+        )
+      );
+
+      allow update: if canWriteOwnedOrTenant(resource.data)
+        && (
+          isSuperAdmin()
+          || (
+            request.resource.data.tenantId == resource.data.tenantId
+            && request.resource.data.orgId == resource.data.orgId
+            && request.resource.data.organizationId == resource.data.organizationId
+            && request.resource.data.ownerUid == resource.data.ownerUid
+            && request.resource.data.userId == resource.data.userId
+          )
+        );
+
+      allow delete: if isSuperAdmin() || (sameTenant(resource.data) && isOrgStaff());
+
+      match /documents/{docId} {
+        allow read: if canReadDossier(dossierId);
+
+        allow create: if canWriteDossier(dossierId)
+          && (
+            isSuperAdmin()
+            || (sameTenant(dossierData(dossierId)) && isOrgStaff())
+            || (
+              isDossierOwner(dossierId)
+              && request.resource.data.status == 'uploaded'
+              && request.resource.data.uploadedByUid == request.auth.uid
+              && request.resource.data.reviewerUid == null
+              && request.resource.data.reviewNotes == null
+            )
+            // Lot G — owner peut créer un document `requested` provenant
+            // du wizard d'audit (préparation de la checklist canonique).
+            // Aucun fichier n'est encore attaché : storagePath/fileName doivent
+            // rester nuls et le statut figé à 'requested' avec requestSource
+            // 'audit_wizard'. Le client ne peut PAS approve/reject.
+            || (
+              isDossierOwner(dossierId)
+              && request.resource.data.status == 'requested'
+              && request.resource.data.requestSource == 'audit_wizard'
+              && request.resource.data.uploadedByUid == null
+              && request.resource.data.storagePath == null
+              && request.resource.data.fileName == null
+              && request.resource.data.reviewerUid == null
+              && request.resource.data.reviewNotes == null
+              && request.resource.data.rejectionReason == null
+              && request.resource.data.ownerUid == request.auth.uid
+            )
+          );
+
+        // Owner peut uniquement re-uploader (changer fileName/storagePath, status->'uploaded')
+        // si le document avait été 'requested' ou 'rejected'. Il ne peut JAMAIS approve/reject.
+        allow update: if canWriteDossier(dossierId)
+          && (
+            isSuperAdmin()
+            || (sameTenant(dossierData(dossierId)) && isOrgStaff())
+            || (
+              isDossierOwner(dossierId)
+              && request.resource.data.uploadedByUid == request.auth.uid
+              && request.resource.data.status == 'uploaded'
+              && ['requested', 'rejected', 'uploaded'].hasAny([resource.data.status])
+              && noneChanged(['reviewerUid', 'reviewNotes', 'rejectionReason'])
+            )
+          );
+
+        allow delete: if isSuperAdmin() || (sameTenant(dossierData(dossierId)) && isOrgStaff());
+      }
+
+      match /timeline/{eventId} {
+        allow read: if canReadDossier(dossierId);
+        allow create: if canWriteDossier(dossierId);
+        allow update, delete: if isSuperAdmin() || (sameTenant(dossierData(dossierId)) && isOrgStaff());
+      }
+
+      match /tasks/{taskId} {
+        allow read, create, update: if canWriteDossier(dossierId);
+        allow delete: if isSuperAdmin() || (sameTenant(dossierData(dossierId)) && isOrgStaff());
+      }
+    }
+
+    match /travelBookings/{bookingId} {
+      allow read: if canReadOwnedOrTenant(resource.data);
+
+      // Le client peut créer une demande mais ne peut JAMAIS fixer un prix ou un statut autre que 'requested'
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && (sameTenant(request.resource.data) || request.resource.data.tenantId == null))
+        || (
+          isOwner(request.resource.data.createdByUid)
+          && request.resource.data.status == 'requested'
+          && (
+            !('flight' in request.resource.data) || request.resource.data.flight == null
+              || (request.resource.data.flight.priceUsd == null && request.resource.data.flight.carrier == null)
+          )
+          && (
+            !('hotel' in request.resource.data) || request.resource.data.hotel == null
+              || (request.resource.data.hotel.priceUsd == null && request.resource.data.hotel.hotelName == null)
+          )
+        )
+      );
+
+      // Staff/admin peuvent tout modifier (cotation, statut, assignation).
+      // Owner ne peut que passer status à 'cancelled' tant qu'il n'est pas confirmé.
+      allow update: if signedIn() && (
+        isSuperAdmin()
+        || (sameTenant(resource.data) && isOrgStaff() && tenantUnchanged() && ownerUnchanged())
+        || (
+          isOwner(resource.data.createdByUid)
+          && tenantUnchanged()
+          && ownerUnchanged()
+          && resource.data.status != 'confirmed'
+          && request.resource.data.status == 'cancelled'
+          && onlyChanged(['status', 'updatedAt', 'updatedBy', 'notes'])
+        )
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if resource.data.visibility == 'public'
+        || (signedIn() && sameTenant(resource.data))
+        || isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin() || (signedIn() && isOrgStaff() && sameTenant(request.resource.data));
+    }
+
+    match /liveSessions/{sessionId} {
+      allow read: if resource.data.visibility == 'public'
+        || (signedIn() && sameTenant(resource.data))
+        || isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin() || (signedIn() && isOrgStaff() && sameTenant(request.resource.data));
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if canReadOwnedOrTenant(resource.data);
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (
+          sameTenant(request.resource.data)
+          && (
+            isOrgStaff()
+            || isOwner(request.resource.data.userId)
+          )
+        )
+      );
+      allow update, delete: if signedIn() && (
+        isSuperAdmin()
+        || (sameTenant(resource.data) && isOrgStaff())
+        || isOwner(resource.data.userId)
+      );
+    }
+
+    match /tickets/{ticketId} {
+      allow create: if signedIn() && (
+        isOwner(request.resource.data.userId)
+        || isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+      );
+      allow read, update, delete: if signedIn() && (
+        isOwner(resource.data.userId)
+        || isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data))
+      );
+    }
+
+    match /payments/{paymentId} {
+      // Le client ne peut créer qu'avec status='pending' et sans pré-marquer 'paid'.
+      // Toute mutation paid/failed doit venir d'une Cloud Function avec Admin SDK (qui bypass les rules).
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+        || (
+          (isOwner(request.resource.data.ownerUid) || isOwner(request.resource.data.userId))
+          && request.resource.data.status == 'pending'
+          && request.resource.data.paidAt == null
+          && request.resource.data.failedAt == null
+        )
+      );
+
+      allow read: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data))
+        || isOwner(resource.data.ownerUid)
+        || isOwner(resource.data.userId)
+      );
+
+      // Aucun client/staff ne peut modifier amount/status/provider* depuis le SDK Web.
+      // Seul super_admin peut faire un rapprochement manuel (manualReference).
+      allow update: if signedIn() && (
+        isSuperAdmin()
+        || (
+          isOrgStaff()
+          && sameTenant(resource.data)
+          && tenantUnchanged()
+          && ownerUnchanged()
+          && noneChanged(['amountUsd', 'amountLocal', 'currency', 'status', 'provider', 'providerSessionId', 'providerIntentId', 'paidAt', 'failedAt'])
+        )
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    match /auditLogs/{logId} {
+      // Lecture : super-admin global, ou org-admin/staff sur son tenant
+      allow read: if isSuperAdmin() || (signedIn() && isOrgStaff() && sameTenant(resource.data));
+
+      // Création : super-admin, staff (tenant), ou tout user authentifié pour ses propres actions (actor == self)
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && (request.resource.data.tenantId == myTenantId() || request.resource.data.tenantId == null))
+        || (
+          request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.status == 'recorded'
+        )
+      );
+
+      // IMMUTABLE — aucun update ni delete possible, même super-admin
+      allow update, delete: if false;
+    }
+
+    match /mail/{mailId} {
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && (request.resource.data.tenantId == myTenantId() || request.resource.data.tenantId == null))
+      );
+      allow read, update, delete: if isSuperAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // Phase 2 \u2014 nouvelles collections canoniques
+    // -------------------------------------------------------------------
+
+    match /documentRequests/{reqId} {
+      allow read: if canReadOwnedOrTenant(resource.data);
+      // Seul staff/admin peut demander une pi\u00e8ce
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+      );
+      allow update: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data) && tenantUnchanged() && ownerUnchanged())
+        || (
+          // Owner peut marquer 'fulfilled' en y attachant un docId
+          (isOwner(resource.data.ownerUid) || isOwner(resource.data.userId))
+          && tenantUnchanged()
+          && ownerUnchanged()
+          && request.resource.data.status == 'fulfilled'
+          && onlyChanged(['status', 'fulfilledByDocId', 'updatedAt', 'updatedBy'])
+        )
+      );
+      allow delete: if isSuperAdmin() || (sameTenant(resource.data) && isOrgStaff());
+    }
+
+    match /checklists/{checklistId} {
+      allow read: if canReadOwnedOrTenant(resource.data);
+
+      // Lot C — option B : owner peut créer sa propre checklist (audit wizard) avec
+      // une payload restreinte. Update reste staff/admin uniquement.
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+        || (
+          (isOwner(request.resource.data.ownerUid) || isOwner(request.resource.data.userId))
+          && sameTenant(request.resource.data)
+          && request.resource.data.status == 'in_progress'
+          && request.resource.data.completed == 0
+          && request.resource.data.completionRate == 0
+          && request.resource.data.dossierId is string
+          && request.resource.data.items is list
+        )
+      );
+
+      allow update: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data) && tenantUnchanged() && ownerUnchanged())
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    match /serviceRequests/{srId} {
+      allow read: if canReadOwnedOrTenant(resource.data);
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(request.resource.data))
+        || (
+          (isOwner(request.resource.data.ownerUid) || isOwner(request.resource.data.userId))
+          && request.resource.data.status == 'requested'
+          && request.resource.data.quotedAmountUsd == null
+          && request.resource.data.quotedAt == null
+          && request.resource.data.quotedByUid == null
+          && request.resource.data.assignedAgentUid == null
+        )
+      );
+      allow update: if signedIn() && (
+        isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data) && tenantUnchanged() && ownerUnchanged())
+        || (
+          // Owner peut annuler ou accepter le devis, mais pas modifier le quote
+          (isOwner(resource.data.ownerUid) || isOwner(resource.data.userId))
+          && tenantUnchanged()
+          && ownerUnchanged()
+          && noneChanged(['quotedAmountUsd', 'quotedAt', 'quotedByUid', 'assignedAgentUid', 'internalNotes'])
+          && request.resource.data.status in ['cancelled', 'accepted', 'requested']
+        )
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /services/{serviceId} {
+      // Catalogue : lecture publique si visibility=public
+      allow read: if resource.data.visibility == 'public'
+        || (signedIn() && sameTenant(resource.data))
+        || isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin()
+        || (signedIn() && isOrgStaff() && sameTenant(request.resource.data));
+    }
+
+    match /countries/{code} {
+      // R\u00e9f\u00e9rentiel public, modifiable par super-admin uniquement
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /programs/{programId} {
+      // Catalogue formations \u2014 m\u00eame mod\u00e8le que services
+      allow read: if resource.data.visibility == 'public'
+        || (signedIn() && sameTenant(resource.data))
+        || isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin()
+        || (signedIn() && isOrgStaff() && sameTenant(request.resource.data));
+    }
+
+    match /systemSettings/{key} {
+      // Feature flags \u2014 lecture pour tout user authentifi\u00e9, \u00e9criture super-admin only
+      allow read: if signedIn();
+      allow create, update, delete: if isSuperAdmin();
+      // Sous-collections (ex: featureFlags/items) — même politique
+      match /{subColl}/{itemId} {
+        allow read: if signedIn();
+        allow create, update, delete: if isSuperAdmin();
+      }    }
+
+    // -------------------------------------------------------------------
+    match /sygepecLeads/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecClientProfiles/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecCases/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecAuditResponses/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecDocumentChecklists/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecTimeline/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecClientDocuments/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecTrainingReferrals/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecTravelReadiness/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecFlightRequests/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+    match /sygepecAccommodationRequests/{docId} {
+      allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
+      allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
+    }
+
+    match /formData/{userId} {
+      allow read, create, update, delete: if isOwner(userId) || isSuperAdmin() || isOrgStaff();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && (
+        isSuperAdmin()
+        || isOwner(resource.data.userId)
+        || (isOrgStaff() && sameTenant(resource.data))
+      );
+      allow create: if signedIn() && (
+        isSuperAdmin()
+        || isOwner(request.resource.data.userId)
+        || (isOrgStaff() && sameTenant(request.resource.data))
+      );
+      allow update, delete: if signedIn() && (
+        isSuperAdmin()
+        || isOwner(resource.data.userId)
+        || (isOrgStaff() && sameTenant(resource.data))
+      );
+    }
+
+    match /conversations/{conversationId} {
+      allow create: if signedIn() && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow read, update, delete: if signedIn() && (
+        resource.data.participants.hasAny([request.auth.uid])
+        || isSuperAdmin()
+        || (isOrgStaff() && sameTenant(resource.data))
+      );
+
+      match /messages/{messageId} {
+        allow create: if signedIn() && (
+          request.resource.data.senderId == request.auth.uid
+          || isSuperAdmin()
+          || isOrgStaff()
+        );
+        allow read: if signedIn() && (
+          resource.data.senderId == request.auth.uid
+          || resource.data.receiverId == request.auth.uid
+          || isSuperAdmin()
+          || isOrgStaff()
+        );
+        allow update, delete: if signedIn() && (
+          resource.data.senderId == request.auth.uid
+          || isSuperAdmin()
+          || isOrgStaff()
+        );
+      }
+
+      match /typingStatus/{uid} {
+        allow create, update, delete: if isOwner(uid) || isSuperAdmin() || isOrgStaff();
+        allow read: if signedIn() && (uid == request.auth.uid || isSuperAdmin() || isOrgStaff());
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

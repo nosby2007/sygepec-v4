@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { getAuth } from 'firebase/auth';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { from, map, switchMap } from 'rxjs';
+import { toSignal, toObservable } from '@angular/core/rxjs-interop';
+import { map, switchMap, distinctUntilChanged, of } from 'rxjs';
+
+import { AuthContextService } from '../../../core/auth/auth-context.service';
 
 import { TicketsRepository, Ticket, TicketStatus } from '../data/tickets.repository';
 import { MessagesRepository, TicketMessage } from '../data/messages.repository';
+import { SupportNotifyService } from '../data/support-notify.service';
 
 // Material
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -19,7 +20,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { SupportNotifyService } from '../data/support-notify.service';
 
 @Component({
   standalone: true,
@@ -83,7 +83,9 @@ import { SupportNotifyService } from '../data/support-notify.service';
             <div class="muted" *ngIf="messages().length === 0">No messages yet.</div>
 
             <div class="chat" *ngIf="messages().length > 0">
-              <div class="msg" *ngFor="let m of messages(); trackBy: trackByMsgId" [class.me]="m.authorUid === ctx().uid">
+              <div class="msg"
+                   *ngFor="let m of messages(); trackBy: trackByMsgId"
+                   [class.me]="m.authorUid === ctx().uid">
                 <div class="meta muted small">
                   <b>{{ m.authorName || m.authorUid }}</b> · {{ toDate(m.createdAt) | date:'MMM d, y · h:mm a' }}
                 </div>
@@ -99,7 +101,7 @@ import { SupportNotifyService } from '../data/support-notify.service';
                 <textarea matInput rows="3" formControlName="body" placeholder="Describe the issue…"></textarea>
               </mat-form-field>
 
-              <button mat-flat-button type="submit" [disabled]="messageForm.invalid || sending">
+              <button mat-flat-button type="submit" [disabled]="messageForm.invalid || sending || !ctx().uid">
                 {{ sending ? 'Sending…' : 'Send' }}
               </button>
             </form>
@@ -133,50 +135,35 @@ export class TicketDetailsComponent {
   private ticketsRepo = inject(TicketsRepository);
   private messagesRepo = inject(MessagesRepository);
 
-  private db = getFirestore();
-  private auth = getAuth();
+  private authCtx = inject(AuthContextService);
+  private notify = inject(SupportNotifyService);
 
   savingStatus = false;
   sending = false;
-  private notify = inject(SupportNotifyService);
+
+  // Auth context signal (always defined due to service initial state)
+  readonly ctx = this.authCtx.context;
+  private readonly ctx$ = toObservable(this.ctx);
 
   readonly ticketId = toSignal(
-    this.route.paramMap.pipe(map(p => p.get('ticketId') as string)),
+    this.route.paramMap.pipe(map(p => (p.get('ticketId') ?? ''))),
     { initialValue: '' }
-  );
-
-  readonly ctx = toSignal(
-    from(Promise.resolve(this.auth.currentUser?.uid ?? null)).pipe(
-      switchMap(uid => {
-        if (!uid) return from(Promise.resolve({ uid: null, tenantId: null, displayName: null, roles: [] as string[] }));
-        return from(getDoc(doc(this.db, 'users', uid))).pipe(
-          map(s => {
-            const data = s.exists() ? (s.data() as any) : {};
-            return {
-              uid,
-              tenantId: (data.tenantId ?? data.organizationId ?? null) as string | null,
-              displayName: (data.displayName ?? null) as string | null,
-              roles: (data.roles ?? []) as string[]
-            };
-          })
-        );
-      })
-    ),
-    { initialValue: { uid: null as string | null, tenantId: null as string | null, displayName: null as string | null, roles: [] as string[] } }
   );
 
   readonly ticket = toSignal(
     this.route.paramMap.pipe(
-      map(p => p.get('ticketId') as string),
-      switchMap(id => this.ticketsRepo.getTicketById(id))
+      map(p => (p.get('ticketId') ?? '')),
+      distinctUntilChanged(),
+      switchMap(id => (id ? this.ticketsRepo.getTicketById(id) : of(null as Ticket | null)))
     ),
     { initialValue: null as Ticket | null }
   );
 
   readonly messages = toSignal(
     this.route.paramMap.pipe(
-      map(p => p.get('ticketId') as string),
-      switchMap(id => this.messagesRepo.listMessages(id))
+      map(p => (p.get('ticketId') ?? '')),
+      distinctUntilChanged(),
+      switchMap(id => (id ? this.messagesRepo.listMessages(id) : of([] as TicketMessage[])))
     ),
     { initialValue: [] as TicketMessage[] }
   );
@@ -193,6 +180,7 @@ export class TicketDetailsComponent {
 
   toDate(v: any): Date {
     if (!v) return new Date();
+    if (typeof v === 'number') return new Date(v);
     if (v?.toMillis) return new Date(v.toMillis());
     return new Date(v);
   }
@@ -209,51 +197,39 @@ export class TicketDetailsComponent {
 
   async sendMessage(t: Ticket) {
     if (this.messageForm.invalid) return;
+
     const c = this.ctx();
     if (!c.uid) return;
 
     this.sending = true;
     try {
-      const body = this.messageForm.value.body!.trim();
+      const body = (this.messageForm.value.body ?? '').trim();
       if (!body) return;
 
-      // role mapping (simple)
+      const roles = ((c as any)['roles'] ?? []) as string[];
       const authorRole =
-        c.roles.includes('admin') || c.roles.includes('superAdmin') ? 'admin' :
-        c.roles.includes('staff') || c.roles.includes('orgAdmin') ? 'staff' :
+        roles.includes('admin') || roles.includes('superAdmin') ? 'admin' :
+        roles.includes('staff') || roles.includes('orgAdmin') ? 'staff' :
         'customer';
 
       await this.messagesRepo.addMessage(t.id, {
         tenantId: t.tenantId ?? null,
         ticketId: t.id,
         authorUid: c.uid,
-        authorName: c.displayName,
+        authorName: c.displayName ?? null,
         authorRole,
         body
       });
 
       await this.ticketsRepo.touchLastMessage(t.id);
-      const msgBody = body;
 
-// Determine who replied
-if (authorRole === 'staff' || authorRole === 'admin') {
-  // notify client (if you store client email somewhere)
-  // Option A (recommended): store requesterEmail on ticket doc
- const requesterEmail = t.requesterEmail ?? null;
-  await this.notify.notifyStaffReply(t, requesterEmail, msgBody);
-} else {
-  // customer replied => notify staff
-  await this.notify.notifyCustomerReply(t, msgBody);
-}
-
-
-      // Optional: if staff writes, mark waiting_customer; if customer writes, mark open/in_progress
-      // Keep it simple for now, or uncomment:
-      /*
-      if (authorRole === 'staff' && t.status === 'in_progress') {
-        await this.ticketsRepo.setStatus(t.id, 'waiting_customer');
+      // Notifications (conserve ta logique)
+      if (authorRole === 'staff' || authorRole === 'admin') {
+        const requesterEmail = (t as any).requesterEmail ?? null;
+        await this.notify.notifyStaffReply(t, requesterEmail, body);
+      } else {
+        await this.notify.notifyCustomerReply(t, body);
       }
-      */
 
       this.messageForm.reset({ body: '' });
     } finally {

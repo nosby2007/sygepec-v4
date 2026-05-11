@@ -2,139 +2,115 @@ import { Injectable } from '@angular/core';
 import {
   collection,
   doc,
-  getDoc,
-  getDocs,
+  Firestore,
   getFirestore,
-  limit,
+  limit as fsLimit,
+  onSnapshot,
   orderBy,
   query,
-  serverTimestamp,
   setDoc,
   updateDoc,
-  where
+  where,
+  serverTimestamp
 } from 'firebase/firestore';
-import { from, map, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 
-export type TicketCategory = 'billing' | 'technical' | 'clinical' | 'general';
-export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type TicketStatus = 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed';
 
-export interface ListAssignedOptions {
-  tenantId?: string | null;
-  assignedToUid: string;
-  status?: TicketStatus | '';
-  max?: number;
-}
 export interface Ticket {
   id: string;
-
-  tenantId?: string | null;
-  createdByUid: string;
-  assignedToUid?: string | null;
-  requesterEmail?: string | null;
-requesterName?: string | null;
+  tenantId: string | null;
 
   subject: string;
-  category: TicketCategory;
-  priority: TicketPriority;
+  category: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   status: TicketStatus;
 
-  lastMessageAt?: any;
-  createdAt?: any;
-  updatedAt?: any;
-}
+  requesterUid?: string | null;
+  requesterEmail?: string | null;
 
-export interface ListTicketsOptions {
-  tenantId?: string | null;
-  createdByUid?: string | null;     // “My tickets”
-  status?: TicketStatus | '';
-  max?: number;
+  lastMessageAt?: any; // Timestamp | number
+  createdAt?: any;     // Timestamp | number
+  updatedAt?: any;     // Timestamp | number
 }
 
 @Injectable({ providedIn: 'root' })
 export class TicketsRepository {
-  private db = getFirestore();
-  private colRef = collection(this.db, 'tickets');
+  private readonly db: Firestore = getFirestore();
 
-  listTickets(opts: ListTicketsOptions): Observable<Ticket[]> {
-    const max = opts.max ?? 200;
-
-    const filters: any[] = [];
-    if (opts.tenantId !== undefined) filters.push(where('tenantId', '==', opts.tenantId ?? null));
-    if (opts.createdByUid) filters.push(where('createdByUid', '==', opts.createdByUid));
-    if (opts.status) filters.push(where('status', '==', opts.status));
-
-    const q = query(this.colRef, ...filters, orderBy('updatedAt', 'desc'), limit(max));
-
-    return from(getDocs(q)).pipe(
-      map(s => s.docs.map(d => ({ id: d.id, ...(d.data() as any) } as Ticket)))
-    );
-  }
-
+  /**
+   * REAL-TIME: observe un ticket (doc) via onSnapshot
+   */
   getTicketById(ticketId: string): Observable<Ticket | null> {
-    return from(getDoc(doc(this.db, 'tickets', ticketId))).pipe(
-      map(s => (s.exists() ? ({ id: s.id, ...(s.data() as any) } as Ticket) : null))
-    );
+    return new Observable<Ticket | null>((subscriber) => {
+      const ref = doc(this.db, 'tickets', ticketId);
+
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (!snap.exists()) {
+            subscriber.next(null);
+            return;
+          }
+          subscriber.next({ id: snap.id, ...(snap.data() as any) } as Ticket);
+        },
+        (err) => subscriber.error(err)
+      );
+
+      return () => unsub();
+    });
   }
 
-  async createTicket(
-  payload: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageAt'>,
-  ticketId?: string
-): Promise<string> {
-  const id = ticketId ?? crypto.randomUUID();
+  /**
+   * REAL-TIME: liste des tickets d’un tenant
+   * (utile pour tickets-list, dashboard support, etc.)
+   */
+  listTicketsByTenant(tenantId: string, max = 200): Observable<Ticket[]> {
+    return new Observable<Ticket[]>((subscriber) => {
+      const colRef = collection(this.db, 'tickets');
+      const q = query(
+        colRef,
+        where('tenantId', '==', tenantId),
+        orderBy('lastMessageAt', 'desc'),
+        fsLimit(max)
+      );
 
-  await setDoc(doc(this.db, 'tickets', id), {
-    ...payload,
-    tenantId: payload.tenantId ?? null,
-    assignedToUid: payload.assignedToUid ?? null,
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as Ticket));
+          subscriber.next(items);
+        },
+        (err) => subscriber.error(err)
+      );
 
-    // NEW: requester fields persisted
-    requesterEmail: payload.requesterEmail ?? null,
-    requesterName: payload.requesterName ?? null,
-
-    lastMessageAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  } as any);
-
-  return id;
-}
-
-
-  async updateTicket(ticketId: string, patch: Partial<Ticket>): Promise<void> {
-    await updateDoc(doc(this.db, 'tickets', ticketId), {
-      ...patch,
-      updatedAt: serverTimestamp()
-    } as any);
+      return () => unsub();
+    });
   }
 
   async setStatus(ticketId: string, status: TicketStatus): Promise<void> {
-    await this.updateTicket(ticketId, { status });
+    const ref = doc(this.db, 'tickets', ticketId);
+    await updateDoc(ref, { status, updatedAt: serverTimestamp() });
   }
 
   async touchLastMessage(ticketId: string): Promise<void> {
-    await updateDoc(doc(this.db, 'tickets', ticketId), {
-      lastMessageAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    } as any);
+    const ref = doc(this.db, 'tickets', ticketId);
+    await updateDoc(ref, { lastMessageAt: serverTimestamp(), updatedAt: serverTimestamp() });
   }
 
-   async assignTo(ticketId: string, assignedToUid: string | null): Promise<void> {
-    await this.updateTicket(ticketId, { assignedToUid: assignedToUid ?? null });
-  }
-
-  listAssignedTickets(opts: ListAssignedOptions): Observable<Ticket[]> {
-    const max = opts.max ?? 200;
-
-    const filters: any[] = [];
-    if (opts.tenantId !== undefined) filters.push(where('tenantId', '==', opts.tenantId ?? null));
-    filters.push(where('assignedToUid', '==', opts.assignedToUid));
-    if (opts.status) filters.push(where('status', '==', opts.status));
-
-    const q = query(this.colRef, ...filters, orderBy('updatedAt', 'desc'), limit(max));
-
-    return from(getDocs(q)).pipe(
-      map(s => s.docs.map(d => ({ id: d.id, ...(d.data() as any) } as Ticket)))
-    );
+  /**
+   * Optionnel: create ticket (si tu en as besoin)
+   * Garde la signature API-ready.
+   */
+  async createTicket(ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'lastMessageAt'>): Promise<string> {
+    const { addDoc } = await import('firebase/firestore');
+    const colRef = collection(this.db, 'tickets');
+    const ref = await addDoc(colRef, {
+      ...ticket,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      lastMessageAt: serverTimestamp()
+    });
+    return ref.id;
   }
 }

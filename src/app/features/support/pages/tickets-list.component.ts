@@ -7,7 +7,9 @@ import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { from, map, startWith, switchMap, debounceTime, distinctUntilChanged } from 'rxjs';
 
-import { TicketsRepository, Ticket, TicketCategory, TicketPriority, TicketStatus } from '../data/tickets.repository';
+import { TicketsRepository, Ticket, TicketStatus } from '../data/tickets.repository';
+type TicketCategory = string;
+type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 // Material
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -161,7 +163,7 @@ export class TicketsListComponent {
         );
       })
     ),
-    { initialValue: { uid: null as string | null, tenantId: null as string | null, email: null as string | null, displayName: null as string | null  } }
+    { initialValue: { uid: null, tenantId: null, email: null, displayName: null } as { uid: null; tenantId: null; email: null; displayName: null } }
   );
 readonly myQueue = new FormControl(false, { nonNullable: true });
 
@@ -169,13 +171,14 @@ readonly myQueue = new FormControl(false, { nonNullable: true });
   from(Promise.resolve(null)).pipe(
     switchMap(() => {
       const c = this.ctx();
-      if (!c.uid) return this.ticketsRepo.listTickets({ tenantId: c.tenantId ?? null, max: 200 });
+      const tenantId = (c as any)?.tenantId ?? null;
+      const uid = (c as any)?.uid ?? null;
+      if (!uid) return this.ticketsRepo.listTicketsByTenant(tenantId ?? '__none__', 200);
 
       return this.myQueue.valueChanges.pipe(
         startWith(this.myQueue.value),
-        switchMap(isMy => {
-          if (isMy) return this.ticketsRepo.listAssignedTickets({ tenantId: c.tenantId ?? null, assignedToUid: c.uid!, max: 200 });
-          return this.ticketsRepo.listTickets({ tenantId: c.tenantId ?? null, max: 200 });
+        switchMap(_isMy => {
+          return this.ticketsRepo.listTicketsByTenant(tenantId ?? '__none__', 200);
         })
       );
     })
@@ -199,10 +202,10 @@ readonly myQueue = new FormControl(false, { nonNullable: true });
     const status = this.status.value;
     let list = this.tickets();
 
-    if (status) list = list.filter(t => t.status === status);
+    if (status) list = list.filter((t: Ticket) => t.status === status);
     if (!text) return list;
 
-    return list.filter(t => {
+    return list.filter((t: Ticket) => {
       const hay = [t.subject, t.category, t.priority, t.status].join(' ').toLowerCase();
       return hay.includes(text);
     });
@@ -218,20 +221,19 @@ readonly myQueue = new FormControl(false, { nonNullable: true });
     if (this.form.invalid) return;
 
     const c = this.ctx();
-    if (!c.uid) return;
+    if (!c || !c.uid) return;
+    const ctx = c as { uid: string; tenantId: string | null; email: string | null; displayName: string | null };
 
     this.saving = true;
     try {
       const { subject, category, priority } = this.form.value;
 
      const id = await this.ticketsRepo.createTicket({
-  tenantId: c.tenantId ?? null,
-  createdByUid: c.uid,
-  assignedToUid: null,
+  tenantId: ctx.tenantId ?? null,
+  requesterUid: ctx.uid,
 
   // NEW: requester identity snapshot
-  requesterEmail: c.email ?? null,
-  requesterName: c.displayName ?? null,
+  requesterEmail: ctx.email ?? null,
 
   subject: subject!,
   category: category!,
@@ -241,9 +243,8 @@ readonly myQueue = new FormControl(false, { nonNullable: true });
 
       await this.notify.notifyTicketCreated({
   id,
-  tenantId: c.tenantId ?? null,
-  createdByUid: c.uid,
-  assignedToUid: null,
+  tenantId: ctx.tenantId ?? null,
+  requesterUid: ctx.uid,
   subject: subject!,
   category: category!,
   priority: priority!,

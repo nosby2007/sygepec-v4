@@ -1,0 +1,122 @@
+@import '../../../theme.scss';
+
+.dashboard-page {
+  gap: 18px;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.header-btn {
+  border-radius: 10px;
+  background: #f5b841;
+  color: #0a1628;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  border: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(245,184,65,.28);
+  transition: background .18s ease, box-shadow .18s ease, transform .18s ease;
+
+  &:hover {
+    background: #f0a820;
+    box-shadow: 0 8px 20px rgba(245,184,65,.42);
+    transform: translateY(-1px);
+  }
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+  gap: 16px;
+}
+
+.left-col,
+.right-col {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.doc-grid,
+.training-list,
+.activity-list,
+.quick-links {
+  display: grid;
+  gap: 10px;
+}
+
+.doc-row,
+.training-item,
+.activity-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(11,31,58,.08);
+  background: #fff;
+  transition: border-color .18s ease, box-shadow .18s ease;
+
+  &:hover {
+    border-color: rgba(30,99,214,.18);
+    box-shadow: 0 4px 12px rgba(10,22,40,.07);
+  }
+}
+
+.training-item p,
+.activity-row span {
+  margin: 0;
+  font-size: 0.82rem;
+  color: $sy-text-secondary;
+}
+
+.task-list {
+  margin: 0;
+  padding-left: 18px;
+  color: $sy-text-secondary;
+  display: grid;
+  gap: 6px;
+}
+
+.mini-checks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quick-links a {
+  border: 1px solid rgba(11,31,58,.09);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: #102033;
+  font-weight: 600;
+  font-size: .84rem;
+  background: #fff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color .18s ease, background .18s ease, color .18s ease;
+
+  &:hover {
+    border-color: rgba(245,184,65,.48);
+    background: #fffdf5;
+    color: #0a1628;
+  }
+}
+
+@media (max-width: 1080px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+}

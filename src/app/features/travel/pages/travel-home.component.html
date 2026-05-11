@@ -1,0 +1,78 @@
+<mat-toolbar class="travel-toolbar">
+  <span>Travel Readiness</span>
+  <span class="spacer"></span>
+  <a mat-button routerLink="/travel/flights"><mat-icon>flight</mat-icon>Request flight</a>
+  <a mat-button routerLink="/travel/hotels"><mat-icon>hotel</mat-icon>Request accommodation</a>
+</mat-toolbar>
+
+<div class="travel-page">
+  <section class="sy-page-header">
+    <div>
+      <h1>Travel readiness for {{ ctx().displayName || 'your case' }}</h1>
+      <p>Track passport, visa status, travel booking, accommodation, and arrival checklist.</p>
+    </div>
+    <div class="header-actions">
+      <span class="sy-status-pill info">Readiness {{ readinessPercent() }}%</span>
+    </div>
+  </section>
+
+  <section class="sy-grid-4">
+    <article class="sy-card sy-stat-card"><span class="sy-stat-label">Total bookings</span><strong class="sy-stat-value">{{ myBookings().length }}</strong></article>
+    <article class="sy-card sy-stat-card"><span class="sy-stat-label">Requested</span><strong class="sy-stat-value">{{ countStatus('requested') }}</strong></article>
+    <article class="sy-card sy-stat-card"><span class="sy-stat-label">Cancelled</span><strong class="sy-stat-value">{{ countStatus('cancelled') }}</strong></article>
+    <article class="sy-card sy-stat-card"><span class="sy-stat-label">Travel readiness</span><strong class="sy-stat-value">{{ readinessPercent() }}%</strong></article>
+  </section>
+
+  <section class="travel-grid">
+    <div class="left-col">
+      <article class="sy-card sy-readiness-card">
+        <div class="sy-section-title"><h2>Readiness matrix</h2></div>
+        <div class="sy-progress-row"><span>Global readiness</span><strong>{{ readinessPercent() }}%</strong></div>
+        <div class="sy-progress-track"><div class="sy-progress-fill" [style.width.%]="readinessPercent()"></div></div>
+        <div class="matrix">
+          <div><span>Passport status</span><strong class="sy-status-pill success">Valid</strong></div>
+          <div><span>Visa/case status</span><strong class="sy-status-pill warning">In process</strong></div>
+          <div><span>Flight status</span><strong class="sy-status-pill" [ngClass]="hasFlightBooking() ? 'success' : 'danger'">{{ hasFlightBooking() ? 'Booked' : 'Missing' }}</strong></div>
+          <div><span>Accommodation status</span><strong class="sy-status-pill" [ngClass]="hasHotelBooking() ? 'success' : 'danger'">{{ hasHotelBooking() ? 'Booked' : 'Missing' }}</strong></div>
+          <div><span>Insurance status</span><strong class="sy-status-pill danger">Pending</strong></div>
+        </div>
+      </article>
+
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title"><h2>Arrival checklist</h2></div>
+        <ul class="arrival-checklist">
+          <li>Confirm airport pickup details</li>
+          <li>Print core travel documents</li>
+          <li>Prepare local SIM and emergency contacts</li>
+          <li>Validate first-week accommodation logistics</li>
+        </ul>
+      </article>
+    </div>
+
+    <aside class="right-col">
+      <article class="sy-card sy-timeline-card">
+        <div class="sy-section-title"><h3>Recent booking activity</h3></div>
+        <div class="booking-list" *ngIf="recent().length > 0; else noBookingsTpl">
+          <div class="booking-item" *ngFor="let b of recent(); trackBy: trackById">
+            <div>
+              <strong>{{ b.type | uppercase }} - {{ b.status }}</strong>
+              <p *ngIf="b.type === 'flight' && b.flight">{{ b.flight.origin }} to {{ b.flight.destination }}</p>
+              <p *ngIf="b.type === 'hotel' && b.hotel">{{ b.hotel.city }} from {{ b.hotel.checkIn }} to {{ b.hotel.checkOut }}</p>
+            </div>
+            <button mat-stroked-button type="button" (click)="cancel(b)" [disabled]="b.status === 'cancelled'">Cancel</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title"><h3>Travel actions</h3></div>
+        <a routerLink="/travel/flights" class="action-link">Request flight</a>
+        <a routerLink="/travel/hotels" class="action-link">Request accommodation</a>
+      </article>
+    </aside>
+  </section>
+</div>
+
+<ng-template #noBookingsTpl>
+  <div class="sy-empty-state">No booking requests yet.</div>
+</ng-template>

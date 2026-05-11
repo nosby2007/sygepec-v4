@@ -1,0 +1,291 @@
+<div class="lp" aria-label="SYGEPEC Immigration Pathway Platform">
+
+  <!-- ══ NAVBAR ══ -->
+  <header class="lp-nav">
+    <div class="lp-con lp-nav__inner">
+      <a class="lp-brand" routerLink="/public">
+        <span class="lp-brand__mark">S</span>
+        <div class="lp-brand__text">
+          <strong>SYGEPEC</strong>
+          <span>Immigration Pathway OS</span>
+        </div>
+      </a>
+      <nav class="lp-nav__links" aria-label="Navigation principale">
+        <a routerLink="/public/services/document-review">Services</a>
+        <a routerLink="/public/destinations">Destinations</a>
+        <a [routerLink]="['/public']" fragment="how-it-works">About</a>
+        <a routerLink="/public/services/training-pathway">Free Tools</a>
+        <a routerLink="/public/contact">Contact</a>
+      </nav>
+      <div class="lp-nav__acts">
+        <a routerLink="/auth/login" class="lp-btn lp-btn--ghost">Connexion</a>
+        <a routerLink="/start-audit" class="lp-btn lp-btn--gold">Start Pre-Assessment</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ HERO ══ -->
+  <section class="lp-hero" aria-labelledby="lp-h1">
+    <div class="lp-con lp-hero__inner">
+      <div class="lp-hero__copy">
+        <p class="lp-eyebrow">Plateforme d'audit immigration et préparation de dossier</p>
+        <h1 id="lp-h1">
+          Ton parcours immigration,
+          <em>structuré étape par étape.</em>
+        </h1>
+        <p class="lp-hero__sub">
+          Audit personnalisé · Documents manquants · Formations recommandées · Revue humaine · Préparation départ
+        </p>
+        <div class="lp-hero__svc">
+          <a routerLink="/start-audit" class="lp-svc"><strong>Audit immigration</strong><span aria-hidden="true">→</span></a>
+          <a routerLink="/client/documents" class="lp-svc"><strong>Document Vault</strong><span aria-hidden="true">→</span></a>
+          <a routerLink="/public/services/document-review" class="lp-svc"><strong>Pré-vérification</strong><span aria-hidden="true">→</span></a>
+          <a routerLink="/public/services/training-pathway" class="lp-svc lp-svc--hl"><strong>Formation IELTS / NCLEX</strong><span aria-hidden="true">→</span></a>
+          <a routerLink="/public/contact" class="lp-svc lp-svc--hl"><strong>Revue humaine</strong><span aria-hidden="true">→</span></a>
+          <a routerLink="/public/services/travel-readiness" class="lp-svc"><strong>Travel Readiness</strong><span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+      <article class="lp-mock" aria-label="Aperçu dashboard readiness">
+        <div class="lp-mock__hd">
+          <strong>Dossier SYGEPEC</strong>
+          <span class="lp-pill">En cours</span>
+        </div>
+        <div class="lp-mock__tiles">
+          <div class="lp-tile"><span>Destination</span><strong>Canada</strong></div>
+          <div class="lp-tile lp-tile--blue"><span>Readiness score</span><strong>45 %</strong></div>
+          <div class="lp-tile lp-tile--gold"><span>Docs manquants</span><strong>4</strong></div>
+          <div class="lp-tile"><span>Formation</span><strong>IELTS</strong></div>
+          <div class="lp-tile"><span>Revue humaine</span><strong>Pending</strong></div>
+          <div class="lp-tile"><span>Travel readiness</span><strong>—</strong></div>
+        </div>
+        <div class="lp-mock__action">
+          <span>Prochaine étape</span>
+          <strong>Téléverser la preuve de fonds</strong>
+          <a routerLink="/start-audit" class="lp-btn lp-btn--gold lp-btn--sm">Commencer →</a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ══ TRUST BAR ══ -->
+  <div class="lp-trust" aria-label="Piliers du parcours">
+    <div class="lp-con lp-trust__inner">
+      <span><i class="lp-dot" aria-hidden="true"></i>Audit personnel</span>
+      <span><i class="lp-dot" aria-hidden="true"></i>Pré-vérification documents</span>
+      <span><i class="lp-dot" aria-hidden="true"></i>Revue humaine</span>
+      <span><i class="lp-dot" aria-hidden="true"></i>Préparation voyage</span>
+    </div>
+  </div>
+
+  <!-- ══ WHY AUDIT ══ -->
+  <section id="audit" class="lp-sec lp-sec--w" aria-labelledby="audit-h">
+    <div class="lp-con">
+      <header class="lp-sh">
+        <h2 id="audit-h">Pourquoi commencer par un audit ?</h2>
+        <p>Avant de payer la moindre procédure, comprends d'abord ton profil.</p>
+      </header>
+      <div class="lp-g3">
+        <article class="lp-card">
+          <div class="lp-card__ico" aria-hidden="true">✓</div>
+          <h3>Éviter les mauvaises procédures</h3>
+          <p>Beaucoup de personnes commencent sans savoir si leur profil est prêt.</p>
+        </article>
+        <article class="lp-card">
+          <div class="lp-card__ico" aria-hidden="true">📄</div>
+          <h3>Identifier les documents manquants</h3>
+          <p>Passeport, diplômes, attestations, preuves de fonds, langue : ton dossier doit être clair.</p>
+        </article>
+        <article class="lp-card">
+          <div class="lp-card__ico" aria-hidden="true">🎓</div>
+          <h3>Choisir les bonnes formations</h3>
+          <p>Si ton parcours exige IELTS, OET, NCLEX, DHA ou DOH, SYGEPEC te l'indique.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PROOF BAND ══ -->
+  <section class="lp-proof" aria-label="Témoignages">
+    <div class="lp-con">
+      <h2 class="lp-proof__title">Ce que nos utilisateurs disent de leur préparation</h2>
+      <div class="lp-proof__grid">
+        <article class="lp-proof__card">
+          <p class="lp-stars" aria-label="5 étoiles">★★★★★</p>
+          <p>"Le score readiness m'a permis de corriger mes documents avant toute procédure coûteuse."</p>
+          <strong>Aline M. · Projet Canada</strong>
+        </article>
+        <article class="lp-proof__card">
+          <p class="lp-stars" aria-label="5 étoiles">★★★★★</p>
+          <p>"J'ai compris dès l'audit que je devais passer IELTS avant la soumission. Gain de temps énorme."</p>
+          <strong>Patrick N. · Projet UK</strong>
+        </article>
+        <article class="lp-proof__card">
+          <p class="lp-stars" aria-label="5 étoiles">★★★★★</p>
+          <p>"La revue humaine a validé mes pièces critiques et évité un dossier incomplet."</p>
+          <strong>Fatou B. · Projet UAE</strong>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PATHWAY 2-COL (Archer-style) ══ -->
+  <section id="how-it-works" class="lp-sec lp-sec--alt" aria-labelledby="path-h">
+    <div class="lp-con">
+      <header class="lp-sh">
+        <h2 id="path-h">Comment SYGEPEC construit ton parcours</h2>
+        <p>6 étapes clés, un seul objectif : ton dossier prêt à soumettre.</p>
+      </header>
+      <div class="lp-pathway">
+        <article class="lp-pcard">
+          <div class="lp-pcard__n" aria-hidden="true">01</div>
+          <div class="lp-pcard__body">
+            <h3>Choisis ta destination</h3>
+            <p>Canada, USA, UAE, Qatar, Europe — ou laisse SYGEPEC comparer selon ton profil.</p>
+            <a routerLink="/start-audit" class="lp-lnk">Démarrer →</a>
+          </div>
+        </article>
+        <article class="lp-pcard">
+          <div class="lp-pcard__n" aria-hidden="true">02</div>
+          <div class="lp-pcard__body">
+            <h3>Fais ton audit personnel</h3>
+            <p>Réponds à quelques questions. SYGEPEC évalue ton profil administratif complet.</p>
+            <a routerLink="/start-audit" class="lp-lnk">Démarrer →</a>
+          </div>
+        </article>
+        <article class="lp-pcard">
+          <div class="lp-pcard__n" aria-hidden="true">03</div>
+          <div class="lp-pcard__body">
+            <h3>Obtiens ton score de préparation</h3>
+            <p>Ton readiness score te montre exactement où tu en es et ce qui manque.</p>
+            <a routerLink="/start-audit" class="lp-lnk">Démarrer →</a>
+          </div>
+        </article>
+        <article class="lp-pcard">
+          <div class="lp-pcard__n" aria-hidden="true">04</div>
+          <div class="lp-pcard__body">
+            <h3>Organise tes documents</h3>
+            <p>Document Vault sécurisé : centralise, suis et pré-vérifie chaque pièce.</p>
+            <a routerLink="/start-audit" class="lp-lnk">Démarrer →</a>
+          </div>
+        </article>
+        <article class="lp-pcard">
+          <div class="lp-pcard__n" aria-hidden="true">05</div>
+          <div class="lp-pcard__body">
+            <h3>Reçois tes recommandations de formation</h3>
+            <p>IELTS, NCLEX, DHA/DOH, OET — SYGEPEC identifie la formation prioritaire pour toi.</p>
+            <a routerLink="/start-audit" class="lp-lnk">Démarrer →</a>
+          </div>
+        </article>
+        <article class="lp-pcard">
+          <div class="lp-pcard__n" aria-hidden="true">06</div>
+          <div class="lp-pcard__body">
+            <h3>Revue humaine et départ</h3>
+            <p>Un conseiller valide ton dossier complet avant soumission et préparation voyage.</p>
+            <a routerLink="/start-audit" class="lp-lnk">Démarrer →</a>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ MODULES ══ -->
+  <section id="documents" class="lp-sec lp-sec--w" aria-labelledby="mod-h">
+    <div class="lp-con">
+      <header class="lp-sh">
+        <h2 id="mod-h">Une plateforme pour structurer tout ton projet</h2>
+      </header>
+      <div class="lp-modules">
+        <article class="lp-module">Audit immigration</article>
+        <article class="lp-module">Dossier client</article>
+        <article class="lp-module">Document Vault</article>
+        <article class="lp-module">Pré-vérification documentaire</article>
+        <article class="lp-module">Training Recommendations</article>
+        <article class="lp-module">Travel Readiness</article>
+        <article class="lp-module">Support conseiller</article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ DESTINATIONS ══ -->
+  <section class="lp-sec lp-sec--alt" aria-labelledby="dest-h">
+    <div class="lp-con">
+      <header class="lp-sh">
+        <h2 id="dest-h">Destinations couvertes</h2>
+        <p>Immigration, études, travail, relocation — pas du tourisme.</p>
+      </header>
+      <div class="lp-dest">
+        <article class="lp-dc"><h3><a routerLink="/public/destinations/canada">🇨🇦 Canada</a></h3><p>Études · Travail · Résidence permanente · Langue · Documents</p></article>
+        <article class="lp-dc"><h3><a routerLink="/public/destinations/usa">🇺🇸 USA</a></h3><p>Études · Travail · Licensing · Sponsoring · Documents</p></article>
+        <article class="lp-dc"><h3><a routerLink="/public/destinations/uae">🇦🇪 UAE / Dubaï</a></h3><p>Emploi · Licensing · Credential verification · DHA/DOH</p></article>
+        <article class="lp-dc"><h3><a routerLink="/public/destinations/qatar">🇶🇦 Qatar</a></h3><p>Emploi · Documents professionnels · Relocation</p></article>
+        <article class="lp-dc"><h3><a routerLink="/public/destinations/europe">🇪🇺 Europe</a></h3><p>Études · Travail · Documents</p></article>
+        <article class="lp-dc lp-dc--dark">
+          <h3>Je ne sais pas encore</h3>
+          <p>SYGEPEC aide à comparer selon ton profil.</p>
+          <a routerLink="/start-audit" class="lp-lnk lp-lnk--light">Faire l'audit →</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ TRAINING BAND ══ -->
+  <section id="training" class="lp-train" aria-labelledby="train-h">
+    <div class="lp-con lp-train__inner">
+      <div class="lp-train__copy">
+        <p class="lp-eyebrow lp-eyebrow--gold">Connexion Innovacare Training</p>
+        <h2 id="train-h">Quand ton profil a besoin de formation, SYGEPEC t'oriente.</h2>
+        <p>
+          Selon ton audit, SYGEPEC recommande des programmes Innovacare Training : IELTS/OET, NCLEX,
+          DHA/DOH, Global Nurse Licensing, préparation documentaire ou parcours professionnel.
+        </p>
+        <a routerLink="/start-audit" class="lp-btn lp-btn--gold">Voir mes formations recommandées</a>
+      </div>
+      <ul class="lp-train__tags" aria-label="Formations disponibles">
+        <li>IELTS / OET</li>
+        <li>NCLEX</li>
+        <li>DHA / DOH</li>
+        <li>Global Nurse Licensing Pack</li>
+        <li>Document Preparation</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ══ RELOCATION ══ -->
+  <section id="relocation" class="lp-sec lp-sec--w" aria-labelledby="reloc-h">
+    <div class="lp-con">
+      <header class="lp-sh">
+        <h2 id="reloc-h">La préparation voyage vient après le dossier.</h2>
+        <p>Ce n'est pas du tourisme : c'est la continuité logistique de ton dossier immigration.</p>
+      </header>
+      <div class="lp-reloc">
+        <article class="lp-rc">✈ Flight request</article>
+        <article class="lp-rc">🏨 Accommodation request</article>
+        <article class="lp-rc">🛡 Insurance checklist</article>
+        <article class="lp-rc">📋 Arrival checklist</article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FINAL CTA ══ -->
+  <section class="lp-cta" aria-labelledby="cta-h">
+    <div class="lp-con lp-cta__inner">
+      <h2 id="cta-h">Commence par ton audit personnel.</h2>
+      <p>En quelques minutes, SYGEPEC transforme ton projet en profil structuré prêt pour revue humaine.</p>
+      <div class="lp-cta__btns">
+        <a routerLink="/start-audit" class="lp-btn lp-btn--gold lp-btn--lg">Débute ton audit immigration</a>
+        <a routerLink="/auth/login" class="lp-btn lp-btn--ghost-light">Parler à un conseiller</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ COMPLIANCE ══ -->
+  <div id="contact" class="lp-compl" aria-label="Mentions légales">
+    <div class="lp-con">
+      SYGEPEC fournit une orientation administrative et éducative. Les résultats ne constituent pas un avis légal
+      ni une garantie d'obtention de visa. Une revue humaine est requise avant toute soumission.
+    </div>
+  </div>
+
+  <app-ai-intake-widget />
+
+</div>

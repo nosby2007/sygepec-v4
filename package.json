@@ -6,7 +6,11 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "migrate:dry-run": "node scripts/migrate-legacy-collections.mjs",
+    "migrate:dry-run:help": "node scripts/migrate-legacy-collections.mjs --help",
+    "migrate:dry-run:json": "node scripts/migrate-legacy-collections.mjs --json",
+    "migrate:dry-run:bootstrap": "node scripts/migrate-legacy-collections.mjs --bootstrap-only --json"
   },
   "prettier": {
     "printWidth": 100,
@@ -22,12 +26,15 @@
   },
   "private": true,
   "dependencies": {
+    "@angular/cdk": "^20.2.14",
     "@angular/common": "^20.3.0",
     "@angular/compiler": "^20.3.0",
     "@angular/core": "^20.3.0",
     "@angular/forms": "^20.3.0",
+    "@angular/material": "^20.2.14",
     "@angular/platform-browser": "^20.3.0",
     "@angular/router": "^20.3.0",
+    "firebase": "^12.7.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"

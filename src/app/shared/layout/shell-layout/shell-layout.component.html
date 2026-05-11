@@ -1,61 +1,96 @@
-<nav class="nav">
-  <a *ngFor="let item of menu()" [routerLink]="item.route" routerLinkActive="active">
-    {{ item.label }}
-  </a>
-</nav>
-
-
-
-<div class="shell">
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="logo">SY</div>
-      <div class="title">SYGEPEC</div>
+<app-impersonation-banner />
+<div class="shell-container">
+  <aside class="sidebar" [class.open]="sidebarOpen()">
+    <div class="sidebar-header">
+      <div class="logo-section">
+        <div class="logo-icon">S</div>
+        <div>
+          <h1 class="logo-text">SYGEPEC</h1>
+          <div class="logo-sub">Immigration OS</div>
+        </div>
+      </div>
+      <button class="close-sidebar" (click)="sidebarOpen.set(false)" *ngIf="isMobile()" aria-label="Close menu">
+        <mat-icon>close</mat-icon>
+      </button>
     </div>
 
-    <div class="tenant">
-      <div class="label">Context</div>
-      <button class="pill" (click)="setPersonal()" [class.active]="isPersonal()">Personal (SYGEPEC)</button>
+    <nav class="sidebar-nav" aria-label="Sidebar navigation">
+      <div class="nav-section" *ngIf="coreNav().length">
+        <div class="nav-section-label">Core</div>
+        <a *ngFor="let item of coreNav()" [routerLink]="item.path" routerLinkActive="active" class="nav-item" (click)="isMobile() && sidebarOpen.set(false)">
+          <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      </div>
 
-      <div class="label" style="margin-top:10px;">Organizations</div>
-      <ng-container *ngIf="orgs$ | async as orgs">
-        <button class="pill" *ngFor="let o of orgs" (click)="setOrg(o.orgId)" [class.active]="isOrg(o.orgId)">
-          {{ o.orgName || o.orgId }}
-        </button>
-        <div class="hint" *ngIf="orgs.length === 0">No organization assigned.</div>
-      </ng-container>
-    </div>
+      <div class="nav-section" *ngIf="workspaceNav().length">
+        <div class="nav-section-label">Workspace</div>
+        <a *ngFor="let item of workspaceNav()" [routerLink]="item.path" routerLinkActive="active" class="nav-item" (click)="isMobile() && sidebarOpen.set(false)">
+          <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      </div>
 
-    <nav class="nav">
-      <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Overview</a>
-      <a routerLink="/dashboard/immigration" routerLinkActive="active">Immigration</a>
-      <a routerLink="/dashboard/training" routerLinkActive="active">Training</a>
-      <a routerLink="/dashboard/jobs" routerLinkActive="active">Jobs</a>
-      <a routerLink="/dashboard/travel" routerLinkActive="active">Travel</a>
-      <a routerLink="/dashboard/support" routerLinkActive="active">Support</a>
-      <a *ngIf="isAdmin()" routerLink="/dashboard/admin" routerLinkActive="active">Admin</a>
+      <div class="nav-section" *ngIf="adminNav().length">
+        <div class="nav-section-label">Admin</div>
+        <a *ngFor="let item of adminNav()" [routerLink]="item.path" routerLinkActive="active" class="nav-item" (click)="isMobile() && sidebarOpen.set(false)">
+          <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      </div>
     </nav>
 
-    <div class="footer">
-      <div class="user" *ngIf="user() as u">
-        <div class="name">{{ u.displayName || u.email }}</div>
-        <div class="role">{{ u.globalRole }} <span *ngIf="u.plan">• {{ u.plan }}</span></div>
-        <div class="ctx">tenant: {{ tenantId() }} <span *ngIf="orgId()">• org: {{ orgId() }}</span></div>
+    <div class="sidebar-footer">
+      <div class="user-profile">
+        <div class="user-avatar">{{ getInitial() }}</div>
+        <div class="user-info">
+          <div class="user-name">{{ ctx().displayName || ctx().email || 'User' }}</div>
+          <div class="user-role">{{ ctx().tenantId || 'Public workspace' }}</div>
+        </div>
       </div>
-      <button class="btn" (click)="logout()">Logout</button>
+      <button class="logout-btn" (click)="logout()" title="Logout" aria-label="Logout">
+        <mat-icon>logout</mat-icon>
+      </button>
     </div>
   </aside>
 
-  <main class="content">
+  <div class="sidebar-backdrop" *ngIf="sidebarOpen() && isMobile()" (click)="sidebarOpen.set(false)"></div>
+
+  <div class="main-content">
     <header class="topbar">
-      <div class="breadcrumb">Dashboard</div>
-      <div class="actions">
-        <button class="btn-outline">Help</button>
+      <button class="menu-toggle" (click)="sidebarOpen.set(!sidebarOpen())" *ngIf="isMobile()" aria-label="Open menu">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <div class="topbar-title">
+        <strong>SYGEPEC Workspace</strong>
+        <span>Audit IA, documents, relocation</span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-actions">
+        <button class="icon-btn" aria-label="Notifications">
+          <mat-icon>notifications</mat-icon>
+          <span class="notif-dot"></span>
+        </button>
+        <a routerLink="/support" class="topbar-cta">Contact Advisor</a>
       </div>
     </header>
 
-    <section class="page">
-      <router-outlet />
-    </section>
-  </main>
+    <div class="loading-overlay" *ngIf="ctx().loading">
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading your workspace...</div>
+      </div>
+    </div>
+
+    <main class="page-container" *ngIf="!ctx().loading">
+      <router-outlet></router-outlet>
+    </main>
+
+    <nav class="mobile-bottom-nav" *ngIf="isMobile() && !ctx().loading" aria-label="Bottom navigation">
+      <a *ngFor="let item of coreNav()" [routerLink]="item.path" routerLinkActive="active" class="mobile-item">
+        <mat-icon>{{ item.icon }}</mat-icon>
+        <span>{{ item.label }}</span>
+      </a>
+    </nav>
+  </div>
 </div>

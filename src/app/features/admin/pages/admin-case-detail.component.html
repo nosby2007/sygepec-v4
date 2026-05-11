@@ -1,0 +1,538 @@
+<div class="sy-dashboard-shell admin-case-detail">
+  <section class="sy-page-header">
+    <div>
+      <h1>Case detail</h1>
+      <p class="header-meta">
+        @if (dossier(); as d) {
+          <strong>{{ d.dossierNumber || d.id }}</strong>
+          <span class="dot">·</span>
+          <span>{{ d.destinationCountry || 'Destination pending' }}</span>
+          <span class="dot">·</span>
+          <span class="sy-status-pill" [ngClass]="statusView(d.status).cssClass">
+            {{ statusView(d.status).label }}
+          </span>
+          @if (d.source === 'audit_wizard') {
+            <span class="badge badge-source">Audit Wizard</span>
+          }
+          @if (d.urgencyLevel === 'urgent') {
+            <span class="badge badge-urgent" title="Client a indiqué un horizon urgent">Urgent</span>
+          }
+          @if (d.previousVisaRefusal) {
+            <span class="badge badge-warn" title="Antécédent de refus de visa">Visa refusal</span>
+          }
+        } @else if (legacyCase(); as l) {
+          <strong>{{ l.caseNumber || l.id }}</strong>
+          <span class="dot">·</span>
+          <span>{{ l.destinationCountry || 'Destination pending' }}</span>
+          <span class="dot">·</span>
+          <span>{{ l.status }}</span>
+        }
+      </p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/admin/cases" class="sy-btn-secondary">Back to cases</a>
+      <a routerLink="/support" class="sy-btn-gold">Assign follow-up</a>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <p class="state-msg">Loading…</p>
+  }
+
+  @if (errorMsg()) {
+    <p class="state-msg error" role="alert">
+      ⚠️ {{ errorMsg() }}
+      <button type="button" class="sy-btn-ghost" (click)="reload()">Retry</button>
+    </p>
+  }
+
+  @if (successMsg()) {
+    <p class="state-msg success" role="status">✓ {{ successMsg() }}</p>
+  }
+
+  @if (!loading() && !errorMsg() && (dossier() || legacyCase())) {
+    <div class="layout">
+      <main class="layout-main">
+
+        <!-- ─────────────────────────── Case Readiness (canonique) ──────────── -->
+        @if (dossier(); as d) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title"><h2>Case readiness</h2></div>
+
+            <div class="readiness-row">
+              <div class="readiness-score">
+                <div class="score-ring" [class.score-low]="(d.readinessScore || 0) < 40"
+                     [class.score-mid]="(d.readinessScore || 0) >= 40 && (d.readinessScore || 0) < 70"
+                     [class.score-high]="(d.readinessScore || 0) >= 70">
+                  <span class="score-value">{{ d.readinessScore || 0 }}<small>%</small></span>
+                  <span class="score-caption">Readiness</span>
+                </div>
+              </div>
+              <div class="readiness-meta">
+                <div class="key-row"><span>Status</span>
+                  <strong><span class="sy-status-pill" [ngClass]="statusView(d.status).cssClass">{{ statusView(d.status).label }}</span></strong>
+                </div>
+                <div class="key-row"><span>Current step</span><strong>{{ formatStep(d.currentStep) || 'Not provided' }}</strong></div>
+                <div class="key-row"><span>Next best action</span><strong>{{ d.nextBestAction || statusView(d.status).defaultNextAction || 'Not provided' }}</strong></div>
+                <div class="key-row"><span>Source</span><strong>{{ formatSource(d.source) }}</strong></div>
+              </div>
+            </div>
+
+            <div class="kv-grid">
+              <div class="kv"><span>Immigration goal</span><strong>{{ formatGoal(d.immigrationGoal) || 'Not provided' }}</strong></div>
+              <div class="kv"><span>Destination</span><strong>{{ d.destinationCountry || 'Not provided' }}</strong></div>
+              @if (d.secondaryDestinationCountry) {
+                <div class="kv"><span>Secondary destination</span><strong>{{ d.secondaryDestinationCountry }}</strong></div>
+              }
+              <div class="kv"><span>Urgency</span><strong>{{ formatUrgency(d.urgencyLevel) }}</strong></div>
+              @if (d.preferredTimeline) {
+                <div class="kv"><span>Preferred timeline</span><strong>{{ d.preferredTimeline }}</strong></div>
+              }
+              @if (d.previousVisaRefusal) {
+                <div class="kv kv-warn"><span>Previous visa refusal</span><strong>Yes</strong></div>
+              }
+              @if (d.currentImmigrationStatus) {
+                <div class="kv"><span>Current immigration status</span><strong>{{ d.currentImmigrationStatus }}</strong></div>
+              }
+              <div class="kv"><span>Assigned agent</span><strong>{{ d.assignedAgentUid || 'Unassigned' }}</strong></div>
+              <div class="kv"><span>Assigned reviewer</span><strong>{{ d.assignedReviewerUid || 'Unassigned' }}</strong></div>
+            </div>
+          </article>
+        }
+
+        <!-- ─────────────────────────── Risk Flags ──────────────────────────── -->
+        @if (dossier(); as d) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title"><h2>Readiness risks</h2></div>
+            <p class="muted small">
+              Internal preparation indicators. <em>Not legal advice.</em> Use to triage advisor review.
+            </p>
+
+            @if (riskFlags().length === 0) {
+              <p class="empty-state">No major readiness risk detected from the audit.</p>
+            } @else {
+              <ul class="risk-list">
+                @for (flag of riskFlags(); track flag.code) {
+                  <li class="risk-item">
+                    <span class="risk-sev" [ngClass]="'sev-' + flag.severity">{{ flag.severity | uppercase }}</span>
+                    <div class="risk-body">
+                      <strong>{{ flag.label }}</strong>
+                      @if (flag.description) {
+                        <p class="muted small">{{ flag.description }}</p>
+                      }
+                      <code class="risk-code">{{ flag.code }}</code>
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          </article>
+        }
+
+        <!-- ─────────────────────────── Audit Summary ───────────────────────── -->
+        @if (dossier(); as d) {
+          @if (d.auditSummary || d.source === 'audit_wizard') {
+            <article class="sy-card sy-feature-card">
+              <div class="sy-section-title"><h2>Audit summary</h2></div>
+              @if (d.auditSummary) {
+                <p class="audit-summary">{{ d.auditSummary }}</p>
+              } @else {
+                <p class="muted">No summary captured during the audit.</p>
+              }
+              <div class="kv-grid">
+                <div class="kv"><span>Created</span><strong>{{ formatDate(d.createdAt) }}</strong></div>
+                <div class="kv"><span>Last update</span><strong>{{ formatDate(d.updatedAt) }}</strong></div>
+                @if (d.auditDraftId) {
+                  <div class="kv"><span>Audit draft id</span><strong class="mono">{{ d.auditDraftId }}</strong></div>
+                }
+              </div>
+            </article>
+          }
+        }
+
+        <!-- ─────────────────────────── Client Profile ──────────────────────── -->
+        @if (clientProfile(); as p) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title"><h2>Client profile</h2></div>
+
+            <div class="profile-block">
+              <h3 class="block-title">Identity</h3>
+              <div class="kv-grid">
+                <div class="kv"><span>Full name</span><strong>{{ p.fullName || 'Not provided' }}</strong></div>
+                <div class="kv"><span>Phone</span><strong>{{ p.phone || 'Not provided' }}</strong></div>
+                <div class="kv"><span>Nationality</span><strong>{{ p.nationality || 'Not provided' }}</strong></div>
+                <div class="kv"><span>Country of residence</span><strong>{{ p.countryOfResidence || p.residenceCountry || 'Not provided' }}</strong></div>
+                @if (p.dateOfBirth) { <div class="kv"><span>Date of birth</span><strong>{{ p.dateOfBirth }}</strong></div> }
+                @if (p.maritalStatus) { <div class="kv"><span>Marital status</span><strong>{{ p.maritalStatus }}</strong></div> }
+                @if (p.dependentsCount !== null && p.dependentsCount !== undefined) {
+                  <div class="kv"><span>Dependents</span><strong>{{ p.dependentsCount }}</strong></div>
+                }
+                @if (p.preferredLanguage) { <div class="kv"><span>Language</span><strong>{{ p.preferredLanguage }}</strong></div> }
+              </div>
+            </div>
+
+            @if (p.highestEducationLevel || p.fieldOfStudy || p.graduationYear) {
+              <div class="profile-block">
+                <h3 class="block-title">Education</h3>
+                <div class="kv-grid">
+                  @if (p.highestEducationLevel) { <div class="kv"><span>Highest level</span><strong>{{ p.highestEducationLevel }}</strong></div> }
+                  @if (p.fieldOfStudy) { <div class="kv"><span>Field of study</span><strong>{{ p.fieldOfStudy }}</strong></div> }
+                  @if (p.graduationYear) { <div class="kv"><span>Graduation year</span><strong>{{ p.graduationYear }}</strong></div> }
+                </div>
+              </div>
+            }
+
+            @if (p.currentProfession || p.yearsOfExperience !== null && p.yearsOfExperience !== undefined || p.professionalLicense) {
+              <div class="profile-block">
+                <h3 class="block-title">Work</h3>
+                <div class="kv-grid">
+                  @if (p.currentProfession) { <div class="kv"><span>Current profession</span><strong>{{ p.currentProfession }}</strong></div> }
+                  @if (p.yearsOfExperience !== null && p.yearsOfExperience !== undefined) {
+                    <div class="kv"><span>Years of experience</span><strong>{{ p.yearsOfExperience }}</strong></div>
+                  }
+                  @if (p.professionalLicense) { <div class="kv"><span>Professional license</span><strong>{{ p.professionalLicense }}</strong></div> }
+                </div>
+              </div>
+            }
+
+            <div class="profile-block">
+              <h3 class="block-title">Travel &amp; financial readiness</h3>
+              <div class="kv-grid">
+                <div class="kv"><span>Passport valid</span><strong>{{ formatBool(p.passportValid) }}</strong></div>
+                @if (p.passportExpirationDate) { <div class="kv"><span>Passport expiry</span><strong>{{ p.passportExpirationDate }}</strong></div> }
+                <div class="kv"><span>Proof of funds available</span><strong>{{ formatBool(p.proofOfFundsAvailable) }}</strong></div>
+                <div class="kv"><span>Sponsor available</span><strong>{{ formatBool(p.sponsorAvailable) }}</strong></div>
+                @if (p.travelHistorySummary) { <div class="kv kv-wide"><span>Travel history</span><strong>{{ p.travelHistorySummary }}</strong></div> }
+              </div>
+            </div>
+          </article>
+        } @else if (dossier() && profileLoaded()) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title"><h2>Client profile</h2></div>
+            <p class="empty-state">No detailed profile yet for this client.</p>
+          </article>
+        }
+
+        <!-- ─────────────────────────── Document Intake ─────────────────────── -->
+        <article class="sy-card sy-feature-card">
+          <div class="sy-section-title"><h2>Documents ({{ documents().length }})</h2></div>
+
+          @if (dossier()) {
+            <div class="doc-counters">
+              <span class="counter"><strong>{{ docCounts().total }}</strong> total</span>
+              <span class="counter c-warn"><strong>{{ docCounts().requested }}</strong> awaiting upload</span>
+              <span class="counter c-info"><strong>{{ docCounts().uploaded }}</strong> needs review</span>
+              <span class="counter c-success"><strong>{{ docCounts().approved }}</strong> approved</span>
+              <span class="counter c-danger"><strong>{{ docCounts().rejected }}</strong> needs correction</span>
+              @if (docCounts().expired > 0) {
+                <span class="counter c-danger"><strong>{{ docCounts().expired }}</strong> expired</span>
+              }
+              @if (docCounts().missingRequired > 0) {
+                <span class="counter c-danger"><strong>{{ docCounts().missingRequired }}</strong> required missing</span>
+              }
+            </div>
+          }
+
+          @if (!documents().length) {
+            <p class="empty-state">No documents attached to this case yet.</p>
+          }
+
+          @for (group of docGroups(); track group.key) {
+            @if (group.rows.length > 0) {
+              <div class="doc-group">
+                <h3 class="block-title">{{ group.title }} <span class="muted small">({{ group.rows.length }})</span></h3>
+                <ul class="doc-list">
+                  @for (doc of group.rows; track doc.id) {
+                    <li class="doc-row">
+                      <div class="doc-head">
+                        <div class="doc-title">
+                          <strong>{{ doc.label }}</strong>
+                          <span class="muted"> · {{ formatCategory(doc.category) }}</span>
+                          @if (doc.required) { <span class="badge badge-required">Required</span> }
+                          @if (doc.requestSource === 'audit_wizard') { <span class="badge badge-source">Audit</span> }
+                        </div>
+                        <span class="sy-status-pill" [ngClass]="doc.statusClass">{{ doc.statusLabel }}</span>
+                      </div>
+
+                      @if (doc.fileName || doc.uploadedAt !== '—') {
+                        <p class="doc-meta muted">{{ doc.fileName || '—' }} · {{ doc.uploadedAt }}</p>
+                      }
+                      @if (doc.statusRaw === 'requested') {
+                        <p class="doc-meta muted small">Awaiting upload by client.</p>
+                      }
+                      @if (doc.rejectionReason) {
+                        <p class="doc-meta error">Rejected — {{ doc.rejectionReason }}</p>
+                      }
+                      @if (doc.reviewNotes) {
+                        <p class="doc-meta muted">Internal note: {{ doc.reviewNotes }}</p>
+                      }
+
+                      @if (canReviewDocs()) {
+                        <div class="doc-actions">
+                          <button type="button" class="sy-btn-primary"
+                                  [disabled]="busyDocId() === doc.id || !canReviewAction(doc)"
+                                  (click)="approveDoc(doc)">
+                            {{ busyDocId() === doc.id ? 'Working…' : 'Approve' }}
+                          </button>
+                          <button type="button" class="sy-btn-secondary"
+                                  [disabled]="busyDocId() === doc.id || !canReviewAction(doc)"
+                                  (click)="rejectDoc(doc)">
+                            Request correction
+                          </button>
+                          @if (!canReviewAction(doc)) {
+                            <span class="muted small">Available once the client uploads the file.</span>
+                          }
+                        </div>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          }
+        </article>
+
+        <!-- ─────────────────────────── Checklist canonique ─────────────────── -->
+        <article class="sy-card sy-feature-card">
+          <div class="sy-section-title"><h2>Checklist</h2></div>
+          @if (checklist(); as c) {
+            <div class="checklist-summary">
+              <div class="progress" [attr.aria-valuenow]="c.completionRate" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" [style.width.%]="c.completionRate"></div>
+              </div>
+              <p class="muted small">
+                {{ c.completed }} / {{ c.total }} completed ({{ c.completionRate }}%) ·
+                {{ (c.missing || []).length }} required missing
+              </p>
+            </div>
+            <ul class="checklist-items">
+              @for (item of c.items; track item.category + '-' + item.label) {
+                <li class="checklist-item" [class.done]="item.done">
+                  <span class="check-icon">{{ item.done ? '✓' : '○' }}</span>
+                  <span class="check-label">{{ item.label }}</span>
+                  @if (item.required) { <span class="badge badge-required">Required</span> }
+                  <span class="muted small">{{ formatCategory(item.category) }}</span>
+                  @if (item.documentId) {
+                    <span class="muted small mono">doc:{{ item.documentId }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          } @else if (legacyChecklistSummary()) {
+            <p>{{ legacyChecklistSummary() }}</p>
+          } @else {
+            <p class="empty-state">No checklist generated for this case yet.</p>
+          }
+        </article>
+
+        <!-- ─────────────────────────── Training & Travel ───────────────────── -->
+        <article class="sy-card sy-feature-card">
+          <div class="sy-section-title"><h2>Training &amp; travel</h2></div>
+          <ul class="detail-list">
+            @for (rec of training(); track rec.programTitle) {
+              <li>{{ rec.programTitle }} · {{ rec.status }}</li>
+            }
+            @if (!training().length) {
+              <li class="muted">No training recommendation.</li>
+            }
+            <li>Travel readiness · {{ travelReadiness() }}%</li>
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────── Timeline ────────────────────────────── -->
+        <article class="sy-card sy-timeline-card">
+          <div class="sy-section-title"><h2>Timeline</h2></div>
+          <ul class="detail-list">
+            @for (event of timeline(); track event.title) {
+              <li>{{ event.title }} · {{ event.description }}</li>
+            }
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────── Tâches du dossier (Lot L) ────────────── -->
+        @if (dossier()) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title">
+              <h2>Tâches</h2>
+              <button type="button" class="sy-btn-secondary sy-btn-sm" (click)="openTaskForm()">+ Nouvelle tâche</button>
+            </div>
+            @if (!tasks().length) {
+              <p class="muted">Aucune tâche pour ce dossier.</p>
+            }
+            @if (tasks().length) {
+              <ul class="detail-list">
+                @for (t of tasks(); track t.id) {
+                  <li>
+                    <strong>{{ t.title }}</strong>
+                    <span class="sy-status-pill" [ngClass]="taskStatusClass(t.status)">{{ taskStatusLabel(t.status) }}</span>
+                    <span class="muted small"> · {{ taskKindLabel(t.kind) }} · Priorité {{ taskPriorityLabel(t.priority) }}</span>
+                    @if (t.assignedToEmail) { <span class="muted small"> · {{ t.assignedToEmail }}</span> }
+                    @if (t.description) { <p class="small">{{ t.description }}</p> }
+                    <div class="task-inline-actions">
+                      @if (t.status === 'open') {
+                        <button type="button" class="sy-btn-ghost sy-btn-sm" [disabled]="busyTaskId() === t.id" (click)="setTaskStatus(t, 'in_progress')">Démarrer</button>
+                      }
+                      @if (t.status === 'in_progress') {
+                        <button type="button" class="sy-btn-ghost sy-btn-sm" [disabled]="busyTaskId() === t.id" (click)="setTaskStatus(t, 'blocked')">Bloquer</button>
+                      }
+                      @if (t.status !== 'done' && t.status !== 'cancelled') {
+                        <button type="button" class="sy-btn-secondary sy-btn-sm" [disabled]="busyTaskId() === t.id" (click)="setTaskStatus(t, 'done')">Terminer</button>
+                      }
+                      @if (t.status === 'done' || t.status === 'cancelled') {
+                        <button type="button" class="sy-btn-ghost sy-btn-sm" [disabled]="busyTaskId() === t.id" (click)="setTaskStatus(t, 'open')">Rouvrir</button>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+
+            @if (showTaskForm()) {
+              <form class="inline-task-form" (ngSubmit)="createTask()" #tf="ngForm">
+                <label class="field">
+                  <span>Titre *</span>
+                  <input type="text" name="title" [(ngModel)]="taskForm.title" required maxlength="120" />
+                </label>
+                <label class="field">
+                  <span>Description</span>
+                  <textarea name="description" [(ngModel)]="taskForm.description" rows="2" maxlength="600"></textarea>
+                </label>
+                <div class="field-row">
+                  <label class="field">
+                    <span>Type</span>
+                    <select name="kind" [(ngModel)]="taskForm.kind">
+                      <option value="review_documents">Revue documents</option>
+                      <option value="contact_client">Contacter le client</option>
+                      <option value="await_client_action">Action client attendue</option>
+                      <option value="admin_followup">Suivi admin</option>
+                      <option value="travel_prep">Préparation voyage</option>
+                      <option value="training_followup">Suivi formation</option>
+                      <option value="other">Autre</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Priorité</span>
+                    <select name="priority" [(ngModel)]="taskForm.priority">
+                      <option value="low">Basse</option>
+                      <option value="normal">Normale</option>
+                      <option value="high">Haute</option>
+                      <option value="urgent">Urgente</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="field">
+                  <span>Échéance</span>
+                  <input type="date" name="dueDate" [(ngModel)]="taskForm.dueDate" />
+                </label>
+                <label class="field">
+                  <span>Assigner à (email)</span>
+                  <input type="email" name="assignedToEmail" [(ngModel)]="taskForm.assignedToEmail" />
+                </label>
+
+                <fieldset class="doc-request-block">
+                  <legend>
+                    <label class="inline-check">
+                      <input type="checkbox" name="requestDoc" [(ngModel)]="taskForm.requestDoc" />
+                      <span>Demander un document au client</span>
+                    </label>
+                  </legend>
+                  @if (taskForm.requestDoc) {
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Type de document</span>
+                        <select name="docCategory" [(ngModel)]="taskForm.docCategory">
+                          <option value="passport">Passeport</option>
+                          <option value="diploma">Diplôme</option>
+                          <option value="transcripts">Relevés de notes</option>
+                          <option value="work_experience_letter">Lettre d'expérience</option>
+                          <option value="birth_certificate">Acte de naissance</option>
+                          <option value="police_clearance">Casier judiciaire</option>
+                          <option value="proof_of_funds">Preuve de fonds</option>
+                          <option value="language_test">Test de langue</option>
+                          <option value="cv_resume">CV</option>
+                          <option value="visa_photo">Photo d'identité</option>
+                          <option value="medical_exam">Examen médical</option>
+                          <option value="bank_statement">Relevé bancaire</option>
+                          <option value="other">Autre</option>
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Obligatoire ?</span>
+                        <select name="docRequired" [(ngModel)]="taskForm.docRequired">
+                          <option [ngValue]="true">Oui</option>
+                          <option [ngValue]="false">Non</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>Libellé visible par le client</span>
+                      <input type="text" name="docLabel" [(ngModel)]="taskForm.docLabel" maxlength="120" placeholder="Ex : Passeport scanné, pages 2 et 3" />
+                    </label>
+                  }
+                </fieldset>
+
+                <div class="task-inline-actions">
+                  <button type="button" class="sy-btn-ghost sy-btn-sm" (click)="closeTaskForm()">Annuler</button>
+                  <button type="submit" class="sy-btn-secondary sy-btn-sm" [disabled]="!tf.form.valid || creatingTask()">
+                    {{ creatingTask() ? 'Création…' : 'Créer' }}
+                  </button>
+                </div>
+              </form>
+            }
+          </article>
+        }
+
+        <!-- ─────────────────────────── Internal notes ──────────────────────── -->
+        @if (canReviewDocs() && dossier(); as d) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title"><h2>Internal notes</h2></div>
+            @if (d.notes) {
+              <p>{{ d.notes }}</p>
+            } @else {
+              <p class="muted">No internal note for this case yet.</p>
+            }
+            <p class="muted small">
+              <!-- TODO Lot futur : édition + auditLog dossier.noteUpdated -->
+              Editing coming in a future lot (audit-logged).
+            </p>
+          </article>
+        }
+
+        <!-- ─────────────────────────── Legacy fallback ─────────────────────── -->
+        @if (!dossier() && legacyCase(); as l) {
+          <article class="sy-card sy-feature-card">
+            <div class="sy-section-title"><h2>Legacy case</h2></div>
+            <p class="legacy-banner">⚠️ Showing legacy case (not yet migrated to canonical schema).</p>
+            <div class="key-row"><span>Reference</span><strong>{{ l.caseNumber || l.id }}</strong></div>
+            <div class="key-row"><span>Status</span><strong>{{ l.status }}</strong></div>
+            <div class="key-row"><span>Readiness</span><strong>{{ l.readinessScore || 0 }}%</strong></div>
+            <div class="key-row"><span>Human review</span><strong>{{ l.humanReviewStatus || 'pending' }}</strong></div>
+            <div class="key-row"><span>Next best action</span><strong>{{ l.nextBestAction || '—' }}</strong></div>
+          </article>
+        }
+
+      </main>
+
+      <!-- ─────────────────────────── Sticky mini-summary ─────────────────── -->
+      @if (dossier(); as d) {
+        <aside class="layout-aside">
+          <div class="sticky-summary">
+            <h3>At a glance</h3>
+            <div class="mini-row"><span>Readiness</span><strong>{{ d.readinessScore || 0 }}%</strong></div>
+            <div class="mini-row"><span>Status</span>
+              <strong><span class="sy-status-pill" [ngClass]="statusView(d.status).cssClass">{{ statusView(d.status).label }}</span></strong>
+            </div>
+            <div class="mini-row"><span>Destination</span><strong>{{ d.destinationCountry || '—' }}</strong></div>
+            <div class="mini-row"><span>Goal</span><strong>{{ formatGoal(d.immigrationGoal) || '—' }}</strong></div>
+            <div class="mini-row"><span>Risks</span><strong>{{ riskFlags().length }}</strong></div>
+            <div class="mini-row"><span>Required missing</span><strong>{{ docCounts().missingRequired }}</strong></div>
+            <div class="mini-row"><span>To review</span><strong>{{ docCounts().uploaded }}</strong></div>
+            @if (d.source === 'audit_wizard') {
+              <p class="muted small">Created via Audit Wizard.</p>
+            }
+          </div>
+        </aside>
+      }
+    </div>
+  }
+</div>

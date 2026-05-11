@@ -1,0 +1,38 @@
+<div class="jobs-page">
+  <mat-toolbar class="page-header">
+    <span>Job Opportunities</span>
+    <span class="spacer"></span>
+  </mat-toolbar>
+
+  <div class="content">
+    <div class="filters">
+      <mat-form-field>
+        <mat-label>Search</mat-label>
+        <input matInput [formControl]="q" placeholder="Title, location..." />
+      </mat-form-field>
+    </div>
+
+    <div class="jobs-list">
+      @for (job of filtered(); track job.id) {
+        <mat-card class="job-card" routerLink="/jobs/{{ job.id }}">
+          <mat-card-header>
+            <mat-card-title>{{ job.title }}</mat-card-title>
+            <mat-card-subtitle>{{ job.location || '—' }}</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <p>{{ job.description | slice:0:120 }}{{ job.description.length > 120 ? '...' : '' }}</p>
+            <div class="tags">
+              <span class="tag">{{ job.jobType || 'Full-time' }}</span>
+              <span class="tag">{{ job.status || 'open' }}</span>
+            </div>
+          </mat-card-content>
+          <mat-card-actions>
+            <a mat-stroked-button [routerLink]="['/jobs', job.id]">View Details</a>
+          </mat-card-actions>
+        </mat-card>
+      } @empty {
+        <p class="empty">No job postings found.</p>
+      }
+    </div>
+  </div>
+</div>

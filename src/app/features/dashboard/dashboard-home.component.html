@@ -1,0 +1,148 @@
+<div class="sy-dashboard-shell dashboard-page">
+  <section class="sy-page-header">
+    <div>
+      <h1>Welcome, {{ ctx().displayName || ctx().email || 'Client' }}.</h1>
+      <p>Track your immigration dossier, documents, training and travel readiness in one place.</p>
+    </div>
+    <div class="header-actions">
+      <ng-container *ngIf="activeDossier(); else headerNoCase">
+        <span class="sy-status-pill" [ngClass]="statusView().cssClass">
+          Status: {{ statusView().label }}
+        </span>
+        <a routerLink="/client/my-case" class="header-btn">View my case</a>
+      </ng-container>
+      <ng-template #headerNoCase>
+        <a routerLink="/start-audit" class="header-btn">Start my audit</a>
+      </ng-template>
+    </div>
+  </section>
+
+  <!-- Pending draft banner -->
+  <section class="sy-card sy-action-card" *ngIf="hasPendingDraft() && !activeDossier()">
+    <div class="sy-section-title">
+      <h2>An audit is waiting to be saved</h2>
+      <span class="sy-status-pill warning">Draft</span>
+    </div>
+    <p>Your personal audit is not yet converted into an active dossier. Resume the journey to create your SYGEPEC dossier.</p>
+    <div class="quick-links">
+      <a routerLink="/start-audit" [queryParams]="{ resume: 1 }">Resume my audit</a>
+    </div>
+  </section>
+
+  <!-- Loading -->
+  <section class="sy-card" *ngIf="state().loading">
+    <p class="sy-muted">Loading your dossier…</p>
+  </section>
+
+  <!-- Error -->
+  <section class="sy-card sy-action-card" *ngIf="!state().loading && state().error">
+    <div class="sy-section-title">
+      <h2>We could not load your dossier</h2>
+      <span class="sy-status-pill danger">Error</span>
+    </div>
+    <p>{{ state().error }}</p>
+    <div class="quick-links">
+      <button type="button" class="header-btn" (click)="retry()">Retry</button>
+    </div>
+  </section>
+
+  <!-- Empty state -->
+  <section
+    class="sy-card sy-action-card"
+    *ngIf="!state().loading && !state().error && !activeDossier()"
+  >
+    <div class="sy-section-title">
+      <h2>No active case yet</h2>
+    </div>
+    <p>
+      Once your personal audit is completed, your SYGEPEC immigration dossier will appear here with
+      its status, destination and next best action.
+    </p>
+    <div class="quick-links">
+      <a routerLink="/start-audit" class="header-btn">Start my audit</a>
+    </div>
+  </section>
+
+  <!-- Active case -->
+  <section class="main-grid" *ngIf="!state().loading && !state().error && activeDossier() as d">
+    <div class="left-col">
+      <article class="sy-card sy-progress-card">
+        <div class="sy-section-title">
+          <h2>My immigration case</h2>
+          <span class="sy-status-pill" [ngClass]="statusView().cssClass">{{ statusView().label }}</span>
+        </div>
+        <p>
+          <strong>Reference:</strong> {{ d.dossierNumber || d.id }}<br />
+          <strong>Destination:</strong> {{ d.destinationCountry || 'Not yet defined' }}<br />
+          <strong>Goal:</strong> {{ d.immigrationGoal || 'Not yet defined' }}
+        </p>
+        <div class="sy-progress-row">
+          <span>Overall progress</span>
+          <strong>{{ progressPercent() }}%</strong>
+        </div>
+        <div class="sy-progress-track">
+          <div class="sy-progress-fill" [style.width.%]="progressPercent()"></div>
+        </div>
+        <p><strong>Next best action:</strong> {{ nextActionText() }}</p>
+        <div class="quick-links">
+          <a routerLink="/client/my-case">Open my case</a>
+        </div>
+      </article>
+
+      <article class="sy-card">
+        <div class="sy-section-title">
+          <h2>Documents and checklist</h2>
+          <span class="sy-status-pill info">Coming next</span>
+        </div>
+        <p class="sy-muted">
+          Documents and checklist will appear here once generated.
+          <a routerLink="/client/documents">Open the document vault</a>.
+        </p>
+      </article>
+
+      <article class="sy-card">
+        <div class="sy-section-title">
+          <h2>Recommended training</h2>
+          <a routerLink="/client/training-recommendations" class="inline-link">See recommendations</a>
+        </div>
+        <p class="sy-muted">Personalized training recommendations are available in your training space.</p>
+      </article>
+    </div>
+
+    <aside class="right-col">
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title">
+          <h3>SYGEPEC guidance</h3>
+          <span class="sy-status-pill info">Live</span>
+        </div>
+        <p>{{ nextActionText() }}</p>
+        <a routerLink="/support" class="header-btn">Talk to support</a>
+      </article>
+
+      <article class="sy-card">
+        <div class="sy-section-title"><h3>Travel readiness</h3></div>
+        <p class="sy-muted">Travel readiness will appear here once your case reaches the travel preparation step.</p>
+        <div class="quick-links">
+          <a routerLink="/travel">Open travel space</a>
+        </div>
+      </article>
+
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title"><h3>Quick links</h3></div>
+        <div class="quick-links">
+          <a routerLink="/client/profile">My profile</a>
+          <a routerLink="/client/documents">My documents</a>
+          <a routerLink="/support">Support</a>
+          <a *ngIf="ctx()?.['isOrgAdmin']" routerLink="/admin">Admin panel</a>
+        </div>
+      </article>
+    </aside>
+  </section>
+
+  <section class="sy-card">
+    <p class="sy-muted">
+      SYGEPEC provides administrative and educational guidance. Results do not constitute legal advice
+      or a guarantee of visa issuance. A human review is required before any submission.
+    </p>
+  </section>
+</div>

@@ -1,0 +1,249 @@
+<div class="page" *ngIf="dossier(); else loadingTpl">
+  <!-- Header premium -->
+  <header class="sy-page-header dossier-header">
+    <div class="header-top">
+      <a class="back-link" routerLink="/immigration/dossiers" aria-label="Retour aux dossiers">
+        <mat-icon>arrow_back</mat-icon>
+        <span>Dossiers</span>
+      </a>
+      <span class="status-pill" [class]="'status--' + dossier()!.status">
+        <span class="dot"></span>
+        {{ statusLabel(dossier()!.status) }}
+      </span>
+    </div>
+    <div class="header-body">
+      <div class="header-icon" aria-hidden="true">
+        <mat-icon>folder_open</mat-icon>
+      </div>
+      <div class="header-title">
+        <h1>{{ dossier()!.title }}</h1>
+        <p>
+          <mat-icon>person</mat-icon> {{ dossier()!.clientFullName }}
+          <span class="sep">·</span>
+          <mat-icon>flag</mat-icon> {{ dossier()!.destinationCountry }}
+          <span class="sep">·</span>
+          <mat-icon>workspace_premium</mat-icon> {{ dossier()!.program }}
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- KPI -->
+  <section class="sy-grid-4 kpi-grid" aria-label="Indicateurs">
+    <article class="sy-card sy-stat-card kpi kpi--ready">
+      <span class="sy-stat-label">Préparation des documents</span>
+      <strong class="sy-stat-value">{{ docsReadinessPercent() }}%</strong>
+      <span class="kpi-hint">{{ documents().length }} document{{ documents().length > 1 ? 's' : '' }}</span>
+    </article>
+    <article class="sy-card sy-stat-card kpi kpi--validated">
+      <span class="sy-stat-label">Validés</span>
+      <strong class="sy-stat-value">{{ validatedDocsCount() }}</strong>
+      <span class="kpi-hint">Pièces approuvées</span>
+    </article>
+    <article class="sy-card sy-stat-card kpi kpi--missing">
+      <span class="sy-stat-label">Manquants / demandés</span>
+      <strong class="sy-stat-value">{{ requestedDocsCount() }}</strong>
+      <span class="kpi-hint">À fournir</span>
+    </article>
+    <article class="sy-card sy-stat-card kpi kpi--review">
+      <span class="sy-stat-label">À réviser</span>
+      <strong class="sy-stat-value">{{ reviewDocsCount() }}</strong>
+      <span class="kpi-hint">Uploadés ou rejetés</span>
+    </article>
+  </section>
+
+  <!-- Décision admin -->
+  <section class="sy-card decision-card" *ngIf="canSubmitDossier() || canDecideDossier()" aria-label="Actions de décision">
+    <div class="decision-head">
+      <mat-icon>verified</mat-icon>
+      <h2>Actions sur le dossier</h2>
+    </div>
+    <div class="decision-actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        *ngIf="canSubmitDossier() && dossier()!.status !== 'submitted' && dossier()!.status !== 'approved' && dossier()!.status !== 'rejected'"
+        [disabled]="savingSubmit"
+        (click)="submitDossierAction(dossier()!)">
+        <mat-icon>send</mat-icon>
+        <span>{{ savingSubmit ? 'Soumission…' : 'Soumettre le dossier' }}</span>
+      </button>
+      <button
+        type="button"
+        class="btn btn-success"
+        *ngIf="canDecideDossier() && dossier()!.status === 'submitted'"
+        [disabled]="savingDecision"
+        (click)="approveDossierAction(dossier()!)">
+        <mat-icon>check_circle</mat-icon>
+        <span>{{ savingDecision ? '…' : 'Approuver' }}</span>
+      </button>
+      <button
+        type="button"
+        class="btn btn-danger"
+        *ngIf="canDecideDossier() && dossier()!.status === 'submitted'"
+        [disabled]="savingDecision"
+        (click)="rejectDossierAction(dossier()!)">
+        <mat-icon>cancel</mat-icon>
+        <span>{{ savingDecision ? '…' : 'Rejeter' }}</span>
+      </button>
+      <span class="muted small" *ngIf="dossier()!.status === 'approved' || dossier()!.status === 'rejected'">
+        Décision finale enregistrée. Plus d'action requise.
+      </span>
+    </div>
+  </section>
+
+  <section class="vault-grid">
+    <div class="left-col">
+      <!-- Documents -->
+      <article class="sy-card">
+        <div class="sy-section-title">
+          <h2><mat-icon>folder</mat-icon> File de documents</h2>
+          <span class="sy-status-pill warning">Pré-check IA + Révision humaine</span>
+        </div>
+
+        <div class="doc-empty" *ngIf="documents().length === 0">
+          Aucun document pour le moment. Utilisez le formulaire ci-contre pour ajouter une demande.
+        </div>
+
+        <div class="doc-list" *ngIf="documents().length > 0">
+          <div class="doc-row" *ngFor="let doc of documents(); trackBy: trackByDocId">
+            <div class="doc-meta">
+              <strong>{{ doc.title }}</strong>
+              <span class="doc-type">{{ doc.type || 'Général' }}</span>
+              <small *ngIf="doc.notes" class="doc-note">Note : {{ doc.notes }}</small>
+            </div>
+            <div class="doc-controls">
+              <span class="doc-status" [class]="'doc-status--' + doc.status">
+                {{ docStatusLabel(doc.status) }}
+              </span>
+              <a *ngIf="doc.downloadUrl" class="link-btn" [href]="doc.downloadUrl" target="_blank" rel="noreferrer">
+                <mat-icon>open_in_new</mat-icon> Ouvrir
+              </a>
+              <label class="upload-btn" [class.disabled]="uploading[doc.id]">
+                <input type="file" (change)="onFileSelected(dossier()!.id, doc.id, $any($event.target).files?.[0] || null)">
+                <mat-icon>upload_file</mat-icon>
+                {{ uploading[doc.id] ? 'Envoi…' : 'Téléverser' }}
+              </label>
+              <button
+                *ngIf="canReviewDocs() && (doc.status === 'uploaded' || doc.status === 'rejected')"
+                mat-stroked-button type="button" color="primary"
+                (click)="validateDocument(dossier()!.id, doc.id, doc.title)"
+                [disabled]="reviewing[doc.id]">
+                <mat-icon>check</mat-icon> Valider
+              </button>
+              <button
+                *ngIf="canReviewDocs() && (doc.status === 'uploaded' || doc.status === 'validated')"
+                mat-stroked-button type="button" color="warn"
+                (click)="rejectDocument(dossier()!.id, doc.id, doc.title)"
+                [disabled]="reviewing[doc.id]">
+                <mat-icon>close</mat-icon> Rejeter
+              </button>
+            </div>
+            <p class="error" *ngIf="uploadError[doc.id]"><mat-icon>error</mat-icon> {{ uploadError[doc.id] }}</p>
+            <p class="error" *ngIf="reviewError[doc.id]"><mat-icon>error</mat-icon> {{ reviewError[doc.id] }}</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Avertissements -->
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title">
+          <h2><mat-icon>warning</mat-icon> Documents manquants & alertes</h2>
+        </div>
+        <ul class="warn-list">
+          <li *ngIf="requestedDocsCount() === 0 && !hasRejectedDocs()" class="ok">
+            <mat-icon>check_circle</mat-icon> Aucun avertissement.
+          </li>
+          <li *ngFor="let doc of requestedDocs()">
+            <mat-icon>radio_button_unchecked</mat-icon> Document manquant : <b>{{ doc.title }}</b>
+          </li>
+          <li *ngIf="hasRejectedDocs()" class="warn">
+            <mat-icon>cancel</mat-icon> Certains fichiers ont été rejetés et nécessitent une correction.
+          </li>
+        </ul>
+      </article>
+
+      <!-- Notes -->
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title">
+          <h2><mat-icon>edit_note</mat-icon> Ajouter une note</h2>
+        </div>
+        <form [formGroup]="noteForm" (ngSubmit)="addNote(dossier()!.id)" class="simple-form note-form">
+          <mat-form-field appearance="outline" class="full">
+            <mat-label>Message</mat-label>
+            <textarea matInput rows="3" formControlName="message" placeholder="Note interne ou pour le client…"></textarea>
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-flat-button color="primary" type="submit" [disabled]="savingNote || noteForm.invalid">
+              {{ savingNote ? 'Ajout…' : 'Ajouter la note' }}
+            </button>
+          </div>
+        </form>
+      </article>
+    </div>
+
+    <aside class="right-col">
+      <!-- Statut -->
+      <article class="sy-card sy-progress-card" *ngIf="canSubmitDossier()">
+        <div class="sy-section-title"><h3><mat-icon>flag</mat-icon> Modifier le statut</h3></div>
+        <form [formGroup]="statusForm" (ngSubmit)="updateStatus(dossier()!.id)" class="simple-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Statut</mat-label>
+            <mat-select formControlName="status">
+              <mat-option *ngFor="let s of statuses" [value]="s">{{ statusLabel(s) }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" [disabled]="savingStatus">
+            {{ savingStatus ? 'Sauvegarde…' : 'Mettre à jour' }}
+          </button>
+        </form>
+      </article>
+
+      <!-- Demande de document -->
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title"><h3><mat-icon>note_add</mat-icon> Demander un document</h3></div>
+        <form [formGroup]="docForm" (ngSubmit)="addDocument(dossier()!.id)" class="simple-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Titre du document</mat-label>
+            <input matInput formControlName="title" placeholder="Justificatif de fonds" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Catégorie</mat-label>
+            <input matInput formControlName="type" placeholder="Financier" />
+          </mat-form-field>
+          <button mat-stroked-button type="submit" [disabled]="savingDoc || docForm.invalid">
+            {{ savingDoc ? 'Ajout…' : 'Ajouter la demande' }}
+          </button>
+        </form>
+      </article>
+
+      <!-- Timeline -->
+      <article class="sy-card sy-timeline-card">
+        <div class="sy-section-title"><h3><mat-icon>history</mat-icon> Activité récente</h3></div>
+        <div class="timeline-list" *ngIf="timeline().length > 0; else noTimelineTpl">
+          <div class="timeline-item" *ngFor="let event of timeline().slice(0, 10); trackBy: trackByEventId">
+            <div class="ti-head">
+              <mat-icon class="ti-icon">{{ eventIcon(event.type) }}</mat-icon>
+              <strong>{{ eventLabel(event.type) }}</strong>
+              <span class="ti-time">{{ relative(event.createdAt) }}</span>
+            </div>
+            <p class="ti-msg">{{ event.message }}</p>
+            <span class="ti-actor" *ngIf="event.actorName">— {{ event.actorName }}</span>
+          </div>
+        </div>
+      </article>
+    </aside>
+  </section>
+</div>
+
+<ng-template #loadingTpl>
+  <div class="sy-loading-state">
+    <mat-icon>hourglass_top</mat-icon>
+    Chargement du dossier…
+  </div>
+</ng-template>
+
+<ng-template #noTimelineTpl>
+  <div class="sy-empty-state">Aucune activité enregistrée.</div>
+</ng-template>
+

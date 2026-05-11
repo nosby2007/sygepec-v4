@@ -11,7 +11,8 @@ import {
   limit
 } from 'firebase/firestore';
 import { from, map, Observable } from 'rxjs';
-import { LiveSession } from './training.models';
+import { LiveSession } from './training.model';
+
 
 @Injectable({ providedIn: 'root' })
 export class LiveSessionsRepository {

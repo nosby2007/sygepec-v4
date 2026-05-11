@@ -14,7 +14,8 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { from, map, Observable } from 'rxjs';
-import { Course, CourseSummary } from './training.models';
+import { CourseSummary, Course } from './training.model';
+
 
 @Injectable({ providedIn: 'root' })
 export class CoursesRepository {

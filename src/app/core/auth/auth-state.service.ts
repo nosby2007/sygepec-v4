@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import {
-  getAuth,
+  Auth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -10,24 +10,34 @@ import {
   User
 } from 'firebase/auth';
 import {
-  getFirestore,
+  Firestore,
   doc,
   setDoc,
   serverTimestamp,
   getDoc
 } from 'firebase/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { FIREBASE_AUTH, FIRESTORE_DB } from '../firebase/firebase.providers';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private auth = getAuth();
-  private db = getFirestore();
+  private auth: Auth = inject(FIREBASE_AUTH);
+  private db: Firestore = inject(FIRESTORE_DB);
 
   private userSubject = new BehaviorSubject<User | null>(null);
   readonly user$ = this.userSubject.asObservable();
 
   constructor() {
     onAuthStateChanged(this.auth, user => this.userSubject.next(user));
+  }
+
+  appUser(): User | null {
+    return this.userSubject.getValue();
+  }
+
+  isGlobalAdmin(): boolean {
+    // Override in production with custom claims check if needed
+    return false;
   }
 
   async register(email: string, password: string, displayName?: string, tenantId?: string) {
@@ -43,6 +53,11 @@ export class AuthService {
       email,
       displayName: displayName ?? null,
       tenantId: tenantId ?? null,
+      orgId: tenantId ?? null,
+      role: 'client',
+      roles: ['client'],
+      globalRole: 'user',
+      isActive: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

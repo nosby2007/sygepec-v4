@@ -1,0 +1,100 @@
+@import '../../../../theme.scss';
+
+.admin-page {
+  gap: 18px;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.header-btn {
+  border-radius: 12px;
+  background: $sy-primary-trust-blue;
+  color: #fff;
+  padding: 9px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.header-btn.secondary {
+  background: #fff;
+  color: $sy-text-primary;
+  border: 1px solid rgba(16, 32, 51, 0.2);
+}
+
+.kpi-change {
+  color: $sy-text-secondary;
+  font-size: 0.8rem;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 16px;
+}
+
+.left-col,
+.right-col {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 6px;
+  border-bottom: 1px solid rgba(16, 32, 51, 0.08);
+  font-size: 0.86rem;
+}
+
+.data-table th {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $sy-text-secondary;
+}
+
+.queue-grid,
+.review-list,
+.timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.queue-item,
+.review-item,
+.timeline-item {
+  border: 1px solid rgba(16, 32, 51, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfdff;
+}
+
+.review-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.review-item p,
+.timeline-item,
+.sy-card p {
+  margin: 0;
+  color: $sy-text-secondary;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 1080px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,187 @@
+/**
+ * SYGEPEC Design System
+ * Premium immigration SaaS platform theme
+ */
+
+// ============================================
+// COLOR PALETTE
+// ============================================
+
+// Primary Colors
+$sy-primary-navy: #0B1F3A;
+$sy-primary-deep-blue: #123C69;
+$sy-primary-trust-blue: #1E63D6;
+
+// Accent Colors
+$sy-accent-teal: #14B8A6;
+$sy-accent-gold: #F5B841;
+
+// Backgrounds
+$sy-bg-soft: #F6F9FC;
+$sy-bg-card: #FFFFFF;
+
+// Text
+$sy-text-primary: #102033;
+$sy-text-secondary: #5E6B7A;
+
+// Semantic Colors
+$sy-success: #16A34A;
+$sy-warning: #F59E0B;
+$sy-danger: #DC2626;
+$sy-info: #2563EB;
+
+// ============================================
+// TYPOGRAPHY
+// ============================================
+
+$sy-font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+$sy-font-size-xs: 12px;
+$sy-font-size-sm: 14px;
+$sy-font-size-base: 16px;
+$sy-font-size-lg: 18px;
+$sy-font-size-xl: 20px;
+$sy-font-size-2xl: 24px;
+$sy-font-size-3xl: 30px;
+$sy-font-size-4xl: 36px;
+
+$sy-font-weight-regular: 400;
+$sy-font-weight-medium: 500;
+$sy-font-weight-semibold: 600;
+$sy-font-weight-bold: 700;
+
+$sy-line-height-tight: 1.2;
+$sy-line-height-normal: 1.5;
+$sy-line-height-relaxed: 1.75;
+
+// ============================================
+// SPACING
+// ============================================
+
+$sy-spacing-xs: 4px;
+$sy-spacing-sm: 8px;
+$sy-spacing-md: 12px;
+$sy-spacing-lg: 16px;
+$sy-spacing-xl: 24px;
+$sy-spacing-2xl: 32px;
+$sy-spacing-3xl: 48px;
+$sy-spacing-4xl: 64px;
+
+// ============================================
+// BORDER RADIUS
+// ============================================
+
+$sy-radius-sm: 8px;
+$sy-radius-md: 12px;
+$sy-radius-lg: 20px;
+$sy-radius-xl: 24px;
+$sy-radius-2xl: 32px;
+$sy-radius-full: 9999px;
+
+// ============================================
+// SHADOWS
+// ============================================
+
+$sy-shadow-none: none;
+$sy-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$sy-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$sy-shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+$sy-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+// ============================================
+// TRANSITIONS
+// ============================================
+
+$sy-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+$sy-transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+$sy-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+// ============================================
+// GRADIENTS
+// ============================================
+
+$sy-gradient-primary: linear-gradient(135deg, $sy-primary-navy 0%, $sy-primary-deep-blue 50%, $sy-primary-trust-blue 100%);
+$sy-gradient-accent: linear-gradient(135deg, $sy-accent-teal 0%, $sy-accent-gold 100%);
+$sy-gradient-success: linear-gradient(135deg, #059669 0%, $sy-success 100%);
+
+// ============================================
+// Z-INDEX SCALE
+// ============================================
+
+$sy-z-hide: -1;
+$sy-z-base: 0;
+$sy-z-dropdown: 100;
+$sy-z-sticky: 200;
+$sy-z-fixed: 300;
+$sy-z-modal-backdrop: 400;
+$sy-z-modal: 500;
+$sy-z-popover: 600;
+$sy-z-tooltip: 700;
+$sy-z-notification: 800;
+
+// ============================================
+// CSS CUSTOM PROPERTIES FOR JS ACCESS
+// ============================================
+
+:root {
+  // Colors
+  --sy-primary-navy: #{$sy-primary-navy};
+  --sy-primary-deep-blue: #{$sy-primary-deep-blue};
+  --sy-primary-trust-blue: #{$sy-primary-trust-blue};
+  --sy-accent-teal: #{$sy-accent-teal};
+  --sy-accent-gold: #{$sy-accent-gold};
+  --sy-bg-soft: #{$sy-bg-soft};
+  --sy-bg-card: #{$sy-bg-card};
+  --sy-text-primary: #{$sy-text-primary};
+  --sy-text-secondary: #{$sy-text-secondary};
+  --sy-success: #{$sy-success};
+  --sy-warning: #{$sy-warning};
+  --sy-danger: #{$sy-danger};
+  --sy-info: #{$sy-info};
+
+  // Requested aliases
+  --sy-primary: #{$sy-primary-navy};
+  --sy-primary-dark: #{$sy-primary-deep-blue};
+  --sy-deep-blue: #{$sy-primary-deep-blue};
+  --sy-blue: #{$sy-primary-trust-blue};
+  --sy-teal: #{$sy-accent-teal};
+  --sy-gold: #{$sy-accent-gold};
+  --sy-bg: #{$sy-bg-soft};
+  --sy-card: #{$sy-bg-card};
+  --sy-text: #{$sy-text-primary};
+  --sy-muted: #{$sy-text-secondary};
+  --sy-border: #D8E1EE;
+  --sy-gradient-primary: #{$sy-gradient-primary};
+  --sy-gradient-hero: linear-gradient(155deg, #0B1F3A, #123C69 60%, #1E63D6 100%);
+  --sy-gradient-gold: linear-gradient(135deg, #F5B841, #f7cf73);
+
+  // Typography
+  --sy-font-family: #{$sy-font-family};
+  --sy-font-size-xs: #{$sy-font-size-xs};
+  --sy-font-size-sm: #{$sy-font-size-sm};
+  --sy-font-size-base: #{$sy-font-size-base};
+  --sy-font-size-lg: #{$sy-font-size-lg};
+  --sy-font-size-xl: #{$sy-font-size-xl};
+
+  // Spacing
+  --sy-spacing-xs: #{$sy-spacing-xs};
+  --sy-spacing-sm: #{$sy-spacing-sm};
+  --sy-spacing-md: #{$sy-spacing-md};
+  --sy-spacing-lg: #{$sy-spacing-lg};
+  --sy-spacing-xl: #{$sy-spacing-xl};
+
+  // Radius
+  --sy-radius-sm: #{$sy-radius-sm};
+  --sy-radius-md: #{$sy-radius-md};
+  --sy-radius-lg: #{$sy-radius-lg};
+  --sy-radius-xl: #{$sy-radius-xl};
+
+  // Shadows
+  --sy-shadow-sm: #{$sy-shadow-sm};
+  --sy-shadow-card: #{$sy-shadow-card};
+  --sy-shadow-xl: 0 24px 45px -12px rgba(11, 31, 58, 0.22);
+
+  // Z-index
+  --sy-z-modal: #{$sy-z-modal};
+  --sy-z-dropdown: #{$sy-z-dropdown};
+}

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { AuthStateService } from '../auth/auth-state.service';
+import { AuthService as AuthStateService } from '../auth/auth-state.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { OrgMembershipService } from '../tenant/org-membership.service';
 import { NavItem } from './nav.types';

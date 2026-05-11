@@ -1,0 +1,130 @@
+<div class="sy-dashboard-shell admin-page">
+  <section class="sy-page-header">
+    <div>
+      <h1>Tableau de bord administration</h1>
+      <p>Tenant : {{ tenantId() || 'N/A' }} · Rôles : {{ (roles() || []).join(', ') || 'aucun' }}</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="header-btn secondary" (click)="refresh()" [disabled]="loading()">
+        {{ loading() ? 'Chargement…' : '↻ Rafraîchir' }}
+      </button>
+      <a routerLink="/admin/cases" class="header-btn">Dossiers</a>
+      <a routerLink="/admin/documents" class="header-btn">Documents</a>
+      <a routerLink="/admin/tasks" class="header-btn">Tâches</a>
+      <a routerLink="/admin/users" class="header-btn secondary">Utilisateurs</a>
+      <a routerLink="/admin/organizations" class="header-btn secondary">Organisations</a>
+      <a routerLink="/admin/settings" class="header-btn secondary">Paramètres</a>
+    </div>
+  </section>
+
+  <div *ngIf="errorMsg() as err" class="sy-card" style="border-left:4px solid #dc2626;">
+    <strong>Erreur</strong>
+    <p style="margin:4px 0 0;">{{ err }}</p>
+  </div>
+
+  <section class="sy-grid-4">
+    <article class="sy-card sy-stat-card" *ngFor="let card of kpiCards()">
+      <span class="sy-stat-label">{{ card.label }}</span>
+      <strong class="sy-stat-value">{{ card.value }}</strong>
+      <span class="kpi-change">{{ card.change }}</span>
+    </article>
+  </section>
+
+  <section class="admin-grid">
+    <div class="left-col">
+      <article class="sy-card sy-timeline-card">
+        <div class="sy-section-title">
+          <h2>Leads récents</h2>
+          <a routerLink="/admin/users">Tout voir</a>
+        </div>
+        <ng-container *ngIf="recentLeads().length; else noLeads">
+          <table class="data-table">
+            <thead>
+              <tr><th>Lead</th><th>Destination</th><th>Statut</th><th>Date</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let lead of recentLeads()">
+                <td>{{ lead.name }}</td>
+                <td>{{ lead.destination }}</td>
+                <td><span class="sy-status-pill" [ngClass]="getLeadStatusClass(lead.status)">{{ getLeadStatusLabel(lead.status) }}</span></td>
+                <td>{{ lead.time }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </ng-container>
+        <ng-template #noLeads>
+          <p style="margin:0;color:#64748b;font-size:.85rem;">
+            {{ loading() ? 'Chargement des leads…' : 'Aucun lead pour le moment.' }}
+          </p>
+        </ng-template>
+      </article>
+
+      <article class="sy-card sy-action-card">
+        <div class="sy-section-title"><h2>Files d'attente</h2></div>
+        <div class="queue-grid">
+          <div class="queue-item">
+            <strong>Dossiers en attente de révision</strong>
+            <span class="sy-status-pill warning">{{ queueStats().casesAwaitingReview }} en attente</span>
+          </div>
+          <div class="queue-item">
+            <strong>Documents à examiner</strong>
+            <span class="sy-status-pill danger">{{ queueStats().docsUrgent }} urgent{{ queueStats().docsUrgent > 1 ? 's' : '' }}</span>
+          </div>
+          <div class="queue-item">
+            <strong>Demandes de voyage</strong>
+            <span class="sy-status-pill info">{{ queueStats().flightsOpen }} ouverte{{ queueStats().flightsOpen > 1 ? 's' : '' }}</span>
+          </div>
+          <div class="queue-item">
+            <strong>Référencements formation</strong>
+            <span class="sy-status-pill success">{{ queueStats().trainingsActive }} actif{{ queueStats().trainingsActive > 1 ? 's' : '' }}</span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <aside class="right-col">
+      <article class="sy-card sy-document-card">
+        <div class="sy-section-title"><h3>Documents à réviser</h3></div>
+        <ng-container *ngIf="pendingReviews().length; else noReviews">
+          <div class="review-list">
+            <div class="review-item" *ngFor="let review of pendingReviews()">
+              <div>
+                <strong>{{ review.client }}</strong>
+                <p>{{ review.doc }} · {{ review.issue }}</p>
+              </div>
+              <span class="sy-status-pill" [ngClass]="review.priority === 'high' ? 'danger' : (review.priority === 'medium' ? 'warning' : 'info')">{{ review.priority }}</span>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noReviews>
+          <p style="margin:0;color:#64748b;font-size:.85rem;">
+            {{ loading() ? 'Chargement…' : 'Aucun document en attente.' }}
+          </p>
+        </ng-template>
+      </article>
+
+      <article class="sy-card sy-timeline-card">
+        <div class="sy-section-title"><h3>Activité récente</h3></div>
+        <ng-container *ngIf="recentTimeline().length; else noTimeline">
+          <div class="timeline">
+            <div class="timeline-item" *ngFor="let event of recentTimeline()">
+              <strong style="display:block;">{{ event.label }}</strong>
+              <span style="font-size:.78rem;color:#64748b;">{{ event.time }}</span>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noTimeline>
+          <p style="margin:0;color:#64748b;font-size:.85rem;">
+            {{ loading() ? 'Chargement…' : 'Aucun événement récent.' }}
+          </p>
+        </ng-template>
+      </article>
+
+      <article class="sy-card sy-action-card" *ngIf="stats()">
+        <div class="sy-section-title"><h3>Snapshot plateforme</h3></div>
+        <p>Utilisateurs : {{ stats()!.usersCount }} (actifs {{ stats()!.activeUsersCount ?? 'n/a' }})</p>
+        <p>Organisations : {{ stats()!.orgsCount }} (actives {{ stats()!.activeOrgsCount ?? 'n/a' }})</p>
+      </article>
+    </aside>
+  </section>
+</div>
