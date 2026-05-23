@@ -49,6 +49,11 @@ export class JobsListComponent {
   readonly ctx = this.authCtx.context;
   private readonly ctx$ = toObservable(this.ctx);
 
+  readonly canManage = computed(() => {
+    const c = this.ctx();
+    return c.isGlobalAdmin === true || c.isOrgAdmin === true;
+  });
+
   saving = false;
 
   readonly q = new FormControl('', { nonNullable: true });

@@ -66,6 +66,15 @@
   <!-- Active case -->
   <section class="main-grid" *ngIf="!state().loading && !state().error && activeDossier() as d">
     <div class="left-col">
+      <article class="journey-card" [attr.data-tone]="journeyAction().tone">
+        <div>
+          <span class="journey-eyebrow">{{ journeyAction().eyebrow }}</span>
+          <h2>{{ journeyAction().title }}</h2>
+          <p>{{ journeyAction().description }}</p>
+        </div>
+        <a [routerLink]="journeyAction().route" class="journey-cta">{{ journeyAction().label }}</a>
+      </article>
+
       <article class="sy-card sy-progress-card">
         <div class="sy-section-title">
           <h2>My immigration case</h2>
@@ -92,12 +101,91 @@
       <article class="sy-card">
         <div class="sy-section-title">
           <h2>Documents and checklist</h2>
-          <span class="sy-status-pill info">Coming next</span>
+          <span class="sy-status-pill info" *ngIf="documentsState().loading">Loading</span>
+          <span class="sy-status-pill danger" *ngIf="!documentsState().loading && documentsState().error">Error</span>
+          <span class="sy-status-pill" *ngIf="!documentsState().loading && !documentsState().error">
+            {{ checklistView().completionRate }}% ready
+          </span>
         </div>
-        <p class="sy-muted">
-          Documents and checklist will appear here once generated.
-          <a routerLink="/client/documents">Open the document vault</a>.
-        </p>
+        <ng-container *ngIf="documentsState().loading">
+          <p class="sy-muted">Loading your document vault…</p>
+        </ng-container>
+        <ng-container *ngIf="!documentsState().loading && documentsState().error">
+          <p class="sy-muted">{{ documentsState().error }}</p>
+          <div class="quick-links">
+            <button type="button" class="header-btn" (click)="retryDocuments()">Retry</button>
+          </div>
+        </ng-container>
+        <ng-container *ngIf="!documentsState().loading && !documentsState().error">
+          <div class="doc-summary">
+            <div>
+              <span>Requested</span>
+              <strong>{{ documentsRequested() }}</strong>
+            </div>
+            <div>
+              <span>In review</span>
+              <strong>{{ documentsInReview() }}</strong>
+            </div>
+            <div>
+              <span>Approved</span>
+              <strong>{{ documentsApproved() }}</strong>
+            </div>
+          </div>
+          <div class="sy-progress-track">
+            <div class="sy-progress-fill" [style.width.%]="checklistView().completionRate"></div>
+          </div>
+          <p class="sy-muted">
+            Open your secure document vault to upload missing files, replace rejected documents and
+            follow the human review status.
+          </p>
+          <div class="quick-links">
+            <a routerLink="/client/documents">Open the document vault</a>
+          </div>
+        </ng-container>
+      </article>
+
+      <article class="sy-card">
+        <div class="sy-section-title">
+          <h2>Priority actions</h2>
+          <span class="sy-status-pill warning" *ngIf="documentsActionable().length || urgentTasks().length">
+            {{ documentsActionable().length + urgentTasks().length }} open
+          </span>
+          <span class="sy-status-pill success" *ngIf="!documentsActionable().length && !urgentTasks().length">
+            Clear
+          </span>
+        </div>
+
+        <div class="action-list" *ngIf="documentsActionable().length || urgentTasks().length; else noPriorityActions">
+          <a routerLink="/client/documents" class="action-row" *ngIf="documentsActionable().length">
+            <span class="action-icon">DOC</span>
+            <div>
+              <strong>{{ documentsActionable().length }} document(s) need your action</strong>
+              <p>
+                {{ topMissingDocuments().join(', ') || 'Open your document vault for the current checklist.' }}
+              </p>
+            </div>
+            <span class="action-arrow">Open</span>
+          </a>
+
+          <a routerLink="/client/my-case" class="action-row" *ngFor="let task of urgentTasks()">
+            <span class="action-icon">TASK</span>
+            <div>
+              <strong>{{ task.title }}</strong>
+              <p>
+                {{ taskKindLabel(task) }} · {{ taskPriorityLabel(task) }}
+                <span *ngIf="task.dueAt"> · due {{ formatDate(task.dueAt) }}</span>
+              </p>
+            </div>
+            <span class="sy-status-pill" [ngClass]="taskStatusClass(task)">{{ taskStatusLabel(task) }}</span>
+          </a>
+        </div>
+
+        <ng-template #noPriorityActions>
+          <p class="sy-muted">
+            No urgent client action is open. Keep an eye on document decisions, advisor comments and
+            new service recommendations.
+          </p>
+        </ng-template>
       </article>
 
       <article class="sy-card">
@@ -112,11 +200,37 @@
     <aside class="right-col">
       <article class="sy-card sy-action-card">
         <div class="sy-section-title">
-          <h3>SYGEPEC guidance</h3>
-          <span class="sy-status-pill info">Live</span>
+          <h3>Journey timeline</h3>
+          <span class="sy-status-pill info" *ngIf="timelineState().loading">Loading</span>
+          <span class="sy-status-pill danger" *ngIf="!timelineState().loading && timelineState().error">Error</span>
         </div>
-        <p>{{ nextActionText() }}</p>
-        <a routerLink="/support" class="header-btn">Talk to support</a>
+        <ng-container *ngIf="timelineState().error">
+          <p class="sy-muted">{{ timelineState().error }}</p>
+          <button type="button" class="header-btn" (click)="retryTimeline()">Retry</button>
+        </ng-container>
+        <div class="timeline-mini" *ngIf="!timelineState().error">
+          <div class="timeline-item" *ngFor="let event of timelineView()">
+            <span class="timeline-dot"></span>
+            <div>
+              <strong>{{ event.actorName || event.type }}</strong>
+              <p>{{ event.message }}</p>
+              <em>{{ formatDate(event.createdAt) }}</em>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="sy-card">
+        <div class="sy-section-title"><h3>Workflow stages</h3></div>
+        <div class="stage-list">
+          <div class="stage-item" *ngFor="let step of journeySteps()" [attr.data-state]="step.state">
+            <span class="stage-marker"></span>
+            <div>
+              <strong>{{ step.label }}</strong>
+              <p>{{ step.description }}</p>
+            </div>
+          </div>
+        </div>
       </article>
 
       <article class="sy-card">

@@ -1,38 +1,79 @@
-<div class="jobs-page">
-  <mat-toolbar class="page-header">
-    <span>Job Opportunities</span>
-    <span class="spacer"></span>
-  </mat-toolbar>
+<div class="sy-dashboard-shell jobs-list-page">
+  <section class="sy-page-header">
+    <div>
+      <h1>Opportunités d'emploi</h1>
+      <p>Parcourez les offres disponibles, filtrez par mots-clés et postulez en un clic.</p>
+    </div>
+    <div class="header-actions">
+      @if (canManage()) {
+        <a routerLink="/jobs/new" class="header-btn">
+          <span class="material-icons">add</span> Créer une offre
+        </a>
+      }
+      <a routerLink="/jobs" class="header-btn ghost">
+        <span class="material-icons">arrow_back</span> Retour
+      </a>
+    </div>
+  </section>
 
-  <div class="content">
-    <div class="filters">
-      <mat-form-field>
-        <mat-label>Search</mat-label>
-        <input matInput [formControl]="q" placeholder="Title, location..." />
-      </mat-form-field>
+  <section class="sy-card">
+    <div class="sy-section-title">
+      <h2>Filtres</h2>
+      <span class="muted small">{{ filtered().length }} offre(s)</span>
     </div>
 
-    <div class="jobs-list">
-      @for (job of filtered(); track job.id) {
-        <mat-card class="job-card" routerLink="/jobs/{{ job.id }}">
-          <mat-card-header>
-            <mat-card-title>{{ job.title }}</mat-card-title>
-            <mat-card-subtitle>{{ job.location || '—' }}</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <p>{{ job.description | slice:0:120 }}{{ job.description.length > 120 ? '...' : '' }}</p>
-            <div class="tags">
-              <span class="tag">{{ job.jobType || 'Full-time' }}</span>
-              <span class="tag">{{ job.status || 'open' }}</span>
-            </div>
-          </mat-card-content>
-          <mat-card-actions>
-            <a mat-stroked-button [routerLink]="['/jobs', job.id]">View Details</a>
-          </mat-card-actions>
-        </mat-card>
-      } @empty {
-        <p class="empty">No job postings found.</p>
+    <div class="filters">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Recherche</mat-label>
+        <input matInput [formControl]="q" placeholder="Titre, localisation..." />
+      </mat-form-field>
+
+      @if (ctx().tenantId?.startsWith('org_')) {
+        <mat-form-field appearance="outline">
+          <mat-label>Statut</mat-label>
+          <mat-select [formControl]="status">
+            <mat-option value="">Tous</mat-option>
+            @for (s of statuses; track s) {
+              <mat-option [value]="s">{{ s }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
       }
     </div>
-  </div>
+  </section>
+
+  @if (filtered().length === 0) {
+    <div class="sy-empty-state">Aucune offre ne correspond à vos critères.</div>
+  } @else {
+    <div class="jobs-grid">
+      @for (job of filtered(); track job.id) {
+        <a class="job-card" [routerLink]="['/jobs', job.id]">
+          <div class="job-card-head">
+            <h3>{{ job.title }}</h3>
+            <span class="sy-status-pill"
+                  [ngClass]="job.status === 'open' ? 'success' : (job.status === 'draft' ? 'warning' : 'danger')">
+              {{ job.status || 'open' }}
+            </span>
+          </div>
+
+          <div class="job-card-meta">
+            <span class="material-icons">place</span>
+            <span>{{ job.location || 'Lieu non précisé' }}</span>
+          </div>
+
+          <p class="job-card-desc">
+            {{ (job.description || '') | slice:0:140 }}{{ (job.description || '').length > 140 ? '…' : '' }}
+          </p>
+
+          <div class="job-card-tags">
+            <span class="chip">{{ job.jobType || 'full_time' }}</span>
+          </div>
+
+          <div class="job-card-cta">
+            Voir le détail <span class="material-icons">arrow_forward</span>
+          </div>
+        </a>
+      }
+    </div>
+  }
 </div>

@@ -31,6 +31,9 @@ export interface JobApplication {
   coverLetter?: string | null;
   resumeUrl?: string | null;
 
+  /** Fichiers soumis par le candidat (CV, diplômes, lettres, etc.) */
+  dossierFiles?: { name: string; url: string; path: string; size?: number; contentType?: string | null }[] | null;
+
   status: ApplicationStatus;
 
   createdAt?: any;

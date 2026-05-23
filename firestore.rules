@@ -632,6 +632,75 @@ service cloud.firestore {
       allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
       allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();
     }
+
+    // -------------------------------------------------------------------
+    // Jobs (offres d'emploi internationales) — création réservée aux admins
+    // -------------------------------------------------------------------
+    function isJobsAdmin() {
+      return signedIn() && (
+        isSuperAdmin()
+        || hasAnyRole(['org_admin', 'orgAdmin', 'admin', 'agent', 'staff', 'owner'])
+      );
+    }
+
+    match /jobs/{jobId} {
+      // Lecture : offres publiées visibles à tout utilisateur connecté ;
+      // brouillons / fermées visibles seulement aux admins du tenant ou super-admin.
+      allow read: if signedIn() && (
+        isSuperAdmin()
+        || (resource.data.isPublished == true && resource.data.status == 'open')
+        || (isJobsAdmin() && sameTenant(resource.data))
+      );
+
+      // Création : admins uniquement. Le postedByUid doit correspondre à l'auteur.
+      allow create: if isJobsAdmin()
+        && request.resource.data.postedByUid == request.auth.uid
+        && request.resource.data.tenantId is string
+        && request.resource.data.title is string
+        && (
+          isSuperAdmin()
+          || sameTenant(request.resource.data)
+        );
+
+      // Mise à jour : admins du même tenant ou super-admin. Tenant immuable.
+      allow update: if isJobsAdmin()
+        && (
+          isSuperAdmin()
+          || (sameTenant(resource.data) && tenantUnchanged())
+        );
+
+      allow delete: if isSuperAdmin()
+        || (isJobsAdmin() && sameTenant(resource.data));
+
+      // Candidatures : sous-collection /jobs/{jobId}/applications/{appId}
+      match /applications/{appId} {
+        allow read: if signedIn() && (
+          isSuperAdmin()
+          || isOwner(resource.data.applicantUid)
+          || (isJobsAdmin() && sameTenant(resource.data))
+        );
+
+        // Tout utilisateur connecté peut postuler à une offre publiée
+        // pour son propre compte ; statut initial verrouillé à 'submitted'.
+        allow create: if signedIn()
+          && request.resource.data.applicantUid == request.auth.uid
+          && request.resource.data.jobId == jobId
+          && request.resource.data.status == 'submitted'
+          && exists(/databases/$(database)/documents/jobs/$(jobId))
+          && get(/databases/$(database)/documents/jobs/$(jobId)).data.isPublished == true
+          && get(/databases/$(database)/documents/jobs/$(jobId)).data.status == 'open'
+          && request.resource.data.tenantId == get(/databases/$(database)/documents/jobs/$(jobId)).data.tenantId;
+
+        // Seuls les admins peuvent muter le statut / notes internes.
+        allow update: if signedIn() && (
+          isSuperAdmin()
+          || (isJobsAdmin() && sameTenant(resource.data))
+        );
+
+        allow delete: if isSuperAdmin();
+      }
+    }
+
     match /sygepecClientDocuments/{docId} {
       allow read: if canReadOwnedOrTenant(resource.data) || isSuperAdmin();
       allow create, update, delete: if canWriteOwnedOrTenant(request.resource.data) || isSuperAdmin();

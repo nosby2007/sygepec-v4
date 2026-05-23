@@ -1,25 +1,189 @@
-<mat-toolbar>
-  <a mat-icon-button routerLink="/jobs"><mat-icon>arrow_back</mat-icon></a>
-  <span>{{ job()?.title ?? 'Détail offre' }}</span>
-</mat-toolbar>
-
-<div class="wrap">
-  @if (job(); as j) {
-    <mat-card>
-      <mat-card-title>{{ j.title }}</mat-card-title>
-      <mat-card-subtitle>{{ j.location }}</mat-card-subtitle>
-      <mat-card-content>
-        <p>{{ j.description }}</p>
-        <p><strong>Type :</strong> {{ j.jobType }}</p>
-        <p><strong>Statut :</strong> {{ j.status }}</p>
-      </mat-card-content>
-      <mat-card-actions>
-        @if (!applying) {
-          <button mat-flat-button color="primary" (click)="applying = true">Postuler</button>
+<div class="sy-dashboard-shell job-details-page">
+  <section class="sy-page-header">
+    <div>
+      <h1>{{ job()?.title || 'Détail de l\'offre' }}</h1>
+      <p>
+        @if (job(); as j) {
+          {{ j.location || 'Lieu non précisé' }} · {{ j.jobType || 'full_time' }}
+        } @else {
+          Chargement de l'offre…
         }
-      </mat-card-actions>
-    </mat-card>
+      </p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/jobs" class="header-btn ghost">
+        <span class="material-icons">arrow_back</span> Retour
+      </a>
+    </div>
+  </section>
+
+  @if (job(); as j) {
+    @if (j.coverUrl) {
+      <section class="sy-card cover-card">
+        <img class="cover-img" [src]="j.coverUrl" [alt]="j.title" />
+      </section>
+    }
+
+    <section class="sy-card">
+      <div class="sy-section-title">
+        <h2>Description</h2>
+        <span class="sy-status-pill"
+              [ngClass]="j.status === 'open' ? 'success' : (j.status === 'draft' ? 'warning' : 'danger')">
+          {{ j.status }}
+        </span>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-row"><span class="label">Lieu</span><b>{{ j.location || '—' }}</b></div>
+        <div class="info-row"><span class="label">Type</span><b>{{ j.jobType }}</b></div>
+        <div class="info-row"><span class="label">Statut</span><b>{{ j.status }}</b></div>
+      </div>
+
+      <p class="job-desc">{{ j.description }}</p>
+
+      @if (isOwnerOrg(j)) {
+        <div class="owner-actions">
+          @if (j.status !== 'open') {
+            <button type="button" class="sy-submit" (click)="publish(j)" [disabled]="savingAction">
+              <span class="material-icons">publish</span> Publier
+            </button>
+          }
+          @if (j.status !== 'closed') {
+            <button type="button" class="sy-submit secondary" (click)="close(j)" [disabled]="savingAction">
+              <span class="material-icons">lock</span> Clôturer
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+    @if (!isOwnerOrg(j) && ctx().uid && j.status === 'open') {
+      <section class="sy-card">
+        <div class="sy-section-title">
+          <h2>Postuler</h2>
+          @if (myAppsForJob(j.id).length > 0) {
+            <span class="sy-status-pill success">Candidature envoyée</span>
+          }
+        </div>
+
+        @if (myAppsForJob(j.id).length === 0) {
+          <form class="apply-form" [formGroup]="applyForm" (ngSubmit)="apply(j)">
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Lettre de motivation</mat-label>
+              <textarea matInput rows="5" formControlName="coverLetter"
+                        placeholder="Présentez-vous brièvement et expliquez votre intérêt pour ce poste."></textarea>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Lien vers votre CV (optionnel)</mat-label>
+              <input matInput formControlName="resumeUrl" placeholder="https://..." />
+            </mat-form-field>
+
+            <div class="dossier-block">
+              <div class="dossier-head">
+                <div>
+                  <strong>Mon dossier de candidature</strong>
+                  <small>CV, diplômes, lettres, passeport... (PDF / images, max 15 Mo / fichier)</small>
+                </div>
+                <label class="dossier-add">
+                  <input type="file" multiple
+                         accept=".pdf,image/*,.doc,.docx"
+                         (change)="onDossierFilesSelected($event)" hidden />
+                  <span class="material-icons">attach_file</span> Ajouter des fichiers
+                </label>
+              </div>
+
+              @if (dossierFiles().length > 0) {
+                <ul class="dossier-files">
+                  @for (f of dossierFiles(); track f.name + f.size; let i = $index) {
+                    <li>
+                      <span class="material-icons">description</span>
+                      <span class="f-name">{{ f.name }}</span>
+                      <span class="f-size">{{ (f.size / 1024) | number:'1.0-0' }} Ko</span>
+                      <button type="button" class="f-remove" (click)="removeDossierFile(i)" aria-label="Retirer">
+                        <span class="material-icons">close</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <div class="dossier-empty">Aucun fichier ajouté pour le moment.</div>
+              }
+            </div>
+
+            @if (applyError) {
+              <div class="error-msg">{{ applyError }}</div>
+            }
+
+            <button type="submit" class="sy-submit" [disabled]="applyForm.invalid || applying">
+              <span class="material-icons">send</span>
+              {{ applying ? 'Envoi…' : 'Envoyer ma candidature' }}
+            </button>
+          </form>
+        } @else {
+          <p class="muted">Vous avez déjà postulé à cette offre. Suivez l'avancement depuis votre espace candidat.</p>
+        }
+      </section>
+    }
+
+    @if (isOwnerOrg(j)) {
+      <section class="sy-card">
+        <div class="sy-section-title">
+          <h2>Candidatures reçues</h2>
+          <span class="sy-status-pill info">{{ applications().length }}</span>
+        </div>
+
+        @if (applications().length === 0) {
+          <div class="sy-empty-state">Aucune candidature pour le moment.</div>
+        } @else {
+          <div class="apps-list">
+            @for (a of applications(); track trackByAppId($index, a)) {
+              <div class="app-row">
+                <div class="app-main">
+                  <div class="app-name">{{ a.applicantName || 'Candidat anonyme' }}</div>
+                  <div class="app-meta">
+                    <span>{{ a.applicantEmail || '—' }}</span>
+                  </div>
+                  @if (a.coverLetter) {
+                    <p class="app-cover">{{ a.coverLetter }}</p>
+                  }
+                  @if (a.resumeUrl) {
+                    <a [href]="a.resumeUrl" target="_blank" rel="noopener" class="inline-link">Voir le CV (lien)</a>
+                  }
+                  @if (a.dossierFiles && a.dossierFiles.length) {
+                    <div class="app-dossier">
+                      <strong>Dossier soumis :</strong>
+                      <ul>
+                        @for (df of a.dossierFiles; track df.path) {
+                          <li>
+                            <a [href]="df.url" target="_blank" rel="noopener">
+                              <span class="material-icons">attach_file</span> {{ df.name }}
+                            </a>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                </div>
+                <div class="app-actions">
+                  <span class="sy-status-pill" [ngClass]="a.status === 'offer' ? 'success' : (a.status === 'rejected' ? 'danger' : 'info')">
+                    {{ a.status }}
+                  </span>
+                  <select class="status-select"
+                          [value]="a.status"
+                          (change)="setAppStatus(j.id, a.id, $any($event.target).value)">
+                    @for (s of appStatuses; track s) {
+                      <option [value]="s">{{ s }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
   } @else {
-    <p>Chargement…</p>
+    <div class="sy-empty-state">Chargement…</div>
   }
 </div>

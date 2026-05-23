@@ -1,35 +1,85 @@
-<mat-toolbar>
-  <mat-icon>work</mat-icon>
-  <span>Emplois</span>
-</mat-toolbar>
+<div class="sy-dashboard-shell jobs-home">
+  <section class="sy-page-header">
+    <div>
+      <h1>Emplois</h1>
+      <p>
+        @if (isOrgUser()) {
+          Gérez les offres de votre organisation et suivez les candidatures reçues.
+        } @else {
+          Découvrez les opportunités professionnelles et postulez en quelques clics.
+        }
+      </p>
+    </div>
+    <div class="header-actions">
+      @if (canManageJobs()) {
+        <a routerLink="/jobs/new" class="header-btn">
+          <span class="material-icons">add</span> Créer une offre
+        </a>
+      }
+      <a routerLink="/jobs/list" class="header-btn ghost">
+        <span class="material-icons">work</span> Voir toutes les offres
+      </a>
+    </div>
+  </section>
 
-<div class="wrap">
   @if (isOrgUser()) {
-    <mat-card>
-      <mat-card-title>Offres de l'organisation</mat-card-title>
-      <mat-card-content>
-        @for (job of orgJobs(); track trackByJobId($index, job)) {
-          <div class="job-row">
-            <a [routerLink]="['/jobs', job.id]">{{ job.title }}</a>
-            <span class="status">{{ job.status }}</span>
-          </div>
-        } @empty {
-          <p>Aucune offre pour le moment.</p>
-        }
-      </mat-card-content>
-    </mat-card>
+    <section class="sy-card">
+      <div class="sy-section-title">
+        <h2>Offres de l'organisation</h2>
+        <span class="sy-status-pill info">{{ orgJobs().length }} offre(s)</span>
+      </div>
+
+      @if (orgJobs().length === 0) {
+        <div class="sy-empty-state">Aucune offre publiée pour le moment.</div>
+      } @else {
+        <div class="job-list">
+          @for (job of orgJobs(); track trackByJobId($index, job)) {
+            <a class="job-row" [routerLink]="['/jobs', job.id]">
+              <div class="job-main">
+                <div class="job-title">{{ job.title }}</div>
+                <div class="job-meta">
+                  <span>{{ job.location || 'Lieu non précisé' }}</span>
+                  <span class="dot">·</span>
+                  <span>{{ job.jobType || 'full_time' }}</span>
+                </div>
+              </div>
+              <span class="sy-status-pill"
+                    [ngClass]="job.status === 'open' ? 'success' : (job.status === 'draft' ? 'warning' : 'danger')">
+                {{ job.status }}
+              </span>
+            </a>
+          }
+        </div>
+      }
+    </section>
   } @else {
-    <mat-card>
-      <mat-card-title>Offres disponibles</mat-card-title>
-      <mat-card-content>
-        @for (job of publicJobsRecent(); track trackByJobId($index, job)) {
-          <div class="job-row">
-            <a [routerLink]="['/jobs', job.id]">{{ job.title }}</a>
-          </div>
-        } @empty {
-          <p>Aucune offre disponible.</p>
-        }
-      </mat-card-content>
-    </mat-card>
+    <section class="sy-card">
+      <div class="sy-section-title">
+        <h2>Offres disponibles</h2>
+        <a routerLink="/jobs/list" class="inline-link">Tout voir</a>
+      </div>
+
+      @if (publicJobsRecent().length === 0) {
+        <div class="sy-empty-state">Aucune offre disponible pour le moment.</div>
+      } @else {
+        <div class="job-grid">
+          @for (job of publicJobsRecent(); track trackByJobId($index, job)) {
+            <a class="job-card" [routerLink]="['/jobs', job.id]">
+              <div class="job-card-head">
+                <h3>{{ job.title }}</h3>
+                <span class="chip">{{ job.jobType || 'full_time' }}</span>
+              </div>
+              <div class="job-card-meta">
+                <span class="material-icons">place</span>
+                <span>{{ job.location || 'Lieu non précisé' }}</span>
+              </div>
+              <div class="job-card-cta">
+                Voir l'offre <span class="material-icons">arrow_forward</span>
+              </div>
+            </a>
+          }
+        </div>
+      }
+    </section>
   }
 </div>

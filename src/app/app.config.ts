@@ -3,7 +3,7 @@ import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { routes } from './app.routes';
 import { provideFirebaseSdk } from './core/firebase/firebase.providers';
 import { provideDataProvider } from './core/data/data-provider.config';
-import { environment } from '../environments/environment.development';
+import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
   providers: [

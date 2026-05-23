@@ -31,6 +31,9 @@ export interface JobPosting {
   jobType: JobType;
   description: string;
 
+  coverUrl?: string | null;
+  coverPath?: string | null;
+
   status: JobStatus;
   isPublished: boolean;
   publishedAt?: any;

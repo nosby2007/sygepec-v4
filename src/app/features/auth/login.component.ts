@@ -11,6 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
+import { AUTH_UI_STYLES } from './auth-ui.styles';
 
 @Component({
   standalone: true,
@@ -26,172 +27,90 @@ import { MatIconModule } from '@angular/material/icon';
     MatIconModule
   ],
   template: `
-    <div class="auth-bg">
-      <div class="auth-card">
-
-        <div class="auth-brand">
-          <span class="auth-brand-mark">S</span>
-          <div>
-            <div class="auth-brand-name">SYGEPEC</div>
-            <div class="auth-brand-sub">Votre passeport vers l'étranger</div>
+    <main class="auth-page">
+      <div class="auth-grid">
+        <section class="auth-story">
+          <a routerLink="/public" class="auth-brand" aria-label="Retour au site public SYGEPEC">
+            <span class="auth-brand-mark">S</span>
+            <div>
+              <div class="auth-brand-name">SYGEPEC</div>
+              <div class="auth-brand-sub">Immigration operating system</div>
+            </div>
+          </a>
+          <p class="auth-eyebrow">Secure candidate workspace</p>
+          <h1>Reprenez votre dossier exactement la ou vous l'avez laisse.</h1>
+          <p>
+            Connectez-vous pour suivre votre readiness score, vos documents, vos demandes de
+            service, vos opportunites internationales et les prochaines actions recommandees par
+            SYGEPEC.
+          </p>
+          <div class="auth-proof" aria-label="Garanties du portail">
+            <div>
+              <strong>Dossier centralise</strong>
+              <span>Audit, documents, checklist et suivi conseiller dans le meme espace.</span>
+            </div>
+            <div>
+              <strong>Acces protege</strong>
+              <span>Routes authentifiees, RBAC et separation des espaces client/admin.</span>
+            </div>
+            <div>
+              <strong>Reprise intelligente</strong>
+              <span>Votre brouillon d'audit reste disponible avant creation du dossier.</span>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <h1 class="auth-title">Connexion</h1>
-        <p class="auth-sub">Bienvenue ! Connectez-vous pour accéder à votre espace immigration.</p>
+        <section class="auth-panel" aria-labelledby="login-title">
+          <p class="panel-label">Client sign in</p>
+          <h2 id="login-title" class="auth-title">Acceder a mon espace SYGEPEC</h2>
+          <p class="auth-sub">
+            Utilisez l'adresse email liee a votre audit ou a votre dossier. Les comptes admin
+            passent par l'entree reservee.
+          </p>
 
-        <form [formGroup]="form" (ngSubmit)="onSubmit()">
-          <mat-form-field appearance="outline" class="auth-field">
-            <mat-label>Adresse e-mail</mat-label>
-            <input matInput formControlName="email" type="email" autocomplete="email" />
-            <mat-icon matSuffix>mail_outline</mat-icon>
-          </mat-form-field>
+          <form [formGroup]="form" (ngSubmit)="onSubmit()">
+            <mat-form-field appearance="outline" class="auth-field">
+              <mat-label>Adresse e-mail</mat-label>
+              <input matInput formControlName="email" type="email" autocomplete="email" />
+              <mat-icon matSuffix>mail_outline</mat-icon>
+            </mat-form-field>
 
-          <mat-form-field appearance="outline" class="auth-field">
-            <mat-label>Mot de passe</mat-label>
-            <input matInput formControlName="password" type="password" autocomplete="current-password" />
-            <mat-icon matSuffix>lock_outline</mat-icon>
-          </mat-form-field>
+            <mat-form-field appearance="outline" class="auth-field">
+              <mat-label>Mot de passe</mat-label>
+              <input matInput formControlName="password" type="password" autocomplete="current-password" />
+              <mat-icon matSuffix>lock_outline</mat-icon>
+            </mat-form-field>
 
-          <div *ngIf="error" class="auth-error">{{ error }}</div>
+            <div class="form-row">
+              <span class="mini-note">Connexion securisee par Firebase Auth.</span>
+              <a routerLink="/auth/forgot-password" class="auth-link auth-link-muted">Mot de passe oublie ?</a>
+            </div>
 
-          <button class="auth-submit" type="submit" [disabled]="form.invalid || loading">
-            {{ loading ? 'Connexion en cours...' : 'Se connecter' }}
-          </button>
+            <div *ngIf="error" class="auth-error">{{ error }}</div>
 
-          <a routerLink="/auth/register" class="auth-link">Pas encore de compte ? Créer un compte →</a>
-          <a routerLink="/auth/admin-login" class="auth-link auth-link-muted">Vous êtes administrateur ? Connexion réservée →</a>
-        </form>
+            <button class="auth-submit" type="submit" [disabled]="form.invalid || loading">
+              {{ loading ? 'Connexion en cours...' : 'Se connecter' }}
+            </button>
+
+            <div class="auth-links">
+              <a routerLink="/auth/register" [queryParams]="registerQueryParams()" class="auth-link">
+                Nouveau candidat ? Creer un espace SYGEPEC
+              </a>
+              <a routerLink="/auth/admin-login" class="auth-link auth-link-muted">
+                Connexion administrateur
+              </a>
+            </div>
+
+            <p class="security-note">
+              SYGEPEC organise et suit les procedures. La plateforme ne garantit pas l'obtention
+              d'un visa, d'un emploi ou d'une approbation officielle.
+            </p>
+          </form>
+        </section>
       </div>
-    </div>
+    </main>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
-    .auth-bg {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background:
-        radial-gradient(ellipse at 20% 50%, rgba(30,99,214,.22), transparent 44%),
-        radial-gradient(ellipse at 80% 15%, rgba(245,184,65,.14), transparent 40%),
-        linear-gradient(145deg, #0a1628, #1b3a6b 54%, #123c69);
-      padding: 24px;
-    }
-    .auth-card {
-      width: 100%;
-      max-width: 430px;
-      background: #ffffff;
-      border-radius: 22px;
-      padding: 38px 34px 32px;
-      box-shadow: 0 32px 72px rgba(0,0,0,.32);
-    }
-    .auth-brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 26px;
-    }
-    .auth-brand-mark {
-      width: 44px;
-      height: 44px;
-      border-radius: 11px;
-      display: grid;
-      place-items: center;
-      background: #f5b841;
-      color: #0a1628;
-      font-weight: 900;
-      font-size: 21px;
-      font-family: 'Sora', 'Avenir Next', sans-serif;
-      box-shadow: 0 4px 14px rgba(245,184,65,.42);
-      text-decoration: none;
-    }
-    .auth-brand-name {
-      font-weight: 800;
-      font-size: 15px;
-      color: #0a1628;
-      font-family: 'Sora', 'Avenir Next', sans-serif;
-      letter-spacing: .06em;
-    }
-    .auth-brand-sub {
-      font-size: 11px;
-      color: #6b7d94;
-      margin-top: 2px;
-    }
-    .auth-title {
-      margin: 0 0 6px;
-      font-size: 1.75rem;
-      font-weight: 800;
-      color: #0a1628;
-      font-family: 'Sora', 'Avenir Next', sans-serif;
-      line-height: 1.2;
-      letter-spacing: -.025em;
-    }
-    .auth-sub {
-      margin: 0 0 22px;
-      font-size: .88rem;
-      color: #5e6b7a;
-      line-height: 1.58;
-    }
-    .auth-field {
-      width: 100%;
-      margin-bottom: 4px;
-    }
-    .auth-error {
-      color: #c0392b;
-      font-size: 13px;
-      margin: 2px 0 12px;
-      padding: 9px 12px;
-      background: rgba(192,57,43,.08);
-      border-radius: 8px;
-      border: 1px solid rgba(192,57,43,.16);
-    }
-    .auth-submit {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      background: #f5b841;
-      color: #0a1628;
-      font-weight: 800;
-      font-size: .92rem;
-      cursor: pointer;
-      margin-top: 8px;
-      box-shadow: 0 6px 18px rgba(245,184,65,.36);
-      font-family: inherit;
-      letter-spacing: .01em;
-      transition: background .18s ease, box-shadow .18s ease, transform .18s ease;
-    }
-    .auth-submit:hover:not(:disabled) {
-      background: #f0a820;
-      box-shadow: 0 10px 26px rgba(245,184,65,.5);
-      transform: translateY(-2px);
-    }
-    .auth-submit:disabled {
-      opacity: .6;
-      cursor: not-allowed;
-    }
-    .auth-link {
-      display: block;
-      text-align: center;
-      margin-top: 18px;
-      font-size: .84rem;
-      color: #1e63d6;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .auth-link:hover {
-      color: #0a1628;
-    }
-    .auth-link-muted {
-      color: #6b7d94;
-      font-weight: 500;
-      margin-top: 8px;
-    }
-    .auth-link-muted:hover { color: #c0392b; }
-  `]
+  styles: [AUTH_UI_STYLES]
 })
 export class LoginComponent {
   private fb = inject(FormBuilder);
@@ -207,6 +126,15 @@ export class LoginComponent {
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required]
   });
+
+  registerQueryParams(): Record<string, string | number> {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    const draft = this.route.snapshot.queryParamMap.get('draft');
+    const params: Record<string, string | number> = {};
+    if (returnUrl) params['returnUrl'] = returnUrl;
+    if (draft) params['draft'] = draft;
+    return params;
+  }
 
   async onSubmit() {
     if (this.form.invalid) return;

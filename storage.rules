@@ -112,6 +112,40 @@ service firebase.storage {
       allow write: if false;
     }
 
+    // -------------------------------------------------------------------
+    // Jobs (offres d'emploi)
+    // - cover : image publique de l'offre. Écriture admin uniquement.
+    // - applications : dossiers déposés par les candidats. Le candidat écrit
+    //   sous son propre uid ; les admins / super-admin lisent.
+    // -------------------------------------------------------------------
+    function isJobsAdmin() {
+      return signedIn() && (
+        isSuperAdmin()
+        || hasAnyRole(['org_admin', 'orgAdmin', 'admin', 'agent', 'staff', 'owner'])
+      );
+    }
+
+    match /jobs/{jobId}/cover/{fileName} {
+      allow read: if true;
+      allow write: if isJobsAdmin()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /jobs/{jobId}/applications/{uid}/{fileName} {
+      allow read: if signedIn() && (
+        uid == request.auth.uid
+        || isJobsAdmin()
+      );
+      allow write: if signedIn()
+        && uid == request.auth.uid
+        && request.resource.size < 15 * 1024 * 1024;
+      allow delete: if signedIn() && (
+        uid == request.auth.uid
+        || isJobsAdmin()
+      );
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -42,6 +42,7 @@ export class AuthService {
 
   async register(email: string, password: string, displayName?: string, tenantId?: string) {
     const cred = await createUserWithEmailAndPassword(this.auth, email, password);
+    const normalizedTenantId = tenantId?.trim() || 'sygepec-main';
 
     if (displayName) {
       await updateProfile(cred.user, { displayName });
@@ -52,8 +53,8 @@ export class AuthService {
       uid: cred.user.uid,
       email,
       displayName: displayName ?? null,
-      tenantId: tenantId ?? null,
-      orgId: tenantId ?? null,
+      tenantId: normalizedTenantId,
+      orgId: normalizedTenantId,
       role: 'client',
       roles: ['client'],
       globalRole: 'user',

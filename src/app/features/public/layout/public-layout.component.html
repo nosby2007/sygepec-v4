@@ -1,0 +1,138 @@
+<div class="sy-public-shell">
+  <header class="sy-public-nav" [class.sy-public-nav--open]="mobileOpen()">
+    <div class="sy-public-container sy-public-nav__inner">
+      <a class="sy-public-brand" routerLink="/public" (click)="closeMobile()" aria-label="SYGEPEC home">
+        <span class="sy-public-brand__mark">S</span>
+        <span class="sy-public-brand__copy">
+          <strong>SYGEPEC</strong>
+          <small>Global Pathway OS</small>
+        </span>
+      </a>
+
+      <nav class="sy-public-nav__links" aria-label="Public navigation">
+        <div class="sy-public-nav__group" *ngFor="let group of navGroups">
+          <a [routerLink]="group.url" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: false }">
+            {{ group.label }}
+          </a>
+          <div class="sy-public-mega" role="menu">
+            <div class="sy-public-mega__intro">
+              <strong>{{ group.label }}</strong>
+              <span>{{ group.description }}</span>
+            </div>
+            <a
+              *ngFor="let item of group.items"
+              [routerLink]="item.url"
+              routerLinkActive="is-active"
+              role="menuitem"
+            >
+              <span class="sy-public-icon">{{ item.iconKey?.slice(0, 2) || 'sy' }}</span>
+              <span>
+                <strong>{{ item.label }}</strong>
+                <small>{{ item.description }}</small>
+              </span>
+            </a>
+          </div>
+        </div>
+        <a routerLink="/public/jobs" routerLinkActive="is-active">Jobs</a>
+        <a routerLink="/public/pricing" routerLinkActive="is-active">Pricing</a>
+        <a routerLink="/public/about" routerLinkActive="is-active">About</a>
+        <a routerLink="/public/contact" routerLinkActive="is-active">Contact</a>
+      </nav>
+
+      <div class="sy-public-nav__actions">
+        <a class="sy-public-btn sy-public-btn--ghost" routerLink="/auth/login">Sign in</a>
+        <a class="sy-public-btn sy-public-btn--primary" routerLink="/start-audit">Start Assessment</a>
+      </div>
+
+      <button
+        class="sy-public-menu-btn"
+        type="button"
+        (click)="toggleMobile()"
+        [attr.aria-expanded]="mobileOpen()"
+        aria-label="Open public navigation"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+
+    <div class="sy-public-mobile" *ngIf="mobileOpen()">
+      <div class="sy-public-mobile__panel">
+        <a routerLink="/public/destinations" (click)="closeMobile()">Destinations</a>
+        <a routerLink="/public/profiles" (click)="closeMobile()">Profiles</a>
+        <a routerLink="/public/services" (click)="closeMobile()">Services</a>
+        <a routerLink="/public/jobs" (click)="closeMobile()">Jobs</a>
+        <a routerLink="/public/pricing" (click)="closeMobile()">Pricing</a>
+        <a routerLink="/public/about" (click)="closeMobile()">About</a>
+        <a routerLink="/public/contact" (click)="closeMobile()">Contact</a>
+        <div class="sy-public-mobile__actions">
+          <a class="sy-public-btn sy-public-btn--ghost" routerLink="/auth/login" (click)="closeMobile()">Sign in</a>
+          <a class="sy-public-btn sy-public-btn--primary" routerLink="/start-audit" (click)="closeMobile()">Start Assessment</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="sy-public-main">
+    <router-outlet />
+  </main>
+
+  <footer class="sy-public-footer">
+    <div class="sy-public-container sy-public-footer__grid">
+      <section class="sy-public-footer__brand" aria-label="SYGEPEC mission">
+        <a class="sy-public-brand sy-public-brand--footer" routerLink="/public">
+          <span class="sy-public-brand__mark">S</span>
+          <span class="sy-public-brand__copy">
+            <strong>SYGEPEC</strong>
+            <small>Immigration, career and document workflow platform.</small>
+          </span>
+        </a>
+        <p>
+          SYGEPEC helps candidates, families and partner organizations prepare clearer international
+          pathways with structured dossiers, documents, jobs and coaching workflows.
+        </p>
+        <a class="sy-public-footer__cta" routerLink="/public/contact">Talk to SYGEPEC</a>
+      </section>
+
+      <section>
+        <h2>Destinations</h2>
+        <a *ngFor="let destination of footerDestinations" [routerLink]="['/public/destinations', destination.slug]">
+          {{ destination.title }}
+        </a>
+      </section>
+
+      <section>
+        <h2>Profiles</h2>
+        <a *ngFor="let profile of footerProfiles" [routerLink]="['/public/profiles', profile.slug]">
+          {{ profile.title }}
+        </a>
+      </section>
+
+      <section>
+        <h2>Services</h2>
+        <a *ngFor="let service of footerServices" [routerLink]="['/public/services', service.slug]">
+          {{ service.title }}
+        </a>
+      </section>
+
+      <section>
+        <h2>Company</h2>
+        <a routerLink="/public/about">About SYGEPEC</a>
+        <a routerLink="/public/jobs">International Jobs</a>
+        <a routerLink="/public/pricing">Pricing</a>
+        <a routerLink="/public/faq">FAQ</a>
+        <a routerLink="/auth/login">Client sign in</a>
+      </section>
+    </div>
+
+    <div class="sy-public-container sy-public-footer__legal">
+      <p>
+        SYGEPEC helps users organize, prepare and track immigration, career and document workflows.
+        It does not guarantee visa approval, job placement or legal outcomes. Users should verify
+        requirements with official authorities or licensed professionals when required.
+      </p>
+      <span>© 2026 SYGEPEC. All rights reserved.</span>
+    </div>
+  </footer>
+</div>

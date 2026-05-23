@@ -12,7 +12,12 @@ export const routes: Routes = [
   { path: 'home', redirectTo: 'public', pathMatch: 'full' },
   { path: 'destinations', redirectTo: 'public/destinations', pathMatch: 'full' },
   { path: 'destinations/:slug', redirectTo: 'public/destinations/:slug', pathMatch: 'full' },
+  { path: 'profiles', redirectTo: 'public/profiles', pathMatch: 'full' },
+  { path: 'profiles/:slug', redirectTo: 'public/profiles/:slug', pathMatch: 'full' },
+  { path: 'services', redirectTo: 'public/services', pathMatch: 'full' },
   { path: 'services/:slug', redirectTo: 'public/services/:slug', pathMatch: 'full' },
+  { path: 'pricing', redirectTo: 'public/pricing', pathMatch: 'full' },
+  { path: 'about', redirectTo: 'public/about', pathMatch: 'full' },
   { path: 'contact', redirectTo: 'public/contact', pathMatch: 'full' },
 
   {

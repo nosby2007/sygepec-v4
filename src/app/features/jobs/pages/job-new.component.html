@@ -1,0 +1,118 @@
+<div class="sy-dashboard-shell job-new-page">
+  <section class="sy-page-header">
+    <div>
+      <h1>Créer une offre d'emploi</h1>
+      <p>Publiez une nouvelle opportunité destinée aux candidats de la plateforme.</p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/jobs" class="header-btn ghost">
+        <span class="material-icons">arrow_back</span> Retour
+      </a>
+    </div>
+  </section>
+
+  <section class="sy-card">
+    <div class="sy-section-title">
+      <h2>Informations de l'offre</h2>
+      <span class="muted small">Les champs marqués * sont requis</span>
+    </div>
+
+    <form class="job-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="cover-uploader">
+        <label class="cover-label">
+          <span class="cover-label-text">Image de l'offre (optionnel)</span>
+          <span class="cover-label-hint">JPG / PNG / WEBP — max 5 Mo</span>
+        </label>
+
+        @if (coverPreview(); as preview) {
+          <div class="cover-preview">
+            <img [src]="preview" alt="Aperçu de l'offre" />
+            <button type="button" class="cover-remove" (click)="removeCover()" aria-label="Retirer l'image">
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+        } @else {
+          <label class="cover-dropzone">
+            <input type="file" accept="image/*" (change)="onCoverSelected($event)" hidden />
+            <span class="material-icons">add_photo_alternate</span>
+            <span>Cliquez pour ajouter une image</span>
+          </label>
+        }
+
+        @if (coverError()) {
+          <div class="error-msg small">{{ coverError() }}</div>
+        }
+      </div>
+
+      <div class="grid two">
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Titre du poste *</mat-label>
+          <input matInput formControlName="title" placeholder="Ex. Infirmier(ère) auxiliaire" />
+          @if (hasError('title', 'required')) {
+            <mat-error>Le titre est requis.</mat-error>
+          }
+          @if (hasError('title', 'minlength')) {
+            <mat-error>Le titre doit contenir au moins 3 caractères.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Lieu *</mat-label>
+          <input matInput formControlName="location" placeholder="Ex. Montréal, QC" />
+          @if (hasError('location', 'required')) {
+            <mat-error>Le lieu est requis.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="grid two">
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Type de contrat *</mat-label>
+          <mat-select formControlName="jobType">
+            @for (t of jobTypes; track t.value) {
+              <mat-option [value]="t.value">{{ t.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Rémunération (optionnel)</mat-label>
+          <input matInput formControlName="salary" placeholder="Ex. 25 $/h ou 50 000 $/an" />
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Description du poste *</mat-label>
+        <textarea matInput rows="8" formControlName="description"
+                  placeholder="Décrivez les responsabilités, exigences et avantages..."></textarea>
+        @if (hasError('description', 'required')) {
+          <mat-error>La description est requise.</mat-error>
+        }
+        @if (hasError('description', 'minlength')) {
+          <mat-error>Au moins 20 caractères.</mat-error>
+        }
+      </mat-form-field>
+
+      <label class="publish-toggle">
+        <input type="checkbox" formControlName="publishNow" />
+        <span class="track"><span class="thumb"></span></span>
+        <span class="label-text">
+          <strong>Publier immédiatement</strong>
+          <small>Si désactivé, l'offre sera enregistrée en brouillon.</small>
+        </span>
+      </label>
+
+      @if (errorMsg()) {
+        <div class="error-msg">{{ errorMsg() }}</div>
+      }
+
+      <div class="actions">
+        <a routerLink="/jobs" class="sy-submit secondary">Annuler</a>
+        <button type="submit" class="sy-submit" [disabled]="form.invalid || saving()">
+          <span class="material-icons">check</span>
+          {{ saving() ? 'Publication...' : (form.value.publishNow ? "Publier l'offre" : 'Enregistrer en brouillon') }}
+        </button>
+      </div>
+    </form>
+  </section>
+</div>

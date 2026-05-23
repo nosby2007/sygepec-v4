@@ -7,88 +7,126 @@ import { switchMap } from 'rxjs';
 import { TicketsRepository, Ticket } from '../data/tickets.repository';
 import { AuthContextService } from '../../../core/auth/auth-context.service';
 
-// Material
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-
 @Component({
   standalone: true,
   selector: 'app-support-home',
-  imports: [CommonModule, RouterLink, MatToolbarModule, MatCardModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <mat-toolbar>
-      <span>Support</span>
-      <span class="spacer"></span>
-      <a mat-button routerLink="/support/tickets"><mat-icon>support_agent</mat-icon>Tickets</a>
-    </mat-toolbar>
+    <div class="sy-dashboard-shell support-home">
+      <section class="sy-page-header">
+        <div>
+          <h1>Support</h1>
+          <p>Suivez vos demandes d'assistance et créez de nouveaux tickets en toute simplicité.</p>
+        </div>
+        <div class="header-actions">
+          <a routerLink="/support/tickets" class="header-btn">
+            <span class="material-icons">support_agent</span> Voir les tickets
+          </a>
+        </div>
+      </section>
 
-    <div class="wrap">
-      <mat-card class="card">
-        <mat-card-title>Overview</mat-card-title>
-        <mat-card-content>
-          <div class="muted">Tenant: <b>{{ tenantId() || 'PUBLIC/None' }}</b></div>
-          <div class="muted">User: <b>{{ uid() || 'Not signed in' }}</b></div>
+      <section class="sy-card">
+        <div class="sy-section-title">
+          <h2>Vue d'ensemble</h2>
+          <span class="sy-status-pill info">Tenant : {{ tenantId() || 'Public' }}</span>
+        </div>
 
-          <div class="kpis">
-            <div class="kpi">
-              <div class="label">Total tickets</div>
-              <div class="value">{{ tickets().length }}</div>
-            </div>
-            <div class="kpi">
-              <div class="label">Open</div>
-              <div class="value">{{ countByStatus('open') }}</div>
-            </div>
-            <div class="kpi">
-              <div class="label">Waiting customer</div>
-              <div class="value">{{ countByStatus('waiting_customer') }}</div>
-            </div>
+        <div class="kpis">
+          <div class="sy-stat-card">
+            <span class="sy-stat-label">Tickets total</span>
+            <span class="sy-stat-value">{{ tickets().length }}</span>
           </div>
-        </mat-card-content>
+          <div class="sy-stat-card">
+            <span class="sy-stat-label">Ouverts</span>
+            <span class="sy-stat-value">{{ countByStatus('open') }}</span>
+          </div>
+          <div class="sy-stat-card">
+            <span class="sy-stat-label">En attente client</span>
+            <span class="sy-stat-value">{{ countByStatus('waiting_customer') }}</span>
+          </div>
+        </div>
 
-        <mat-card-actions align="end">
-          <a mat-stroked-button routerLink="/support/tickets">Open tickets</a>
-          <a mat-flat-button routerLink="/support/tickets">Create ticket</a>
-        </mat-card-actions>
-      </mat-card>
+        <div class="quick-links">
+          <a routerLink="/support/tickets">Ouvrir mes tickets</a>
+          <a routerLink="/support/tickets" class="primary">Créer un ticket</a>
+        </div>
+      </section>
 
-      <mat-card class="card">
-        <mat-card-title>Recent</mat-card-title>
-        <mat-card-content>
-          <div class="muted" *ngIf="recent().length === 0">No tickets yet.</div>
+      <section class="sy-card">
+        <div class="sy-section-title">
+          <h2>Tickets récents</h2>
+          <a routerLink="/support/tickets" class="inline-link">Tout voir</a>
+        </div>
 
-          <div class="list" *ngIf="recent().length > 0">
-            <div class="row" *ngFor="let t of recent(); trackBy: trackById">
-              <div class="main">
-                <div class="title">{{ t.subject }}</div>
-                <div class="muted small">{{ t.category }} · {{ t.priority }} · {{ t.status }}</div>
-              </div>
-              <div class="actions">
-                <a mat-stroked-button [routerLink]="['/support/tickets', t.id]">Open</a>
+        <div class="sy-empty-state" *ngIf="recent().length === 0">
+          Aucun ticket pour le moment.
+        </div>
+
+        <div class="list" *ngIf="recent().length > 0">
+          <a class="row"
+             *ngFor="let t of recent(); trackBy: trackById"
+             [routerLink]="['/support/tickets', t.id]">
+            <div class="main">
+              <div class="title">{{ t.subject }}</div>
+              <div class="meta">
+                <span>{{ t.category }}</span>
+                <span class="dot">·</span>
+                <span>Priorité&nbsp;{{ t.priority }}</span>
               </div>
             </div>
-          </div>
-        </mat-card-content>
-      </mat-card>
+            <span class="sy-status-pill" [ngClass]="statusClass(t.status)">{{ t.status }}</span>
+          </a>
+        </div>
+      </section>
     </div>
   `,
   styles: [`
-    .spacer { flex: 1; }
-    .wrap { padding: 16px; display: grid; gap: 16px; }
-    .card { border-radius: 16px; }
-    .muted { opacity: .75; }
-    .small { font-size: 12px; }
-    .kpis { margin-top: 10px; display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 900px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
-    .kpi { padding: 12px; border: 1px solid rgba(0,0,0,.08); border-radius: 12px; }
-    .label { font-size: 12px; opacity: .75; }
-    .value { font-size: 24px; font-weight: 800; }
-    .list { margin-top: 6px; display: grid; gap: 10px; }
-    .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,.06); }
-    .title { font-weight: 800; }
-    .actions { display: flex; align-items: center; }
+    .support-home { gap: 18px; }
+    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .header-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #f5b841; color: #0a1628;
+      padding: 9px 16px; border-radius: 10px;
+      font-weight: 700; font-size: .82rem; text-decoration: none;
+      box-shadow: 0 4px 12px rgba(245,184,65,.28);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .header-btn:hover { background: #f0a820; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(245,184,65,.42); }
+    .header-btn .material-icons { font-size: 18px; }
+
+    .kpis { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 6px; }
+    @media (min-width: 720px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+
+    .quick-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .quick-links a {
+      border: 1px solid rgba(11,31,58,.09);
+      border-radius: 10px; padding: 10px 14px;
+      color: #102033; font-weight: 600; font-size: .84rem;
+      background: #fff; text-decoration: none;
+      transition: border-color .18s ease, background .18s ease;
+    }
+    .quick-links a:hover { border-color: rgba(245,184,65,.48); background: #fffdf5; }
+    .quick-links a.primary {
+      background: linear-gradient(145deg, #1d67e0, #11458e);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 6px 18px rgba(30,99,214,.28);
+    }
+    .quick-links a.primary:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(30,99,214,.38); }
+
+    .list { display: grid; gap: 10px; }
+    .row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid rgba(11,31,58,.08);
+      border-radius: 12px; background: #fff; text-decoration: none;
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+    .row:hover { border-color: rgba(30,99,214,.18); box-shadow: 0 4px 12px rgba(10,22,40,.07); transform: translateY(-1px); }
+    .main { display: grid; gap: 4px; min-width: 0; }
+    .title { font-weight: 700; color: #0a1628; font-size: .92rem; }
+    .meta { color: #5e6b7a; font-size: .78rem; display: flex; gap: 6px; flex-wrap: wrap; }
+    .dot { opacity: .5; }
   `]
 })
 export class SupportHomeComponent {
@@ -108,6 +146,17 @@ export class SupportHomeComponent {
 
   countByStatus(status: any): number {
     return this.tickets().filter((t: Ticket) => t.status === status).length;
+  }
+
+  statusClass(status: string | undefined): string {
+    switch (status) {
+      case 'open': return 'info';
+      case 'in_progress': return 'warning';
+      case 'waiting_customer': return 'warning';
+      case 'resolved': return 'success';
+      case 'closed': return 'success';
+      default: return 'info';
+    }
   }
 
   trackById(_: number, t: Ticket) { return t.id; }

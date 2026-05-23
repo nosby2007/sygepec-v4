@@ -12,11 +12,6 @@ type TicketCategory = string;
 type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 // Material
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -29,103 +24,175 @@ import { SupportNotifyService } from '../data/support-notify.service';
     CommonModule,
     RouterLink,
     ReactiveFormsModule,
-    MatToolbarModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatDividerModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <mat-toolbar>
-      <a mat-icon-button routerLink="/support" aria-label="Back"><mat-icon>arrow_back</mat-icon></a>
-      <span>Tickets</span>
-      <span class="spacer"></span>
-    </mat-toolbar>
+    <div class="sy-dashboard-shell tickets-page">
+      <section class="sy-page-header">
+        <div>
+          <h1>Tickets de support</h1>
+          <p>Créez, recherchez et suivez l'ensemble de vos demandes d'assistance.</p>
+        </div>
+        <div class="header-actions">
+          <a routerLink="/support" class="header-btn ghost">
+            <span class="material-icons">arrow_back</span> Retour
+          </a>
+        </div>
+      </section>
 
-    <div class="wrap">
-      <mat-card class="card">
-        <mat-card-title>Create ticket</mat-card-title>
-        <mat-card-content>
-          <form class="create" [formGroup]="form" (ngSubmit)="create()">
-            <mat-form-field appearance="outline">
-              <mat-label>Subject</mat-label>
-              <input matInput formControlName="subject" placeholder="Unable to upload documents" />
-            </mat-form-field>
+      <section class="sy-card">
+        <div class="sy-section-title">
+          <h2>Nouveau ticket</h2>
+          <span class="sy-status-pill info">Création</span>
+        </div>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Category</mat-label>
-              <mat-select formControlName="category">
-                <mat-option *ngFor="let c of categories" [value]="c">{{ c }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Priority</mat-label>
-              <mat-select formControlName="priority">
-                <mat-option *ngFor="let p of priorities" [value]="p">{{ p }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <button mat-flat-button type="submit" [disabled]="form.invalid || saving">
-              {{ saving ? 'Creating…' : 'Create' }}
-            </button>
-          </form>
-        </mat-card-content>
-      </mat-card>
-
-      <mat-card class="card">
-        <mat-card-content class="filters">
-        <mat-slide-toggle [formControl]="myQueue">My queue (assigned to me)</mat-slide-toggle>
+        <form class="create" [formGroup]="form" (ngSubmit)="create()">
           <mat-form-field appearance="outline" class="full">
-            <mat-label>Search</mat-label>
-            <input matInput [formControl]="q" placeholder="subject, category, priority, status..." />
+            <mat-label>Sujet</mat-label>
+            <input matInput formControlName="subject" placeholder="Impossible de téléverser des documents" />
           </mat-form-field>
 
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>Status</mat-label>
-            <mat-select [formControl]="status">
-              <mat-option value="">All</mat-option>
-              <mat-option *ngFor="let s of statuses" [value]="s">{{ s }}</mat-option>
+          <mat-form-field appearance="outline">
+            <mat-label>Catégorie</mat-label>
+            <mat-select formControlName="category">
+              <mat-option *ngFor="let c of categories" [value]="c">{{ c }}</mat-option>
             </mat-select>
           </mat-form-field>
 
-          <div class="muted small">Showing {{ filtered().length }} tickets</div>
-        </mat-card-content>
-      </mat-card>
+          <mat-form-field appearance="outline">
+            <mat-label>Priorité</mat-label>
+            <mat-select formControlName="priority">
+              <mat-option *ngFor="let p of priorities" [value]="p">{{ p }}</mat-option>
+            </mat-select>
+          </mat-form-field>
 
-      <div class="grid">
-        <mat-card class="card ticket" *ngFor="let t of filtered(); trackBy: trackById">
-          <mat-card-title>{{ t.subject }}</mat-card-title>
-          <mat-card-content>
-            <div class="muted small">
-              {{ t.category }} · {{ t.priority }} · <b>{{ t.status }}</b>
-            </div>
-          </mat-card-content>
-          <mat-divider></mat-divider>
-          <mat-card-actions align="end">
-            <a mat-stroked-button [routerLink]="['/support/tickets', t.id]">Details</a>
-          </mat-card-actions>
-        </mat-card>
+          <button type="submit" class="sy-submit" [disabled]="form.invalid || saving">
+            <span class="material-icons">add_circle</span>
+            {{ saving ? 'Création…' : 'Créer le ticket' }}
+          </button>
+        </form>
+      </section>
+
+      <section class="sy-card">
+        <div class="sy-section-title">
+          <h2>Filtres</h2>
+          <span class="muted small">{{ filtered().length }} ticket(s)</span>
+        </div>
+
+        <div class="filters">
+          <mat-form-field appearance="outline" class="full">
+            <mat-label>Recherche</mat-label>
+            <input matInput [formControl]="q" placeholder="sujet, catégorie, priorité, statut..." />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Statut</mat-label>
+            <mat-select [formControl]="status">
+              <mat-option value="">Tous</mat-option>
+              <mat-option *ngFor="let s of statuses" [value]="s">{{ s }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </section>
+
+      <div class="grid" *ngIf="filtered().length > 0; else empty">
+        <a class="sy-card ticket-card"
+           *ngFor="let t of filtered(); trackBy: trackById"
+           [routerLink]="['/support/tickets', t.id]">
+          <div class="ticket-head">
+            <h3>{{ t.subject }}</h3>
+            <span class="sy-status-pill" [ngClass]="statusClass(t.status)">{{ t.status }}</span>
+          </div>
+          <div class="ticket-meta">
+            <span class="chip">{{ t.category }}</span>
+            <span class="chip priority" [attr.data-priority]="t.priority">{{ t.priority }}</span>
+          </div>
+          <div class="ticket-cta">
+            Voir les détails <span class="material-icons">arrow_forward</span>
+          </div>
+        </a>
       </div>
+
+      <ng-template #empty>
+        <div class="sy-empty-state">Aucun ticket ne correspond à vos critères.</div>
+      </ng-template>
     </div>
   `,
   styles: [`
-    .spacer { flex: 1; }
-    .wrap { padding: 16px; display: grid; gap: 16px; }
-    .card { border-radius: 16px; }
-    .create { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 900px) { .create { grid-template-columns: 1fr 260px 260px auto; align-items: center; } }
-    .filters { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 900px) { .filters { grid-template-columns: 1fr 280px; align-items: center; } }
+    .tickets-page { gap: 18px; }
+    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .header-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 16px; border-radius: 10px;
+      font-weight: 700; font-size: .82rem; text-decoration: none;
+      transition: transform .18s ease, background .18s ease;
+    }
+    .header-btn.ghost {
+      background: rgba(255,255,255,.12); color: #fff;
+      border: 1px solid rgba(255,255,255,.22);
+    }
+    .header-btn.ghost:hover { background: rgba(255,255,255,.2); transform: translateY(-1px); }
+    .header-btn .material-icons { font-size: 18px; }
+
+    .create {
+      display: grid; gap: 12px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 900px) { .create { grid-template-columns: 1.6fr 1fr 1fr auto; align-items: end; } }
     .full { width: 100%; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 1000px) { .grid { grid-template-columns: 1fr 1fr; } }
-    .muted { opacity: .75; }
-    .small { font-size: 12px; }
+
+    .filters { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .filters { grid-template-columns: 2fr 1fr; align-items: end; } }
+    .muted { color: #5e6b7a; }
+    .small { font-size: .78rem; }
+
+    .sy-submit {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      height: 48px; padding: 0 18px;
+      border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(145deg, #1d67e0, #11458e); color: #fff;
+      font-weight: 700; font-size: .85rem;
+      box-shadow: 0 6px 18px rgba(30,99,214,.28);
+      transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+    }
+    .sy-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(30,99,214,.38); }
+    .sy-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .sy-submit .material-icons { font-size: 18px; }
+
+    .grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1100px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+
+    .ticket-card {
+      display: flex; flex-direction: column; gap: 12px;
+      text-decoration: none; color: inherit;
+      cursor: pointer;
+    }
+    .ticket-card:hover { transform: translateY(-2px); }
+
+    .ticket-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .ticket-head h3 {
+      margin: 0; font-size: .98rem; font-weight: 700;
+      color: #0a1628; line-height: 1.3;
+    }
+    .ticket-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      padding: 3px 10px; border-radius: 999px;
+      background: rgba(11,31,58,.06); color: #102033;
+      font-size: .72rem; font-weight: 600;
+    }
+    .chip.priority[data-priority="high"] { background: rgba(245,158,11,.15); color: #b45309; }
+    .chip.priority[data-priority="urgent"] { background: rgba(220,38,38,.12); color: #b91c1c; }
+    .chip.priority[data-priority="low"] { background: rgba(20,184,166,.12); color: #0d7c6e; }
+
+    .ticket-cta {
+      display: flex; align-items: center; gap: 6px; margin-top: auto;
+      color: #1e63d6; font-size: .82rem; font-weight: 600;
+    }
+    .ticket-cta .material-icons { font-size: 16px; }
   `]
 })
 export class TicketsListComponent {
@@ -259,6 +326,17 @@ readonly myQueue = new FormControl(false, { nonNullable: true });
   }
 
   trackById(_: number, t: Ticket) { return t.id; }
+
+  statusClass(status: string | undefined): string {
+    switch (status) {
+      case 'open': return 'info';
+      case 'in_progress': return 'warning';
+      case 'waiting_customer': return 'warning';
+      case 'resolved': return 'success';
+      case 'closed': return 'success';
+      default: return 'info';
+    }
+  }
 
 
 }

@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { map, of, switchMap } from 'rxjs';
+
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AuthContextService } from '../../../core/auth/auth-context.service';
 import { JobsRepository, JobPosting } from '../data/jobs.repository';
@@ -45,6 +47,7 @@ export class JobDetailsComponent {
   private jobsRepo = inject(JobsRepository);
   private appsRepo = inject(ApplicationsRepository);
   private authCtx = inject(AuthContextService);
+  private storage = getStorage();
 
   readonly ctx = this.authCtx.context;
   private readonly ctx$ = toObservable(this.ctx);
@@ -52,6 +55,9 @@ export class JobDetailsComponent {
   applying = false;
   savingAction = false;
   applyError = '';
+
+  /** Fichiers sélectionnés par le candidat (CV, diplômes, lettres, passeport...). */
+  readonly dossierFiles = signal<File[]>([]);
 
   readonly job = toSignal(
     this.route.paramMap.pipe(
@@ -107,16 +113,33 @@ export class JobDetailsComponent {
     try {
       const already = this.myAppsForJob(job.id).length > 0;
       if (already) {
-        this.applyError = 'You already applied to this job.';
+        this.applyError = 'Vous avez déjà postulé à cette offre.';
         return;
       }
 
       const cover = this.applyForm.value.coverLetter!.trim();
       if (!cover) {
-        this.applyError = 'Cover letter required.';
+        this.applyError = 'La lettre de motivation est requise.';
         return;
       }
 
+      // 1. Upload des fichiers du dossier sous jobs/{jobId}/applications/{uid}/<file>
+      const files = this.dossierFiles();
+      const uploaded: { name: string; url: string; path: string; size: number; contentType: string | null }[] = [];
+      for (const f of files) {
+        if (f.size > 15 * 1024 * 1024) {
+          this.applyError = `Fichier trop volumineux : ${f.name} (max 15 Mo).`;
+          return;
+        }
+        const safe = f.name.replace(/[^A-Za-z0-9._-]/g, '_');
+        const path = `jobs/${job.id}/applications/${c.uid}/${Date.now()}_${safe}`;
+        const r = storageRef(this.storage, path);
+        await uploadBytes(r, f, { contentType: f.type });
+        const url = await getDownloadURL(r);
+        uploaded.push({ name: f.name, url, path, size: f.size, contentType: f.type || null });
+      }
+
+      // 2. Création de la candidature
       await this.appsRepo.apply(job.id, {
         tenantId: job.tenantId,
         orgId: job.orgId,
@@ -126,14 +149,44 @@ export class JobDetailsComponent {
         applicantEmail: c.email ?? null,
         coverLetter: cover,
         resumeUrl: (this.applyForm.value.resumeUrl || '').trim() || null,
+        dossierFiles: uploaded.length ? uploaded : null,
         status: 'submitted'
       });
 
       await this.jobsRepo.touchApplicant(job.id);
       this.applyForm.reset({ coverLetter: '', resumeUrl: '' });
+      this.dossierFiles.set([]);
+    } catch (err: any) {
+      const code = err?.code as string | undefined;
+      if (code === 'permission-denied' || code === 'storage/unauthorized') {
+        this.applyError = "Permissions insuffisantes pour postuler. Vous devez être connecté.";
+      } else if (code?.startsWith('storage/')) {
+        this.applyError = "Échec du téléversement du dossier. Réessayez.";
+      } else {
+        this.applyError = err?.message || "Échec de l'envoi de la candidature.";
+      }
     } finally {
       this.applying = false;
     }
+  }
+
+  onDossierFilesSelected(evt: Event) {
+    const input = evt.target as HTMLInputElement;
+    const list = input.files;
+    if (!list || list.length === 0) return;
+    const current = this.dossierFiles();
+    const next = [...current];
+    for (let i = 0; i < list.length; i++) {
+      next.push(list[i]);
+    }
+    this.dossierFiles.set(next);
+    input.value = '';
+  }
+
+  removeDossierFile(idx: number) {
+    const next = [...this.dossierFiles()];
+    next.splice(idx, 1);
+    this.dossierFiles.set(next);
   }
 
   async publish(job: JobPosting) {

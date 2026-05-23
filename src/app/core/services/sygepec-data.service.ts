@@ -61,6 +61,7 @@ import {
   canonicalIdFromLegacyCaseId,
   toCanonicalStatus,
 } from './legacy-mapping';
+import type { DocumentCategory } from '../models/canonical/dossier-document.model';
 
 @Injectable({ providedIn: 'root' })
 export class SygepecDataService {
@@ -121,6 +122,24 @@ export class SygepecDataService {
       createdAtServer: serverTimestamp(),
       updatedAtServer: serverTimestamp(),
     };
+  }
+
+  private categoryFromDocumentLabel(label: string): DocumentCategory {
+    const v = label.toLowerCase();
+    if (v.includes('passport') || v.includes('passeport')) return 'passport';
+    if (v.includes('diploma') || v.includes('diplome') || v.includes('diplôme')) return 'diploma';
+    if (v.includes('transcript') || v.includes('releve') || v.includes('relevé')) return 'transcripts';
+    if (v.includes('work') || v.includes('employment') || v.includes('travail') || v.includes('experience')) return 'work_experience_letter';
+    if (v.includes('birth') || v.includes('naissance')) return 'birth_certificate';
+    if (v.includes('police') || v.includes('casier')) return 'police_clearance';
+    if (v.includes('fund') || v.includes('bank') || v.includes('fonds')) return 'proof_of_funds';
+    if (v.includes('language') || v.includes('ielts') || v.includes('tef') || v.includes('anglais') || v.includes('francais')) return 'language_test';
+    if (v.includes('cv') || v.includes('resume')) return 'cv_resume';
+    return 'other';
+  }
+
+  private auditDocumentId(category: DocumentCategory, index: number): string {
+    return `audit_${category}_${index}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -259,8 +278,14 @@ export class SygepecDataService {
             kind: 'immigration',
             status: toCanonicalStatus('audit_completed'),
             dossierNumber: caseNumber,
+            destinationCountry: auditDraft?.answers?.destinationCountry ?? null,
+            immigrationGoal: auditDraft?.answers?.immigrationGoal ?? null,
             readinessScore: auditDraft?.readinessScore || 0,
             nextBestAction: auditDraft?.summary?.nextAction || null,
+            source: 'audit_wizard',
+            assignedAgentUid: null,
+            assignedReviewerUid: null,
+            notes: null,
             // Lien legacy → canonique (utile pour migration Phase 4)
             legacyCaseId,
             migrationSourceId: legacyCaseId,
@@ -366,28 +391,68 @@ export class SygepecDataService {
     try {
       const existing = await this.checklists.getById(canonicalChecklistId);
       if (!existing) {
+        const categories = missing.map((label: string) => this.categoryFromDocumentLabel(label));
+        const checklistItems: Array<{
+          category: DocumentCategory;
+          label: string;
+          required: boolean;
+          done: boolean;
+          documentId: string;
+        }> = missing.map((label: string, idx: number) => ({
+          category: categories[idx] ?? 'other',
+          label,
+          required: true,
+          done: false,
+          documentId: this.auditDocumentId(categories[idx] ?? 'other', idx),
+        }));
+
         await this.checklists.create(
           canonicalChecklistId,
           {
             dossierId: canonicalDossierId,
             ownerUid: auditDraft?.userId ?? null,
+            userId: auditDraft?.userId ?? null,
             tenantId: auditDraft?.orgId || this.defaultOrgId,
             orgId: auditDraft?.orgId || this.defaultOrgId,
-            items: missing.map((label: string, idx: number) => ({
-              id: `m_${idx}`,
-              category: 'other',
-              label,
-              required: true,
-              completed: false,
-            })),
-            total,
-            completed,
-            completionRate: Math.round((completed / total) * 100),
+            items: checklistItems,
+            total: checklistItems.length,
+            completed: 0,
+            completionRate: 0,
             missing,
-            status: 'active',
+            status: 'in_progress',
             legacyChecklistId: legacyId,
           } as any,
           { uid: auditDraft?.userId ?? 'system', role: 'client' },
+        );
+
+        await Promise.all(
+          checklistItems.map((item, idx) =>
+            this.documents.createForDossier(
+              canonicalDossierId,
+              {
+                id: item.documentId,
+                ownerUid: auditDraft?.userId ?? '',
+                uploadedByUid: null,
+                tenantId: auditDraft?.orgId || this.defaultOrgId,
+                orgId: auditDraft?.orgId || this.defaultOrgId,
+                category: item.category,
+                label: item.label,
+                required: true,
+                requestSource: 'audit_wizard',
+                linkedChecklistItemId: `m_${idx}`,
+                fileName: null,
+                storagePath: null,
+                contentType: null,
+                sizeBytes: null,
+                status: 'requested',
+                reviewerUid: null,
+                reviewNotes: null,
+                rejectionReason: null,
+                expiresAt: null,
+              } as any,
+              { uid: auditDraft?.userId ?? 'system', role: 'client' },
+            ),
+          ),
         );
 
         // Lot 3.8 : audit log de la création de checklist (best-effort).

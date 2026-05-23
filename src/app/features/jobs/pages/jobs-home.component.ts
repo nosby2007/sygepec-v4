@@ -35,6 +35,11 @@ export class JobsHomeComponent {
     return !!c.tenantId && c.tenantId.startsWith('org_');
   });
 
+  canManageJobs = computed(() => {
+    const c = this.ctx();
+    return c.isGlobalAdmin === true || c.isOrgAdmin === true;
+  });
+
   readonly orgJobs = toSignal(
     this.ctx$.pipe(
       map(c => c.tenantId),
