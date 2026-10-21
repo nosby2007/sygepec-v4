@@ -777,6 +777,39 @@ service cloud.firestore {
       }
     }
 
+    // Isolated Perry Tax Pro pilot: owner-only, no staff access until verified server RBAC.
+    match /taxCases/{caseId} {
+      allow get, list: if signedIn() && resource.data.clientUid == request.auth.uid
+        && resource.data.tenantId == 'perry-tax-pro';
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['clientUid','tenantId','taxYear','status','displayName','assignedToUid','createdAt','updatedAt'])
+        && request.resource.data.clientUid == request.auth.uid
+        && request.resource.data.tenantId == 'perry-tax-pro'
+        && request.resource.data.status == 'intake'
+        && request.resource.data.assignedToUid == null
+        && request.resource.data.taxYear is int
+        && request.resource.data.taxYear >= 2020
+        && request.resource.data.displayName is string;
+      allow update, delete: if false;
+    }
+    match /taxTickets/{ticketId} {
+      allow get, list: if signedIn() && resource.data.clientUid == request.auth.uid
+        && resource.data.tenantId == 'perry-tax-pro';
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['caseId','clientUid','tenantId','subject','message','status','createdAt'])
+        && request.resource.data.clientUid == request.auth.uid
+        && request.resource.data.tenantId == 'perry-tax-pro'
+        && request.resource.data.status == 'open'
+        && request.resource.data.caseId is string
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() > 0
+        && request.resource.data.subject.size() <= 150
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000;
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
