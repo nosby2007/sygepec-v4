@@ -810,6 +810,28 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Metadata-only checklist. No tax files or taxpayer identifiers.
+    match /taxChecklist/{itemId} {
+      function ownsTaxCase() {
+        return exists(/databases/$(database)/documents/taxCases/$(request.resource.data.caseId))
+          && get(/databases/$(database)/documents/taxCases/$(request.resource.data.caseId)).data.clientUid == request.auth.uid;
+      }
+      allow get, list: if signedIn()
+        && resource.data.clientUid == request.auth.uid
+        && resource.data.tenantId == 'perry-tax-pro';
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['caseId','clientUid','tenantId','category','label','status','createdAt'])
+        && request.resource.data.clientUid == request.auth.uid
+        && request.resource.data.tenantId == 'perry-tax-pro'
+        && request.resource.data.caseId is string
+        && request.resource.data.category in ['identity','income','deductions','other']
+        && request.resource.data.label is string
+        && request.resource.data.label.size() > 0
+        && request.resource.data.label.size() <= 100
+        && request.resource.data.status == 'needed'
+        && ownsTaxCase();
+      allow update, delete: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
