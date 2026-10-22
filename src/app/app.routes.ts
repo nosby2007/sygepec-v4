@@ -99,6 +99,10 @@ export const routes: Routes = [
           import('./features/immigration/immigration.routes').then((m) => m.IMMIGRATION_ROUTES),
       },
       {
+        path: 'tax',
+        loadChildren: () => import('./features/tax/tax.routes').then(m => m.TAX_ROUTES),
+      },
+      {
         path: 'support',
         loadChildren: () =>
           import('./features/support/support.routes').then((m) => m.SUPPORT_ROUTES),
