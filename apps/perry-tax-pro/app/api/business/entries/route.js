@@ -20,7 +20,7 @@ export async function POST(req) {
  const kind=body.kind, category=cleanText(body.category,60), amountCents=parseAmount(body.amount);
  const date=String(body.date||'');
  const year=Number(date.slice(0,4));
- if(!BUSINESS_CATEGORIES[kind]?.includes(category)||!amountCents||!/^(20\d\d)-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(date)||new Date(date).toISOString?.()===undefined)
+ if(!BUSINESS_CATEGORIES[kind]?.includes(category)||!amountCents||!/^(20\d\d)-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(date))
   return Response.json({error:'Invalid transaction'},{status:400,headers:privateHeaders});
  const parsed=new Date(date+'T12:00:00Z');
  if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==date||year>new Date().getUTCFullYear()+1)
