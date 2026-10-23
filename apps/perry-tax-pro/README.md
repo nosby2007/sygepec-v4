@@ -82,3 +82,15 @@ npx firebase deploy --only hosting:perry-tax-pro-sygepec-v4 --project sygepec-v4
 ```
 
 Do not deploy the default `sygepec-v4` Hosting site from this directory.
+
+## Dedicated branch policy and release gates
+
+**Permanent application branch:** `codex/perry-tax-pro`. Do not merge this branch into `master` or `main`. All Perry Tax Pro development stays on this branch unless the repository owner explicitly changes this policy.
+
+**Security gate:** The Firestore and Storage snippets under `firebase/` are NOT automatically active. Review and integrate them with the actual deployed rules before accepting taxpayer data. A client-side document-count increment is retained for upload compatibility; this is not an authoritative accounting or audit control. Replace it with a trusted backend transaction before production.
+
+**Signature gate:** The Form 8879 signature state is manually tracked. Selecting `SIGNED` is not proof of identity, consent, or a verified electronic signature. Do not use it as sole evidence for e-file authorization.
+
+**Submission gate:** `SUBMITTED` and `ACCEPTED` are manually recorded external statuses, not IRS acknowledgements. Verify original evidence before marking either status.
+
+**Validation gate:** Run build, lint, Firebase Emulator authorization tests, and synthetic end-to-end testing against a separate DEV Firebase project. Review MFA, session revocation, malicious upload scanning, retention/deletion, and audit events before production.
