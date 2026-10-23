@@ -31,3 +31,14 @@ match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
     && validTaxReturn(clientUid, returnId)
     && (request.auth.uid == clientUid || taxPreparer());
 }
+
+match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {
+ allow read: if request.auth != null && request.auth.uid == clientUid;
+ allow create: if request.auth != null && request.auth.uid == clientUid
+  && firestore.exists(/databases/(default)/documents/taxBusinessEntries/$(entryId))
+  && firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data.clientId == clientUid
+  && firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data.kind == 'expense'
+  && request.resource.size > 0 && request.resource.size <= 10485760
+  && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png)');
+ allow update, delete: if false;
+}
