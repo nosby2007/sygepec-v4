@@ -130,13 +130,20 @@ match /taxAppointments/{appointmentId} {
 }
 
 
-// Business bookkeeping: client-owned immutable entries, preparer read-only.
+// Business workspace: client-owned, tenant-isolated immutable records.
 // These rules must be integrated and emulator-tested before production.
+function businessOwner() {
+ return taxSignedIn()
+  && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+  && taxUser().tenantId == 'perry-tax-pro'
+  && taxUser().role == 'CLIENT';
+}
+
 match /taxBusinessEntries/{entryId} {
-  allow get, list: if taxSignedIn()
+  allow get, list: if businessOwner()
     && resource.data.tenantId == 'perry-tax-pro'
-    && (resource.data.clientId == request.auth.uid || taxPreparer());
-  allow create: if taxSignedIn()
+    && resource.data.clientId == request.auth.uid;
+  allow create: if businessOwner()
     && request.resource.data.keys().hasOnly([
       'tenantId','clientId','taxYear','kind','category','amountCents','date','description','createdAt'
     ])
@@ -167,10 +174,10 @@ match /taxBusinessEntries/{entryId} {
 }
 
 match /taxBusinessCustomers/{customerId} {
- allow get, list: if taxSignedIn()
+ allow get, list: if businessOwner()
    && resource.data.tenantId == 'perry-tax-pro'
    && resource.data.ownerUid == request.auth.uid;
- allow create: if taxSignedIn()
+ allow create: if businessOwner()
    && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','phone','email','notes','createdAt'])
    && request.resource.data.tenantId == 'perry-tax-pro'
    && request.resource.data.ownerUid == request.auth.uid
@@ -186,14 +193,13 @@ match /taxBusinessCustomers/{customerId} {
  allow update, delete: if false;
 }
 
-function businessOwner() { return taxSignedIn(); }
 match /taxBusinessServices/{id} {
  allow get, list: if businessOwner() && resource.data.tenantId == 'perry-tax-pro' && resource.data.ownerUid == request.auth.uid;
  allow create: if businessOwner()
   && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','priceCents','durationMinutes','createdAt'])
   && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.ownerUid == request.auth.uid
   && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
-  && request.resource.data.priceCents is int && request.resource.data.priceCents > 0
+  && request.resource.data.priceCents is int && request.resource.data.priceCents > 0 && request.resource.data.priceCents <= 99999999999
   && request.resource.data.durationMinutes is int && request.resource.data.durationMinutes >= 15 && request.resource.data.durationMinutes <= 480;
  allow update, delete: if false;
 }
@@ -210,8 +216,12 @@ match /taxBusinessBookings/{id} {
   && request.resource.data.notes is string && request.resource.data.notes.size() <= 300
   && exists(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId))
   && get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.ownerUid == request.auth.uid
+  && request.resource.data.customerName == get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.name
   && exists(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId))
-  && get(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId)).data.ownerUid == request.auth.uid;
+  && get(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId)).data.ownerUid == request.auth.uid
+  && request.resource.data.serviceName == get(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId)).data.name
+  && request.resource.data.durationMinutes == get(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId)).data.durationMinutes
+  && request.resource.data.priceCents == get(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId)).data.priceCents;
  allow update, delete: if false;
 }
 match /taxBusinessInvoices/{id} {
@@ -223,9 +233,10 @@ match /taxBusinessInvoices/{id} {
   && request.resource.data.customerId is string
   && exists(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId))
   && get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.ownerUid == request.auth.uid
-  && request.resource.data.customerName is string && request.resource.data.description is string
+  && request.resource.data.customerName == get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.name
+  && request.resource.data.description is string
   && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 200
-  && request.resource.data.amountCents is int && request.resource.data.amountCents > 0
+  && request.resource.data.amountCents is int && request.resource.data.amountCents > 0 && request.resource.data.amountCents <= 99999999999
   && request.resource.data.dueDate is string && request.resource.data.dueDate.size() == 10;
  allow update, delete: if false;
 }
