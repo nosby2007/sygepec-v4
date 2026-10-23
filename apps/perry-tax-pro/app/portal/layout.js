@@ -5,6 +5,7 @@ export const metadata = { title: "Client Portal", robots: { index: false } };
 
 const links = [
   { href: "/portal", label: "Dashboard", icon: "🏠" },
+  { href: "/portal/business", label: "Small Business", icon: "📊" },
   { href: "/portal/returns", label: "Tax Years", icon: "🗓️" },
   { href: "/portal/intake", label: "Tax Questionnaire", icon: "📝" },
   { href: "/portal/documents", label: "Documents", icon: "📁" },
