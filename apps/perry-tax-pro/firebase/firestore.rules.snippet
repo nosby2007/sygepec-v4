@@ -147,8 +147,15 @@ match /taxBusinessEntries/{entryId} {
     && request.resource.data.taxYear <= 2100
     && request.resource.data.kind in ['income','expense']
     && request.resource.data.category is string
-    && request.resource.data.category.size() > 0
-    && request.resource.data.category.size() <= 60
+    && (
+      (request.resource.data.kind == 'income'
+        && request.resource.data.category in ['Sales','Services','Other income'])
+      || (request.resource.data.kind == 'expense'
+        && request.resource.data.category in [
+          'Advertising','Car and truck','Contract labor','Insurance','Office expenses',
+          'Rent','Repairs','Supplies','Taxes and licenses','Travel','Meals','Utilities','Other expense'
+        ])
+    )
     && request.resource.data.amountCents is int
     && request.resource.data.amountCents > 0
     && request.resource.data.amountCents <= 99999999999

@@ -23,9 +23,11 @@ export async function POST(req) {
  if(!BUSINESS_CATEGORIES[kind]?.includes(category)||!amountCents||!/^(20\d\d)-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(date))
   return Response.json({error:'Invalid transaction'},{status:400,headers:privateHeaders});
  const parsed=new Date(date+'T12:00:00Z');
- if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==date||year>new Date().getUTCFullYear()+1)
+ if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==date||year<2020||year>new Date().getUTCFullYear()+1)
   return Response.json({error:'Invalid date'},{status:400,headers:privateHeaders});
  const id=crypto.randomUUID();
- await setDocument('taxBusinessEntries/'+id,{tenantId:TAX_TENANT,clientId:session.uid,taxYear:year,kind,category,amountCents,date,description:cleanText(body.description,300),createdAt:new Date().toISOString()},session.idToken,{createOnly:true});
- return Response.json({ok:true,id},{status:201,headers:privateHeaders});
+ try{
+  await setDocument('taxBusinessEntries/'+id,{tenantId:TAX_TENANT,clientId:session.uid,taxYear:year,kind,category,amountCents,date,description:cleanText(body.description,300),createdAt:new Date().toISOString()},session.idToken,{createOnly:true});
+  return Response.json({ok:true,id},{status:201,headers:privateHeaders});
+ }catch{return Response.json({error:'Transaction could not be saved'},{status:503,headers:privateHeaders});}
 }
