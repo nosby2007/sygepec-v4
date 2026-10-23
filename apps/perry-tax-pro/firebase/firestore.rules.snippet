@@ -128,3 +128,33 @@ match /taxAppointments/{appointmentId} {
     && request.resource.data.status in ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
   allow delete: if false;
 }
+
+
+// Business bookkeeping: client-owned immutable entries, preparer read-only.
+// These rules must be integrated and emulator-tested before production.
+match /taxBusinessEntries/{entryId} {
+  allow get, list: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && (resource.data.clientId == request.auth.uid || taxPreparer());
+  allow create: if taxSignedIn()
+    && request.resource.data.keys().hasOnly([
+      'tenantId','clientId','taxYear','kind','category','amountCents','date','description','createdAt'
+    ])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.clientId == request.auth.uid
+    && request.resource.data.taxYear is int
+    && request.resource.data.taxYear >= 2020
+    && request.resource.data.taxYear <= 2100
+    && request.resource.data.kind in ['income','expense']
+    && request.resource.data.category is string
+    && request.resource.data.category.size() > 0
+    && request.resource.data.category.size() <= 60
+    && request.resource.data.amountCents is int
+    && request.resource.data.amountCents > 0
+    && request.resource.data.amountCents <= 99999999999
+    && request.resource.data.date is string
+    && request.resource.data.date.size() == 10
+    && request.resource.data.description is string
+    && request.resource.data.description.size() <= 300;
+  allow update, delete: if false;
+}
