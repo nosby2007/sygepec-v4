@@ -178,3 +178,47 @@ match /taxBusinessCustomers/{customerId} {
    && request.resource.data.notes.size() <= 500;
  allow update, delete: if false;
 }
+
+function businessOwner() { return taxSignedIn(); }
+match /taxBusinessServices/{id} {
+ allow get, list: if businessOwner() && resource.data.tenantId == 'perry-tax-pro' && resource.data.ownerUid == request.auth.uid;
+ allow create: if businessOwner()
+  && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','priceCents','durationMinutes','createdAt'])
+  && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.ownerUid == request.auth.uid
+  && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+  && request.resource.data.priceCents is int && request.resource.data.priceCents > 0
+  && request.resource.data.durationMinutes is int && request.resource.data.durationMinutes >= 15 && request.resource.data.durationMinutes <= 480;
+ allow update, delete: if false;
+}
+match /taxBusinessBookings/{id} {
+ allow get, list: if businessOwner() && resource.data.tenantId == 'perry-tax-pro' && resource.data.ownerUid == request.auth.uid;
+ allow create: if businessOwner()
+  && request.resource.data.keys().hasOnly(['tenantId','ownerUid','customerId','customerName','serviceId','serviceName','start','durationMinutes','priceCents','status','reminderStatus','notes','createdAt'])
+  && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.ownerUid == request.auth.uid
+  && request.resource.data.status == 'SCHEDULED' && request.resource.data.reminderStatus == 'NOT_SENT'
+  && request.resource.data.start is string && request.resource.data.start.size() == 16
+  && request.resource.data.customerId is string && request.resource.data.serviceId is string
+  && request.resource.data.customerName is string && request.resource.data.serviceName is string
+  && request.resource.data.durationMinutes is int && request.resource.data.priceCents is int
+  && request.resource.data.notes is string && request.resource.data.notes.size() <= 300
+  && exists(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId))
+  && get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.ownerUid == request.auth.uid
+  && exists(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId))
+  && get(/databases/$(database)/documents/taxBusinessServices/$(request.resource.data.serviceId)).data.ownerUid == request.auth.uid;
+ allow update, delete: if false;
+}
+match /taxBusinessInvoices/{id} {
+ allow get, list: if businessOwner() && resource.data.tenantId == 'perry-tax-pro' && resource.data.ownerUid == request.auth.uid;
+ allow create: if businessOwner()
+  && request.resource.data.keys().hasOnly(['tenantId','ownerUid','customerId','customerName','description','amountCents','dueDate','status','createdAt'])
+  && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.ownerUid == request.auth.uid
+  && request.resource.data.status == 'DRAFT'
+  && request.resource.data.customerId is string
+  && exists(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId))
+  && get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.ownerUid == request.auth.uid
+  && request.resource.data.customerName is string && request.resource.data.description is string
+  && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 200
+  && request.resource.data.amountCents is int && request.resource.data.amountCents > 0
+  && request.resource.data.dueDate is string && request.resource.data.dueDate.size() == 10;
+ allow update, delete: if false;
+}
