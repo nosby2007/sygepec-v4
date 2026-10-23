@@ -17,9 +17,12 @@ function taxPreparer() {
 
 function taxClientAccount() {
   return taxSignedIn()
-    && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
-    && taxUser().role == 'CLIENT'
-    && (!taxUser().keys().hasAny(['accountType']) || taxUser().accountType == 'TAX');
+    && existsAfter(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+    && getAfter(/databases/$(database)/documents/taxUsers/$(request.auth.uid)).data.role == 'CLIENT'
+    && (
+      !getAfter(/databases/$(database)/documents/taxUsers/$(request.auth.uid)).data.keys().hasAny(['accountType'])
+      || getAfter(/databases/$(database)/documents/taxUsers/$(request.auth.uid)).data.accountType == 'TAX'
+    );
 }
 
 function taxReturn(returnId) {
