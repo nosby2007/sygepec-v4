@@ -10,17 +10,14 @@ function taxPreparer() {
     && taxProfile().role == 'PREPARER';
 }
 
-function taxClient() {
-  return request.auth != null
-    && firestore.exists(/databases/(default)/documents/taxUsers/$(request.auth.uid))
-    && taxProfile().tenantId == 'perry-tax-pro'
-    && taxProfile().role == 'CLIENT';
-}
-
 function validTaxReturn(clientUid, returnId) {
   return firestore.exists(/databases/(default)/documents/taxReturns/$(returnId))
     && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.tenantId == 'perry-tax-pro'
     && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.clientId == clientUid;
+}
+
+function businessEntry(entryId) {
+  return firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data;
 }
 
 match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
@@ -41,10 +38,10 @@ match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
 
 match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {
  allow read: if request.auth != null && (request.auth.uid == clientUid || taxPreparer());
- allow create: if taxClient() && request.auth.uid == clientUid
-  && firestore.exists(/databases/(default)/documents/taxBusinessEntries/$(entryId))
-  && firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data.clientId == clientUid
-  && firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data.kind == 'expense'
+ allow create: if request.auth != null && request.auth.uid == clientUid
+  && businessEntry(entryId).tenantId == 'perry-tax-pro'
+  && businessEntry(entryId).clientId == clientUid
+  && businessEntry(entryId).kind == 'expense'
   && request.resource.size > 0 && request.resource.size <= 10485760
   && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png)');
  allow update, delete: if false;
