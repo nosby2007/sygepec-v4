@@ -58,13 +58,19 @@ match /taxReturns/{returnId} {
   allow update: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
     && (
-      taxPreparer()
+      (taxPreparer()
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.tenantId == resource.data.tenantId
+        && request.resource.data.taxYear == resource.data.taxYear
+        && request.resource.data.createdAt == resource.data.createdAt)
       || (
         resource.data.clientId == request.auth.uid
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.tenantId == resource.data.tenantId
+        && request.resource.data.taxYear == resource.data.taxYear
+        && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
-          'intake', 'filingStatus', 'status', 'docCount', 'updatedAt'
+          'intake', 'filingStatus', 'status', 'updatedAt'
         ])
         && (
           request.resource.data.status == resource.data.status
