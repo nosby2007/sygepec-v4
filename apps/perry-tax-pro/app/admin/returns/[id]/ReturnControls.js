@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { STATUSES } from "@/lib/constants";
+import Icon from "@/components/Icon";
 
 export default function ReturnControls({ returnId, status, preparerId, preparers }) {
   const [s, setS] = useState(status);
@@ -22,8 +23,9 @@ export default function ReturnControls({ returnId, status, preparerId, preparers
   };
 
   return (
-    <div className="card mt row between">
-      <div className="row">
+    <div className="card mt row between" style={{ alignItems: "flex-end" }}>
+      <div className="row" style={{ alignItems: "flex-end" }}>
+        <span className="kpi-icon"><Icon name="layers" size={18} /></span>
         <div className="field">
           <label htmlFor="ret-status">Return status</label>
           <select id="ret-status" className="select" value={s} onChange={(e) => setS(e.target.value)}>
@@ -39,9 +41,9 @@ export default function ReturnControls({ returnId, status, preparerId, preparers
         </div>
       </div>
       <div className="row">
-        {state.ok && <span className="small" style={{ color: "var(--teal)" }}>✓ Saved</span>}
+        {state.ok && <span className="small pos-text" style={{ display: "inline-flex", gap: 4, alignItems: "center" }}><Icon name="check" size={14} /> Saved</span>}
         {state.error && <span className="small" style={{ color: "var(--rose)" }}>{state.error}</span>}
-        <button id="ret-save" className="btn btn-primary" disabled={state.busy} onClick={save}>Update Return</button>
+        <button id="ret-save" className="btn btn-primary" disabled={state.busy} onClick={save}><Icon name="refresh" size={16} /> Update Return</button>
       </div>
     </div>
   );

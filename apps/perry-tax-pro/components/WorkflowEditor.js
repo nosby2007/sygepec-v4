@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SIGNATURE_METHODS, SIGNATURE_STATUSES, SUBMISSION_STATUSES } from "@/lib/constants";
+import Icon from "@/components/Icon";
 
 export default function WorkflowEditor({ item, mode = "both", compact = false }) {
   const [signatureStatus, setSignatureStatus] = useState(item.signature_status);
@@ -75,7 +76,7 @@ export default function WorkflowEditor({ item, mode = "both", compact = false })
         </>
       )}
       <div className="workflow-save">
-        {state.ok && <span className="small" style={{ color: "var(--green)" }}>✓ Saved</span>}
+        {state.ok && <span className="small pos-text" style={{ display: "inline-flex", gap: 4, alignItems: "center", animation: "pop .4s" }}><Icon name="check" size={14} /> Saved</span>}
         {state.error && <span className="small" style={{ color: "var(--rose)" }}>{state.error}</span>}
         <button className="btn btn-primary btn-sm" disabled={state.busy} onClick={save}>{state.busy ? "Saving…" : "Save"}</button>
       </div>
