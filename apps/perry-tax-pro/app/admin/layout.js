@@ -4,10 +4,10 @@ import { requireRole } from "@/lib/auth";
 export const metadata = { title: "Preparer Dashboard", robots: { index: false } };
 
 const links = [
-  { href: "/admin", label: "Clients & Returns", icon: "📊" },
-  { href: "/admin/appointments", label: "Appointments", icon: "📅" },
-  { href: "/admin/signatures", label: "Signatures", icon: "✍️" },
-  { href: "/admin/submissions", label: "Submissions", icon: "📤" },
+  { href: "/admin", label: "Clients & Returns", icon: "chart" },
+  { href: "/admin/appointments", label: "Appointments", icon: "calendar" },
+  { href: "/admin/signatures", label: "Signatures", icon: "pen" },
+  { href: "/admin/submissions", label: "Submissions", icon: "send" },
 ];
 
 export default async function AdminLayout({ children }) {

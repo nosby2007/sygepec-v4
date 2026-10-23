@@ -9,7 +9,7 @@ export default function Page() {
     <main className="section" style={{ paddingTop: 60 }}>
       <div className="container">
         <div className="section-head">
-          <span className="eyebrow">Free Tool</span>
+          <span className="eyebrow"><span className="dot" /> Free Tool · Live results</span>
           <h1 style={{ fontSize: "clamp(2rem,4vw,3rem)", margin: "16px 0 12px" }}>
             2026 <span className="grad-text">Refund Estimator</span>
           </h1>

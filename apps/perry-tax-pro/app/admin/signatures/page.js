@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { listReturns } from "@/lib/data";
-import { fmtDate } from "@/lib/constants";
+import { fmtDate, SIGNATURE_STATUSES } from "@/lib/constants";
 import { SignatureBadge } from "@/components/WorkflowStatus";
 import WorkflowEditor from "@/components/WorkflowEditor";
+import Icon from "@/components/Icon";
+import { NumberCount } from "@/components/Motion";
+import { Donut, PALETTE } from "@/components/charts";
+import { Avatar, Empty, Kpi, PageHead } from "@/components/ui";
+
+const COLORS = { NOT_REQUESTED: PALETTE.slate, REQUESTED: PALETTE.gold, SIGNED: PALETTE.green, DECLINED: PALETTE.rose };
 
 export default async function Page() {
   const returns = await listReturns();
@@ -13,33 +19,41 @@ export default async function Page() {
   const requested = rows.filter((item) => item.signature_status === "REQUESTED").length;
   const signed = rows.filter((item) => item.signature_status === "SIGNED").length;
   const exceptions = rows.filter((item) => item.signature_status === "DECLINED").length;
+  const segs = SIGNATURE_STATUSES.map((s) => ({ label: s.label, value: rows.filter((r) => r.signature_status === s.key).length, color: COLORS[s.key] }));
 
   return (
     <>
-      <div className="page-head">
-        <div><p className="small">Form 8879 tracking</p><h1>Signature Center</h1></div>
-      </div>
-      <div className="grid-3">
-        <div className="card kpi"><div className="lbl">Awaiting signature</div><div className="val grad-text">{requested}</div></div>
-        <div className="card kpi"><div className="lbl">Signed and verified</div><div className="val" style={{ color: "var(--green)" }}>{signed}</div></div>
-        <div className="card kpi"><div className="lbl">Exceptions</div><div className="val" style={{ color: exceptions ? "var(--rose)" : "var(--text)" }}>{exceptions}</div></div>
+      <PageHead kicker="Form 8879 tracking" icon="pen" title="Signature Center" desc="Track requests and verified signatures. This records status; it does not transmit a return to the IRS." />
+      <div className="grid-main">
+        <div className="grid-3 stagger" style={{ alignContent: "start" }}>
+          <Kpi label="Awaiting signature" icon="clock" tone="gold" value={<NumberCount value={requested} />} foot="Follow up with client" />
+          <Kpi label="Signed and verified" icon="shield" tone="green" value={<NumberCount value={signed} />} valueStyle={{ color: "var(--green)" }} foot="Ready for e-file" />
+          <Kpi label="Exceptions" icon="alert" tone="rose" value={<NumberCount value={exceptions} />} valueStyle={{ color: exceptions ? "var(--rose)" : "var(--text)" }} foot="Declined signatures" />
+        </div>
+        <div className="card">
+          <div className="donut-wrap">
+            <Donut size={130} thickness={16} segments={segs} center={rows.length ? `${Math.round((signed / rows.length) * 100)}%` : "—"} sub="signed" label="Signature status distribution" />
+            <div className="legend vertical">{segs.map((s) => <span key={s.label}><i style={{ background: s.color }} />{s.label}<b>{s.value}</b></span>)}</div>
+          </div>
+        </div>
       </div>
       <div className="card mt">
         <div className="card-title">
-          <div><h3>Signature queue</h3><p className="small">Track requests and verified signatures. This records status; it does not transmit a return to the IRS.</p></div>
+          <div><h3>Signature queue</h3><div className="sub">Requested signatures first, then exceptions</div></div>
+          <span className="pill">{rows.length} returns</span>
         </div>
         <div className="workflow-list">
           {rows.map((item) => (
-            <article key={item.id} className="workflow-row">
+            <article key={item.id} className={`workflow-row ${item.signature_status === "REQUESTED" ? "flag" : item.signature_status === "DECLINED" ? "alarm" : ""}`}>
               <div className="workflow-person">
-                <Link href={`/admin/returns/${item.id}`}><b>{item.client_name}</b></Link>
+                <Link href={`/admin/returns/${item.id}`} className="person"><Avatar name={item.client_name} size="sm" /><b>{item.client_name}</b></Link>
                 <span className="hint">{item.client_email} · Tax year {item.tax_year}</span>
                 <div className="row"><SignatureBadge status={item.signature_status} />{item.signed_at && <span className="hint">Verified {fmtDate(item.signed_at)}</span>}</div>
               </div>
               <WorkflowEditor item={item} mode="signature" compact />
             </article>
           ))}
-          {rows.length === 0 && <p className="center muted">No submitted questionnaires are ready for signature processing.</p>}
+          {rows.length === 0 && <Empty icon="pen" title="Nothing to sign yet">No submitted questionnaires are ready for signature processing.</Empty>}
         </div>
       </div>
     </>

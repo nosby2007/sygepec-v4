@@ -2,9 +2,13 @@ import Link from "next/link";
 import { requireTaxClient } from "@/lib/auth";
 import { getClientReturn, listDocuments, listNotes, listAppointments } from "@/lib/data";
 import { intakeToEstimate, buildChecklist } from "@/lib/tax";
-import { money, fmtDate, STATUSES, statusIndex } from "@/lib/constants";
-import { Timeline, StatusBadge } from "@/components/Status";
+import { money, fmtDate, STATUSES, statusIndex, DOC_TYPES } from "@/lib/constants";
+import { Timeline, StatusBadge, statusProgress } from "@/components/Status";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
+import Icon from "@/components/Icon";
+import { MoneyCount } from "@/components/Motion";
+import { Donut, ProgressRing, PALETTE } from "@/components/charts";
+import { Avatar, ChartEmpty } from "@/components/ui";
 
 export default async function Dashboard() {
   const s = await requireTaxClient();
@@ -14,9 +18,11 @@ export default async function Dashboard() {
   const checklist = buildChecklist(r.intake);
   const have = new Set(docs.map((d) => d.type));
   const done = checklist.filter((t) => have.has(t)).length;
+  const missing = checklist.filter((t) => !have.has(t));
   const est = r.intake.submitted ? intakeToEstimate(r.intake) : null;
   const lastNote = notes.filter((n) => n.author_id !== s.id).at(-1);
   const upcoming = appointments.filter((a) => new Date(a.scheduled_at) > new Date() && a.status !== "CANCELLED")[0];
+  const progress = statusProgress(r.status);
 
   const next =
     r.submission_status === "REJECTED"
@@ -31,73 +37,102 @@ export default async function Dashboard() {
       ? { text: "Your return is ready! Message your preparer to schedule your e-signature.", href: "/portal/messages", cta: "Contact Preparer" }
       : { text: STATUSES[statusIndex(r.status)].desc + ". We'll notify you of any updates.", href: "/portal/messages", cta: "View Messages" };
 
+  const taxNet = est ? Math.max(0, est.totalTax - est.seTax) : 0;
+  const estSegments = est ? [
+    { label: "Income tax", value: taxNet, color: PALETTE.blue, display: money(taxNet) },
+    { label: "Self-employment tax", value: est.seTax, color: PALETTE.violet, display: money(est.seTax) },
+    { label: est.refund >= 0 ? "Refund" : "Balance due", value: Math.abs(est.refund), color: est.refund >= 0 ? PALETTE.teal : PALETTE.rose, display: money(Math.abs(est.refund)) },
+  ] : [];
+
   return (
     <>
-      <div className="page-head">
+      <section className="page-banner">
         <div>
-          <p className="small">Tax Year {r.tax_year}</p>
-          <h1>Welcome back, {s.name.split(" ")[0]} 👋</h1>
+          <div className="kicker"><Icon name="sparkle" size={14} /> Tax Year {r.tax_year}</div>
+          <h1>Welcome back, {s.name.split(" ")[0]}</h1>
+          <p style={{ marginTop: 8, maxWidth: 560 }}>{next.text}</p>
+          <div className="row mt-sm" style={{ marginTop: 18 }}>
+            <Link id="next-step-cta" href={next.href} className="btn btn-primary">{next.cta} <Icon name="arrow" size={16} className="icon-arrow" /></Link>
+            <StatusBadge status={r.status} />
+          </div>
+          <div className="banner-stats">
+            <div><b>{done}/{checklist.length}</b><span>Documents received</span></div>
+            <div><b>{est ? money(Math.abs(est.refund)) : "—"}</b><span>{est && est.refund < 0 ? "Est. balance due" : "Est. refund"}</span></div>
+            <div><b>{fmtDate(r.updated_at, { month: "short", day: "numeric" }) || "—"}</b><span>Last update</span></div>
+          </div>
         </div>
-        <StatusBadge status={r.status} />
-      </div>
+        <ProgressRing value={progress} size={150} thickness={12} label="Return progress">
+          <b style={{ fontSize: "1.9rem" }}>{Math.round(progress * 100)}%</b>
+          <span>complete</span>
+        </ProgressRing>
+      </section>
 
       <div className="card">
-        <div className="card-title"><h3>Return progress</h3><span className="small muted">Updated {fmtDate(r.updated_at)}</span></div>
+        <div className="card-title"><div><h3>Return progress</h3><div className="sub">Six stages from questionnaire to IRS acceptance</div></div><span className="pill info"><Icon name="clock" size={13} /> Updated {fmtDate(r.updated_at)}</span></div>
         <Timeline status={r.status} />
       </div>
 
-      <div className="grid-2 mt">
-        <div className="card">
-          <div className="card-title"><h3>Form 8879 signature</h3><SignatureBadge status={r.signature_status} /></div>
-          <p className="small">{r.signed_at ? `Verified ${fmtDate(r.signed_at)}` : r.signature_status === "REQUESTED" ? "Your preparer is waiting for your verified signature." : "Your preparer will request this when the return is ready."}</p>
+      <div className="grid-4 mt stagger">
+        <div className="card kpi card-hover">
+          <div className="kpi-head"><div className="lbl">{est && est.refund < 0 ? "Estimated balance due" : "Estimated refund"}</div><span className={`kpi-icon ${est && est.refund < 0 ? "rose" : "teal"}`}><Icon name="dollar" size={18} /></span></div>
+          <div className={`val ${est && est.refund < 0 ? "neg-text" : "grad-text"}`}>{est ? <MoneyCount value={Math.abs(est.refund)} /> : "—"}</div>
+          <div className="kpi-foot"><span className="small muted">{est ? "Preliminary, based on your answers" : "Complete your questionnaire"}</span></div>
         </div>
-        <div className="card">
-          <div className="card-title"><h3>E-file submission</h3><SubmissionBadge status={r.submission_status} /></div>
-          <p className="small">{r.submission_reference ? `Reference: ${r.submission_reference}` : r.submitted_at ? `Submitted ${fmtDate(r.submitted_at)}` : "No submission has been recorded yet."}</p>
+        <div className="card kpi card-hover">
+          <div className="kpi-head"><div className="lbl">Documents received</div><span className="kpi-icon"><Icon name="folder" size={18} /></span></div>
+          <div className="val">{done}<span className="muted" style={{ fontSize: "1.1rem" }}> / {checklist.length}</span></div>
+          <div className="meter"><span style={{ width: `${checklist.length ? (done / checklist.length) * 100 : 0}%` }} /></div>
+        </div>
+        <div className="card kpi card-hover">
+          <div className="kpi-head"><div className="lbl">Next appointment</div><span className="kpi-icon gold"><Icon name="calendar" size={18} /></span></div>
+          <div className="val" style={{ fontSize: "1.15rem" }}>
+            {upcoming ? fmtDate(upcoming.scheduled_at, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "None scheduled"}
+          </div>
+          <div className="kpi-foot"><Link href={upcoming ? "/portal/appointments" : "/book"} className="small grad-text" style={{ fontWeight: 600 }}>{upcoming ? "View details" : "Book now →"}</Link></div>
+        </div>
+        <div className="card kpi card-hover">
+          <div className="kpi-head"><div className="lbl">Your preparer</div><span className="kpi-icon violet"><Icon name="user" size={18} /></span></div>
+          {r.preparer_name ? (
+            <div className="row nowrap mt-sm"><Avatar name={r.preparer_name} /><div><b>{r.preparer_name}</b><div className="tiny muted">Certified Tax Preparer</div></div></div>
+          ) : <p className="small mt-sm">Assigned once your questionnaire is submitted.</p>}
         </div>
       </div>
 
-      <div className="glass mt" style={{ padding: 26 }}>
-        <div className="row between">
-          <div>
-            <span className="eyebrow">Next step</span>
-            <p style={{ color: "var(--text)", marginTop: 10, fontSize: "1.05rem" }}>{next.text}</p>
-          </div>
-          <Link id="next-step-cta" href={next.href} className="btn btn-primary">{next.cta} →</Link>
+      <div className="grid-main mt">
+        <div className="card">
+          <div className="card-title"><div><h3>Estimate breakdown</h3><div className="sub">Where your tax dollars go this year</div></div>{est && <span className="pill">Effective {(est.effective * 100).toFixed(1)}%</span>}</div>
+          {est ? (
+            <div className="donut-wrap">
+              <Donut size={170} thickness={20} segments={estSegments} center={money(Math.abs(est.refund))} sub={est.refund >= 0 ? "refund" : "due"} label="Estimate breakdown" />
+              <div className="legend vertical">
+                {estSegments.map((x) => <span key={x.label}><i style={{ background: x.color }} />{x.label}<b>{x.display}</b></span>)}
+                <span className="hint" style={{ marginTop: 6 }}>AGI {money(est.agi)} · {est.deductionType} deduction {money(est.deduction)}</span>
+              </div>
+            </div>
+          ) : (
+            <ChartEmpty icon="chart"><p className="small" style={{ marginTop: 6 }}>Submit your questionnaire to unlock your live estimate.</p><Link href="/portal/intake" className="btn btn-sm btn-ghost mt-sm">Open questionnaire</Link></ChartEmpty>
+          )}
+        </div>
+        <div className="card">
+          <div className="card-title"><h3>Still needed</h3><Link href="/portal/documents" className="small grad-text" style={{ fontWeight: 600 }}>Upload</Link></div>
+          {missing.length ? missing.slice(0, 5).map((t) => (
+            <div key={t} className="list-item"><div className="row nowrap"><span className="check" /><span className="small" style={{ color: "var(--text)" }}>{DOC_TYPES[t]}</span></div><span className="badge s-DOCS_PENDING">Needed</span></div>
+          )) : <div className="empty" style={{ padding: 20 }}><div className="icon-badge green"><Icon name="check" size={22} /></div><b>All documents received</b><p className="small">Nice work — your preparer has everything.</p></div>}
+          {missing.length > 5 && <p className="hint mt-sm">+{missing.length - 5} more on the documents page</p>}
         </div>
       </div>
 
       <div className="grid-3 mt">
-        <div className="card kpi">
-          <div className="lbl">{est && est.refund < 0 ? "Estimated balance due" : "Estimated refund"}</div>
-          <div className={`val ${est && est.refund < 0 ? "" : "grad-text"}`} style={est && est.refund < 0 ? { color: "var(--rose)" } : {}}>
-            {est ? money(Math.abs(est.refund)) : "—"}
-          </div>
-          <div className="small muted">{est ? "Preliminary, based on your answers" : "Complete your questionnaire"}</div>
-        </div>
-        <div className="card kpi">
-          <div className="lbl">Documents received</div>
-          <div className="val">{done}<span className="muted" style={{ fontSize: "1.1rem" }}> / {checklist.length}</span></div>
-          <div className="meter"><span style={{ width: `${(done / checklist.length) * 100}%` }} /></div>
-        </div>
-        <div className="card kpi">
-          <div className="lbl">Next appointment</div>
-          <div className="val" style={{ fontSize: "1.25rem" }}>
-            {upcoming ? fmtDate(upcoming.scheduled_at, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "None scheduled"}
-          </div>
-          <Link href={upcoming ? "/portal/appointments" : "/book"} className="small grad-text">{upcoming ? "View details" : "Book now →"}</Link>
-        </div>
-      </div>
-
-      <div className="grid-2 mt">
         <div className="card">
-          <div className="card-title"><h3>Your preparer</h3></div>
-          {r.preparer_name ? (
-            <div className="row"><div className="avatar">{r.preparer_name[0]}</div><div><b>{r.preparer_name}</b><div className="small muted">Certified Tax Preparer</div></div></div>
-          ) : <p className="small">A preparer will be assigned once your questionnaire is submitted.</p>}
+          <div className="card-title"><div className="row nowrap"><span className="kpi-icon gold"><Icon name="pen" size={18} /></span><h3>Form 8879 signature</h3></div><SignatureBadge status={r.signature_status} /></div>
+          <p className="small">{r.signed_at ? `Verified ${fmtDate(r.signed_at)}` : r.signature_status === "REQUESTED" ? "Your preparer is waiting for your verified signature." : "Your preparer will request this when the return is ready."}</p>
         </div>
         <div className="card">
-          <div className="card-title"><h3>Latest message</h3><Link href="/portal/messages" className="small grad-text">Open inbox</Link></div>
+          <div className="card-title"><div className="row nowrap"><span className="kpi-icon"><Icon name="send" size={18} /></span><h3>E-file submission</h3></div><SubmissionBadge status={r.submission_status} /></div>
+          <p className="small">{r.submission_reference ? `Reference: ${r.submission_reference}` : r.submitted_at ? `Submitted ${fmtDate(r.submitted_at)}` : "No submission has been recorded yet."}</p>
+        </div>
+        <div className="card">
+          <div className="card-title"><div className="row nowrap"><span className="kpi-icon teal"><Icon name="chat" size={18} /></span><h3>Latest message</h3></div><Link href="/portal/messages" className="small grad-text" style={{ fontWeight: 600 }}>Open inbox</Link></div>
           {lastNote ? <p className="small" style={{ color: "var(--text)" }}>“{lastNote.message.slice(0, 160)}{lastNote.message.length > 160 ? "…" : ""}”</p> : <p className="small">No messages yet.</p>}
         </div>
       </div>

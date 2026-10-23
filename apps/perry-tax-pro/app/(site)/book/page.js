@@ -13,7 +13,7 @@ export default async function Page() {
   if (s.role !== "CLIENT") redirect("/admin");
   return (
     <main className="section" style={{ paddingTop: 60 }}>
-      <div className="container" style={{ maxWidth: 820 }}>
+      <div className="container" style={{ maxWidth: 1100 }}>
         <div className="section-head">
           <span className="eyebrow">Appointments</span>
           <h1 style={{ fontSize: "clamp(2rem,4vw,3rem)", margin: "16px 0 12px" }}>
