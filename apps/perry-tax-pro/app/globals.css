@@ -334,6 +334,9 @@ tbody tr:hover { background: var(--surface); }
 .appointment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .appointment-card { display: grid; align-content: start; gap: 16px; padding: 22px; }
 .appointment-actions { margin-top: auto; }
+.tax-year-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.tax-year-card { display: flex; flex-direction: column; }
+.tax-year-card h2 { font-size: 2rem; }
 
 /* Wizard */
 .wizard-steps { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }

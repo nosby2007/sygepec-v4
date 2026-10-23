@@ -25,7 +25,7 @@ export default function AuthForm({ mode }) {
       <form onSubmit={submit} className="glass auth-card stack fade-in">
         <div>
           <h1>{isReg ? "Create your account" : "Welcome back"}</h1>
-          <p className="small">{isReg ? "Start your 2026 return in minutes." : "Log in to your InnovaCare Tax portal."}</p>
+          <p className="small">{isReg ? "Start your tax return in minutes." : "Log in to your InnovaCare Tax portal."}</p>
         </div>
         {isReg && (
           <>

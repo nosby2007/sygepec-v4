@@ -34,6 +34,8 @@ function returnDto(row) {
     submission_notes: row.submissionNotes || null,
     submitted_at: row.submittedAt || null,
     accepted_at: row.acceptedAt || null,
+    carry_forward_from_return_id: row.carryForwardFromReturnId || null,
+    carry_forward_from_tax_year: row.carryForwardFromTaxYear || null,
     intake: row.intake || {},
     doc_count: Number(row.docCount || 0),
     created_at: row.createdAt,
@@ -90,12 +92,19 @@ async function activeSession() {
 }
 
 export async function getClientReturn(clientId) {
+  return (await listClientReturns(clientId))[0] || null;
+}
+
+export async function listClientReturns(clientId) {
   const session = await activeSession();
-  if (session.role !== "PREPARER" && session.uid !== String(clientId)) return null;
+  if (session.role !== "PREPARER" && session.uid !== String(clientId)) return [];
   const rows = await queryCollection("taxReturns", session.idToken, {
     filters: [["clientId", "EQUAL", String(clientId)], ["tenantId", "EQUAL", TAX_TENANT]],
   });
-  return returnDto(rows.filter((row) => row.tenantId === TAX_TENANT).sort((a, b) => b.taxYear - a.taxYear)[0]);
+  return rows
+    .filter((row) => row.tenantId === TAX_TENANT)
+    .sort((a, b) => b.taxYear - a.taxYear)
+    .map(returnDto);
 }
 
 export async function getReturn(id) {

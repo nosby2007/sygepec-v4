@@ -5,6 +5,11 @@ the Firebase project `sygepec-v4`. It provides client registration, guided tax
 intake, secure document exchange, messaging, appointment requests, return
 tracking, and a preparer operations dashboard.
 
+Returning clients can keep a year-by-year history and start the next tax year
+from a filed or accepted return. The renewal copies identity, contact, filing,
+spouse, and dependent details while resetting all annual income, deductions,
+bank details, documents, preparer assignment, signature, and e-file state.
+
 The preparer workspace includes appointment confirmation queues, Form 8879
 signature-status tracking, and controlled e-file readiness/submission tracking.
 It records verified workflow events and acknowledgements; it does not transmit

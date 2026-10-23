@@ -15,9 +15,10 @@ export async function POST(req) {
   try {
     auth = await signUpWithPassword(email, body.password, name);
     const now = new Date().toISOString();
+    const taxYear = new Date().getUTCFullYear();
     const profile = { uid: auth.localId, name, email, phone: phone || null, role: "CLIENT", tenantId: TAX_TENANT, createdAt: now, updatedAt: now };
     const [first, ...rest] = name.split(" ");
-    const returnId = `${auth.localId}_2026`;
+    const returnId = `${auth.localId}_${taxYear}`;
     await createDocuments([
       { path: `taxUsers/${auth.localId}`, data: profile },
       {
@@ -39,7 +40,7 @@ export async function POST(req) {
           submissionNotes: null,
           submittedAt: null,
           acceptedAt: null,
-          taxYear: 2026,
+          taxYear,
           status: "INTAKE",
           filingStatus: null,
           intake: { personal: { firstName: first, lastName: rest.join(" "), phone } },

@@ -26,12 +26,13 @@ export default function ClientTable({ rows }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Client</th><th>Status</th><th>Signature</th><th>E-file</th><th>Docs</th><th>Est. Refund</th><th>Preparer</th><th /></tr>
+            <tr><th>Client</th><th>Tax year</th><th>Status</th><th>Signature</th><th>E-file</th><th>Docs</th><th>Est. Refund</th><th>Preparer</th><th /></tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id}>
                 <td><b>{r.client_name}</b><div className="hint">{r.client_email}</div></td>
+                <td><b>{r.tax_year}</b></td>
                 <td><StatusBadge status={r.status} /></td>
                 <td><SignatureBadge status={r.signature_status} /></td>
                 <td><SubmissionBadge status={r.submission_status} /></td>
@@ -43,7 +44,7 @@ export default function ClientTable({ rows }) {
                 <td><Link href={`/admin/returns/${r.id}`} className="btn btn-ghost btn-sm">Open →</Link></td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={8} className="center muted">No matching returns</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={9} className="center muted">No matching returns</td></tr>}
           </tbody>
         </table>
       </div>
