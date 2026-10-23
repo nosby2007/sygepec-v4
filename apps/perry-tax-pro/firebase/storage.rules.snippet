@@ -1,0 +1,33 @@
+// Add inside service firebase.storage / match /b/{bucket}/o.
+function taxProfile() {
+  return firestore.get(/databases/(default)/documents/taxUsers/$(request.auth.uid)).data;
+}
+
+function taxPreparer() {
+  return request.auth != null
+    && firestore.exists(/databases/(default)/documents/taxUsers/$(request.auth.uid))
+    && taxProfile().tenantId == 'perry-tax-pro'
+    && taxProfile().role == 'PREPARER';
+}
+
+function validTaxReturn(clientUid, returnId) {
+  return firestore.exists(/databases/(default)/documents/taxReturns/$(returnId))
+    && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.tenantId == 'perry-tax-pro'
+    && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.clientId == clientUid;
+}
+
+match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
+  allow read: if request.auth != null
+    && validTaxReturn(clientUid, returnId)
+    && (request.auth.uid == clientUid || taxPreparer());
+  allow create: if request.auth != null
+    && validTaxReturn(clientUid, returnId)
+    && (request.auth.uid == clientUid || taxPreparer())
+    && request.resource.size > 0
+    && request.resource.size <= 10 * 1024 * 1024
+    && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png|image/webp|image/heic)');
+  allow update: if false;
+  allow delete: if request.auth != null
+    && validTaxReturn(clientUid, returnId)
+    && (request.auth.uid == clientUid || taxPreparer());
+}

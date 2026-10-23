@@ -1,0 +1,121 @@
+// Add inside service cloud.firestore / databases/{database}/documents.
+// This block is intentionally isolated from the existing SYGEPEC collections.
+function taxSignedIn() {
+  return request.auth != null;
+}
+
+function taxUser() {
+  return get(/databases/$(database)/documents/taxUsers/$(request.auth.uid)).data;
+}
+
+function taxPreparer() {
+  return taxSignedIn()
+    && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+    && taxUser().tenantId == 'perry-tax-pro'
+    && taxUser().role == 'PREPARER';
+}
+
+function taxReturn(returnId) {
+  return get(/databases/$(database)/documents/taxReturns/$(returnId)).data;
+}
+
+function canAccessTaxReturn(returnId) {
+  return taxSignedIn()
+    && exists(/databases/$(database)/documents/taxReturns/$(returnId))
+    && taxReturn(returnId).tenantId == 'perry-tax-pro'
+    && (taxReturn(returnId).clientId == request.auth.uid || taxPreparer());
+}
+
+match /taxUsers/{uid} {
+  allow get: if taxSignedIn() && (uid == request.auth.uid || taxPreparer());
+  allow list: if taxPreparer();
+  allow create: if taxSignedIn()
+    && uid == request.auth.uid
+    && request.resource.data.keys().hasOnly([
+      'uid', 'name', 'email', 'phone', 'role', 'tenantId', 'createdAt', 'updatedAt'
+    ])
+    && request.resource.data.uid == request.auth.uid
+    && request.resource.data.role == 'CLIENT'
+    && request.resource.data.tenantId == 'perry-tax-pro';
+  allow update: if taxSignedIn()
+    && uid == request.auth.uid
+    && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name', 'phone', 'updatedAt'])
+    && request.resource.data.role == resource.data.role
+    && request.resource.data.tenantId == resource.data.tenantId;
+  allow delete: if false;
+}
+
+match /taxReturns/{returnId} {
+  allow get, list: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && (resource.data.clientId == request.auth.uid || taxPreparer());
+  allow create: if taxSignedIn()
+    && request.resource.data.clientId == request.auth.uid
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.status == 'INTAKE'
+    && request.resource.data.preparerId == null
+    && request.resource.data.taxYear is int;
+  allow update: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && (
+      taxPreparer()
+      || (
+        resource.data.clientId == request.auth.uid
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.tenantId == resource.data.tenantId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'intake', 'filingStatus', 'status', 'docCount', 'updatedAt'
+        ])
+        && (
+          request.resource.data.status == resource.data.status
+          || (resource.data.status == 'INTAKE' && request.resource.data.status == 'DOCS_PENDING')
+        )
+      )
+    );
+  allow delete: if false;
+}
+
+match /taxDocuments/{docId} {
+  allow get, list: if canAccessTaxReturn(resource.data.returnId);
+  allow create: if canAccessTaxReturn(request.resource.data.returnId)
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.clientId == taxReturn(request.resource.data.returnId).clientId
+    && request.resource.data.uploadedBy == request.auth.uid;
+  allow update: if false;
+  allow delete: if canAccessTaxReturn(resource.data.returnId)
+    && (
+      taxPreparer()
+      || (
+        resource.data.clientId == request.auth.uid
+        && !['FILED', 'ACCEPTED'].hasAny([taxReturn(resource.data.returnId).status])
+      )
+    );
+}
+
+match /taxNotes/{noteId} {
+  allow get, list: if canAccessTaxReturn(resource.data.returnId);
+  allow create: if canAccessTaxReturn(request.resource.data.returnId)
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.clientId == taxReturn(request.resource.data.returnId).clientId
+    && request.resource.data.authorId == request.auth.uid
+    && request.resource.data.authorRole == taxUser().role
+    && request.resource.data.message is string
+    && request.resource.data.message.size() > 0
+    && request.resource.data.message.size() <= 4000;
+  allow update, delete: if false;
+}
+
+match /taxAppointments/{appointmentId} {
+  allow get, list: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && (resource.data.clientId == request.auth.uid || taxPreparer());
+  allow create: if taxSignedIn()
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.clientId == request.auth.uid
+    && request.resource.data.status == 'REQUESTED';
+  allow update: if taxPreparer()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'updatedAt'])
+    && request.resource.data.status in ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
+  allow delete: if false;
+}
