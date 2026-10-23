@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {getFirebaseSession} from '@/lib/auth';
+import {getFirebaseSession} from '@/lib/business-auth';
 import {getDocument,queryCollection,setDocument,TAX_TENANT} from '@/lib/firebase';
 import {cleanText,mutationGuard,privateHeaders} from '@/lib/security';
 export async function GET(){const s=await getFirebaseSession();if(!s||s.role!=='CLIENT')return Response.json({error:'Unauthorized'},{status:401,headers:privateHeaders});const corrections=await queryCollection('taxBusinessCorrections',s.idToken,{filters:[['clientId','EQUAL',s.uid],['tenantId','EQUAL',TAX_TENANT]],limit:1000});return Response.json({corrections},{headers:privateHeaders});}

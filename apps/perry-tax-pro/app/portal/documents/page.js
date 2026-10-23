@@ -1,10 +1,10 @@
-import { requireRole } from "@/lib/auth";
+import { requireTaxClient } from "@/lib/auth";
 import { getClientReturn, listDocuments } from "@/lib/data";
 import { buildChecklist } from "@/lib/tax";
 import DocumentCenter from "@/components/DocumentCenter";
 
 export default async function Page() {
-  const s = await requireRole("CLIENT");
+  const s = await requireTaxClient();
   const r = await getClientReturn(s.id);
   if (!r) return <p>No return found. Please contact support.</p>;
   const documents = await listDocuments(r.id);

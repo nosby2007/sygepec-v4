@@ -4,7 +4,7 @@ import Image from "next/image";
 const services = [
   { icon: "👤", title: "Individual & Family", text: "W-2 income, dependents, credits like CTC and EITC. Maximize every dollar you're owed." },
   { icon: "🚗", title: "Self-Employed & Gig", text: "1099-NEC, rideshare, delivery and freelance income with expense tracking and SE tax planning." },
-  { icon: "🏢", title: "Small Business", text: "Sole props, LLCs and S-Corps. Schedule C, 1120-S and quarterly estimate planning." },
+  { icon: "🏢", title: "InnovaCare Business", text: "A separate daily workspace for bookkeeping, customers, services, appointments and invoices.", href: "/business" },
   { icon: "📈", title: "Tax Planning", text: "Year-round strategy sessions to lower next year's bill before it happens." },
   { icon: "📨", title: "IRS Notices & Amendments", text: "Got a letter? We review, respond and amend prior-year returns when needed." },
   { icon: "🔒", title: "Secure Client Portal", text: "Upload documents, message your preparer and track your return 24/7." },
@@ -20,7 +20,6 @@ const steps = [
 const tiers = [
   { name: "Essential", price: 149, desc: "Simple W-2 returns", features: ["Federal + 1 state return", "Standard deduction", "Child Tax Credit & EITC", "Secure portal & e-file"] },
   { name: "Plus", price: 249, featured: true, desc: "Families & side income", features: ["Everything in Essential", "Itemized deductions", "1099 / gig income", "Education & childcare credits", "Dedicated preparer"] },
-  { name: "Business", price: 449, desc: "Self-employed & LLCs", features: ["Everything in Plus", "Schedule C / business return", "Expense categorization", "Quarterly estimate plan", "Audit support"] },
 ];
 
 const testimonials = [
@@ -92,8 +91,20 @@ export default function Home() {
                 <div className="icon-badge">{s.icon}</div>
                 <h3>{s.title}</h3>
                 <p className="small">{s.text}</p>
+                {s.href && <Link href={s.href} className="small grad-text">Explore the separate Business service →</Link>}
               </article>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="container" style={{ paddingBottom: 20 }}>
+        <div className="glass cta-band">
+          <span className="eyebrow">A separate service</span>
+          <h2>Run a small business every day—not only at tax time.</h2>
+          <p className="mt" style={{ marginTop: 12 }}>InnovaCare Business has its own registration and workspace for daily finances, customer retention, services, billing and accounting support.</p>
+          <div className="row mt" style={{ justifyContent: "center" }}>
+            <Link href="/business" className="btn btn-primary btn-lg">Explore Business</Link>
           </div>
         </div>
       </section>

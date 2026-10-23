@@ -20,6 +20,7 @@ export async function createSession(firebaseAuth, profile) {
     email: firebaseAuth.email || profile.email,
     name: profile.name,
     role: profile.role,
+    accountType: profile.accountType || "TAX",
     idToken: firebaseAuth.idToken || firebaseAuth.id_token,
     refreshToken: firebaseAuth.refreshToken || firebaseAuth.refresh_token,
     expiresAt,
@@ -68,6 +69,7 @@ export async function getFirebaseSession() {
       email: profile.email || session.email,
       name: profile.name || session.name || "User",
       role: profile.role,
+      accountType: profile.role === "CLIENT" && profile.accountType === "BUSINESS" ? "BUSINESS" : "TAX",
       idToken,
       refreshToken: session.refreshToken,
     };
@@ -79,12 +81,31 @@ export async function getFirebaseSession() {
 export async function getSession() {
   const session = await getFirebaseSession();
   if (!session) return null;
-  return { id: session.id, uid: session.uid, email: session.email, name: session.name, role: session.role };
+  return { id: session.id, uid: session.uid, email: session.email, name: session.name, role: session.role, accountType: session.accountType };
 }
 
 export async function requireRole(role) {
   const s = await getFirebaseSession();
   if (!s) redirect("/login");
   if (role && s.role !== role) redirect(s.role === "PREPARER" ? "/admin" : "/portal");
-  return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role };
+  return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role, accountType: s.accountType };
+}
+
+export function hasBusinessAccess(session) {
+  return session?.role === "CLIENT" && session.accountType === "BUSINESS";
+}
+
+export async function requireBusinessClient() {
+  const s = await getFirebaseSession();
+  if (!s) redirect("/login");
+  if (!hasBusinessAccess(s)) redirect(s.role === "PREPARER" ? "/admin" : "/portal");
+  return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role, accountType: s.accountType };
+}
+
+export async function requireTaxClient() {
+  const s = await getFirebaseSession();
+  if (!s) redirect("/login");
+  if (s.role !== "CLIENT") redirect("/admin");
+  if (s.accountType === "BUSINESS") redirect("/portal/business");
+  return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role, accountType: s.accountType };
 }

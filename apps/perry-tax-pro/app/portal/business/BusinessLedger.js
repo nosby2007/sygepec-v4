@@ -58,8 +58,13 @@ export default function BusinessLedger() {
   }
 
   return <main>
-    <div className="page-head"><div><p className="small">Year-round bookkeeping</p><h1>Small Business</h1><p className="muted">Track business income and expenses throughout the year. These figures are bookkeeping summaries, not a completed tax return.</p></div></div>
-    <div className="card"><Link href="/portal/business/customers" className="btn">Manage customers →</Link> <Link href="/portal/business/workspace" className="btn">Services, calendar & invoices →</Link> <Link href="/portal/business/accounting" className="btn">Accounting & tax handoff →</Link></div>
+    <div className="page-head"><div><p className="small">InnovaCare Business · dedicated service</p><h1>Your daily business workspace</h1><p className="muted">Manage operations throughout the year. This workspace is separate from the personal tax-return portal.</p></div></div>
+    <div className="grid-3">
+      <div className="card"><h3>Customers & retention</h3><p className="small">Keep customer details and follow-up notes together.</p><Link href="/portal/business/customers" className="btn">Manage customers →</Link></div>
+      <div className="card"><h3>Services & billing</h3><p className="small">Organize services, appointments and draft invoices.</p><Link href="/portal/business/workspace" className="btn">Open operations →</Link></div>
+      <div className="card"><h3>Accounting & tax handoff</h3><p className="small">Reconcile activity and prepare year-end records.</p><Link href="/portal/business/accounting" className="btn">Open accounting →</Link></div>
+    </div>
+    <div className="glass mt" style={{ padding: 22 }}><span className="eyebrow">Marketing support</span><h3>Client growth and retention</h3><p className="small">Campaign planning and automated follow-up are planned additions. Your customer directory is the secure foundation; no marketing message is sent automatically today.</p></div>
     <div className="card mt"><label>Tax year <select className="select" value={year} onChange={(event) => setYear(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => new Date().getFullYear() - index).map((value) => <option key={value}>{value}</option>)}</select></label></div>
     <div className="grid-3 mt"><div className="card kpi"><div className="lbl">Income</div><div className="val">{usd(totals.incomeCents)}</div></div><div className="card kpi"><div className="lbl">Expenses</div><div className="val">{usd(totals.expenseCents)}</div></div><div className="card kpi"><div className="lbl">Net before adjustments</div><div className="val">{usd(totals.netCents)}</div></div></div>
     <div className="card mt"><h2>New transaction</h2><form onSubmit={save}>

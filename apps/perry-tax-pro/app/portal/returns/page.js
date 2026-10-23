@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requireTaxClient } from "@/lib/auth";
 import { listClientReturns } from "@/lib/data";
 import { fmtDate } from "@/lib/constants";
 import { StatusBadge } from "@/components/Status";
@@ -7,7 +7,7 @@ import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 import NewTaxYearButton from "@/components/NewTaxYearButton";
 
 export default async function TaxYearsPage() {
-  const session = await requireRole("CLIENT");
+  const session = await requireTaxClient();
   const returns = await listClientReturns(session.id);
   const latest = returns[0];
   const canRenew = latest && ["FILED", "ACCEPTED"].includes(latest.status);

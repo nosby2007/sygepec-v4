@@ -9,6 +9,7 @@ export async function POST(req) {
   const name = cleanText(body.name, 100);
   const email = cleanEmail(body.email);
   const phone = cleanText(body.phone, 30);
+  const accountType = body.accountType === "BUSINESS" ? "BUSINESS" : "TAX";
   if (!name || !email || typeof body.password !== "string" || body.password.length < 12)
     return Response.json({ error: "Name, valid email and a password of 12+ characters are required." }, { status: 400, headers: privateHeaders });
   let auth;
@@ -16,12 +17,11 @@ export async function POST(req) {
     auth = await signUpWithPassword(email, body.password, name);
     const now = new Date().toISOString();
     const taxYear = new Date().getUTCFullYear();
-    const profile = { uid: auth.localId, name, email, phone: phone || null, role: "CLIENT", tenantId: TAX_TENANT, createdAt: now, updatedAt: now };
+    const profile = { uid: auth.localId, name, email, phone: phone || null, role: "CLIENT", accountType, tenantId: TAX_TENANT, createdAt: now, updatedAt: now };
     const [first, ...rest] = name.split(" ");
     const returnId = `${auth.localId}_${taxYear}`;
-    await createDocuments([
-      { path: `taxUsers/${auth.localId}`, data: profile },
-      {
+    const documents = [{ path: `taxUsers/${auth.localId}`, data: profile }];
+    if (accountType === "TAX") documents.push({
         path: `taxReturns/${returnId}`,
         data: {
           tenantId: TAX_TENANT,
@@ -48,10 +48,10 @@ export async function POST(req) {
           createdAt: now,
           updatedAt: now,
         },
-      },
-    ], auth.idToken);
+      });
+    await createDocuments(documents, auth.idToken);
     await createSession(auth, profile);
-    return Response.json({ role: "CLIENT" }, { headers: privateHeaders });
+    return Response.json({ role: "CLIENT", accountType }, { headers: privateHeaders });
   } catch (error) {
     if (auth?.idToken) await deleteFirebaseAccount(auth.idToken).catch(() => null);
     const duplicate = String(error?.code || "").includes("EMAIL_EXISTS");

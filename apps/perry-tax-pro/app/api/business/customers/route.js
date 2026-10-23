@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {getFirebaseSession} from '@/lib/auth';
+import {getFirebaseSession} from '@/lib/business-auth';
 import {queryCollection,setDocument,TAX_TENANT} from '@/lib/firebase';
 import {cleanEmail,cleanText,mutationGuard,privateHeaders} from '@/lib/security';
 export async function GET(){

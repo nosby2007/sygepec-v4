@@ -1,4 +1,4 @@
-import {getFirebaseSession} from '@/lib/auth';
+import {getFirebaseSession} from '@/lib/business-auth';
 import {queryCollection,TAX_TENANT} from '@/lib/firebase';
 import {privateHeaders} from '@/lib/security';
 export async function GET(){

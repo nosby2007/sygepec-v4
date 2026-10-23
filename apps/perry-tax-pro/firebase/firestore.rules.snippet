@@ -15,6 +15,13 @@ function taxPreparer() {
     && taxUser().role == 'PREPARER';
 }
 
+function taxClientAccount() {
+  return taxSignedIn()
+    && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+    && taxUser().role == 'CLIENT'
+    && (!taxUser().keys().hasAny(['accountType']) || taxUser().accountType == 'TAX');
+}
+
 function taxReturn(returnId) {
   return get(/databases/$(database)/documents/taxReturns/$(returnId)).data;
 }
@@ -32,10 +39,11 @@ match /taxUsers/{uid} {
   allow create: if taxSignedIn()
     && uid == request.auth.uid
     && request.resource.data.keys().hasOnly([
-      'uid', 'name', 'email', 'phone', 'role', 'tenantId', 'createdAt', 'updatedAt'
+      'uid', 'name', 'email', 'phone', 'role', 'accountType', 'tenantId', 'createdAt', 'updatedAt'
     ])
     && request.resource.data.uid == request.auth.uid
     && request.resource.data.role == 'CLIENT'
+    && request.resource.data.accountType in ['TAX', 'BUSINESS']
     && request.resource.data.tenantId == 'perry-tax-pro';
   allow update: if taxSignedIn()
     && uid == request.auth.uid
@@ -50,6 +58,7 @@ match /taxReturns/{returnId} {
     && resource.data.tenantId == 'perry-tax-pro'
     && (resource.data.clientId == request.auth.uid || taxPreparer());
   allow create: if taxSignedIn()
+    && taxClientAccount()
     && request.resource.data.clientId == request.auth.uid
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.status == 'INTAKE'
@@ -119,6 +128,7 @@ match /taxAppointments/{appointmentId} {
     && resource.data.tenantId == 'perry-tax-pro'
     && (resource.data.clientId == request.auth.uid || taxPreparer());
   allow create: if taxSignedIn()
+    && taxClientAccount()
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == request.auth.uid
     && request.resource.data.status == 'REQUESTED';
@@ -136,7 +146,8 @@ function businessOwner() {
  return taxSignedIn()
   && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
   && taxUser().tenantId == 'perry-tax-pro'
-  && taxUser().role == 'CLIENT';
+  && taxUser().role == 'CLIENT'
+  && taxUser().accountType == 'BUSINESS';
 }
 
 match /taxBusinessEntries/{entryId} {

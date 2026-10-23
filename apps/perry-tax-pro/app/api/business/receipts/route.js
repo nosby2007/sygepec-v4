@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {getFirebaseSession} from '@/lib/auth';
+import {getFirebaseSession} from '@/lib/business-auth';
 import {getDocument,setDocument,uploadObject,deleteObject,TAX_TENANT} from '@/lib/firebase';
 import {mutationGuard,privateHeaders} from '@/lib/security';
 export async function POST(req){

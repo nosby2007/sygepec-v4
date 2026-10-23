@@ -20,6 +20,7 @@ export async function SiteHeader() {
         <Logo />
         <nav className="nav" aria-label="Main">
           <Link href="/#services">Services</Link>
+          <Link href="/business">Business</Link>
           <Link href="/#how">How It Works</Link>
           <Link href="/#pricing">Pricing</Link>
           <Link href="/estimator">Refund Estimator</Link>
@@ -27,7 +28,7 @@ export async function SiteHeader() {
         </nav>
         <div className="row">
           {s ? (
-            <Link id="nav-portal" href={s.role === "PREPARER" ? "/admin" : "/portal"} className="btn btn-primary btn-sm">
+            <Link id="nav-portal" href={s.role === "PREPARER" ? "/admin" : s.accountType === "BUSINESS" ? "/portal/business" : "/portal"} className="btn btn-primary btn-sm">
               {s.role === "PREPARER" ? "Dashboard" : "My Portal"} →
             </Link>
           ) : (
@@ -57,7 +58,7 @@ export function SiteFooter() {
             <h4>Services</h4>
             <Link href="/#services">Individual Returns</Link>
             <Link href="/#services">Self-Employed</Link>
-            <Link href="/#services">Small Business</Link>
+            <Link href="/business">InnovaCare Business</Link>
             <Link href="/#services">IRS Notices</Link>
           </div>
           <div>

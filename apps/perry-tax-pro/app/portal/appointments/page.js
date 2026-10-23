@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requireTaxClient } from "@/lib/auth";
 import { listAppointments } from "@/lib/data";
 import { fmtDate } from "@/lib/constants";
 
 export default async function Page() {
-  const s = await requireRole("CLIENT");
+  const s = await requireTaxClient();
   const appts = await listAppointments(s.id);
   const now = new Date();
   const upcoming = appts.filter((a) => new Date(a.scheduled_at) >= now);

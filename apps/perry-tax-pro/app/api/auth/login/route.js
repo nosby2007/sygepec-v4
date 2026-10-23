@@ -15,7 +15,7 @@ export async function POST(req) {
       return Response.json({ error: "This account is not authorized for Perry Tax Pro." }, { status: 403, headers: privateHeaders });
     }
     await createSession(auth, profile);
-    return Response.json({ role: profile.role }, { headers: privateHeaders });
+    return Response.json({ role: profile.role, accountType: profile.accountType === "BUSINESS" ? "BUSINESS" : "TAX" }, { headers: privateHeaders });
   } catch {
     return Response.json({ error: "Invalid email or password." }, { status: 401, headers: privateHeaders });
   }

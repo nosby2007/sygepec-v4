@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {getFirebaseSession} from '@/lib/auth';
+import {getFirebaseSession} from '@/lib/business-auth';
 import {queryCollection,setDocument,TAX_TENANT} from '@/lib/firebase';
 import {validMoney} from '@/lib/business-catalog';
 import {cleanText,mutationGuard,privateHeaders} from '@/lib/security';

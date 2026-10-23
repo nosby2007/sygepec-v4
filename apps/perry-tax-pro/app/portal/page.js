@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requireTaxClient } from "@/lib/auth";
 import { getClientReturn, listDocuments, listNotes, listAppointments } from "@/lib/data";
 import { intakeToEstimate, buildChecklist } from "@/lib/tax";
 import { money, fmtDate, STATUSES, statusIndex } from "@/lib/constants";
@@ -7,7 +7,7 @@ import { Timeline, StatusBadge } from "@/components/Status";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 
 export default async function Dashboard() {
-  const s = await requireRole("CLIENT");
+  const s = await requireTaxClient();
   const r = await getClientReturn(s.id);
   if (!r) return <p>No return found. Please contact support.</p>;
   const [docs, notes, appointments] = await Promise.all([listDocuments(r.id), listNotes(r.id), listAppointments(s.id)]);

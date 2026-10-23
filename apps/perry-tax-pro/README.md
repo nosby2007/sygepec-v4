@@ -5,6 +5,11 @@ the Firebase project `sygepec-v4`. It provides client registration, guided tax
 intake, secure document exchange, messaging, appointment requests, return
 tracking, and a preparer operations dashboard.
 
+InnovaCare Business is a separate client category with its own registration,
+navigation, authorization boundary, and daily workspace for bookkeeping,
+customers, services, appointments, invoices, reconciliation, and year-end tax
+handoff. Standard tax clients do not receive access to Business features.
+
 Returning clients can keep a year-by-year history and start the next tax year
 from a filed or accepted return. The renewal copies identity, contact, filing,
 spouse, and dependent details while resetting all annual income, deductions,
