@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useState} from 'react';
+import Link from 'next/link';
 import {BUSINESS_CATEGORIES,summarizeBusiness} from '@/lib/business';
 const usd=cents=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100);
 export default function BusinessLedger(){
@@ -22,7 +23,7 @@ export default function BusinessLedger(){
   const a=document.createElement('a');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.href=url;a.download='business-ledger-'+year+'.csv';a.click();URL.revokeObjectURL(url);
  }
  return <main><div className="page-head"><div><p className="small">Year-round bookkeeping</p><h1>Small Business</h1><p className="muted">Track business income and expenses throughout the year. These figures are bookkeeping summaries, not a completed tax return.</p></div></div>
- <div className="card"><label>Tax year <select className="select" value={year} onChange={e=>setYear(Number(e.target.value))}>{Array.from({length:7},(_,i)=>new Date().getFullYear()-i).map(y=><option key={y}>{y}</option>)}</select></label></div>
+ <div className="card"><Link href="/portal/business/customers" className="btn">Manage customers →</Link></div><div className="card mt"><label>Tax year <select className="select" value={year} onChange={e=>setYear(Number(e.target.value))}>{Array.from({length:7},(_,i)=>new Date().getFullYear()-i).map(y=><option key={y}>{y}</option>)}</select></label></div>
  <div className="grid-3 mt"><div className="card kpi"><div className="lbl">Income</div><div className="val">{usd(totals.incomeCents)}</div></div><div className="card kpi"><div className="lbl">Expenses</div><div className="val">{usd(totals.expenseCents)}</div></div><div className="card kpi"><div className="lbl">Net before adjustments</div><div className="val">{usd(totals.netCents)}</div></div></div>
  <div className="card mt"><h2>New transaction</h2><form onSubmit={save}>
  <div className="grid-2"><label>Type<select className="select" value={form.kind} onChange={e=>setForm({...form,kind:e.target.value,category:BUSINESS_CATEGORIES[e.target.value][0]})}><option value="income">Income</option><option value="expense">Expense</option></select></label>
