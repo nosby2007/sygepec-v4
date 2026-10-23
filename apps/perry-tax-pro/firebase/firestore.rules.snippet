@@ -63,6 +63,9 @@ match /taxReturns/{returnId} {
         && request.resource.data.tenantId == resource.data.tenantId
         && request.resource.data.taxYear == resource.data.taxYear
         && request.resource.data.createdAt == resource.data.createdAt)
+      || (request.auth.uid == resource.data.clientId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['docCount'])
+        && request.resource.data.docCount == resource.data.docCount + 1)
       || (
         resource.data.clientId == request.auth.uid
         && request.resource.data.clientId == resource.data.clientId
