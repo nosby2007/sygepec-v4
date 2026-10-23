@@ -4,6 +4,7 @@ import { getClientReturn, listDocuments, listNotes, listAppointments } from "@/l
 import { intakeToEstimate, buildChecklist } from "@/lib/tax";
 import { money, fmtDate, STATUSES, statusIndex } from "@/lib/constants";
 import { Timeline, StatusBadge } from "@/components/Status";
+import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 
 export default async function Dashboard() {
   const s = await requireRole("CLIENT");
@@ -18,7 +19,11 @@ export default async function Dashboard() {
   const upcoming = appointments.filter((a) => new Date(a.scheduled_at) > new Date() && a.status !== "CANCELLED")[0];
 
   const next =
-    r.status === "INTAKE"
+    r.submission_status === "REJECTED"
+      ? { text: "Your submission needs attention. Contact your preparer for the correction required.", href: "/portal/messages", cta: "Contact Preparer" }
+      : r.signature_status === "REQUESTED"
+      ? { text: "Your Form 8879 signature is requested. Contact your preparer to complete the verified signing process.", href: "/portal/messages", cta: "Contact Preparer" }
+      : r.status === "INTAKE"
       ? { text: "Complete your tax questionnaire so we can build your document checklist.", href: "/portal/intake", cta: "Start Questionnaire" }
       : r.status === "DOCS_PENDING"
       ? { text: `Upload your remaining documents (${done}/${checklist.length} received).`, href: "/portal/documents", cta: "Upload Documents" }
@@ -39,6 +44,17 @@ export default async function Dashboard() {
       <div className="card">
         <div className="card-title"><h3>Return progress</h3><span className="small muted">Updated {fmtDate(r.updated_at)}</span></div>
         <Timeline status={r.status} />
+      </div>
+
+      <div className="grid-2 mt">
+        <div className="card">
+          <div className="card-title"><h3>Form 8879 signature</h3><SignatureBadge status={r.signature_status} /></div>
+          <p className="small">{r.signed_at ? `Verified ${fmtDate(r.signed_at)}` : r.signature_status === "REQUESTED" ? "Your preparer is waiting for your verified signature." : "Your preparer will request this when the return is ready."}</p>
+        </div>
+        <div className="card">
+          <div className="card-title"><h3>E-file submission</h3><SubmissionBadge status={r.submission_status} /></div>
+          <p className="small">{r.submission_reference ? `Reference: ${r.submission_reference}` : r.submitted_at ? `Submitted ${fmtDate(r.submitted_at)}` : "No submission has been recorded yet."}</p>
+        </div>
       </div>
 
       <div className="glass mt" style={{ padding: 26 }}>

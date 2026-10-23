@@ -146,6 +146,11 @@ p { color: var(--muted); }
 .s-FILED, .s-CONFIRMED { color: var(--teal); border-color: rgba(25,211,181,0.35); }
 .s-ACCEPTED, .s-COMPLETED { color: var(--green); border-color: rgba(52,211,153,0.35); }
 .s-CANCELLED { color: var(--rose); border-color: rgba(255,107,139,0.35); }
+.wf-NOT_REQUESTED, .wf-NOT_READY { color: var(--muted); }
+.wf-REQUESTED, .wf-READY { color: #9c6506; border-color: rgba(245,184,65,.48); background: rgba(245,184,65,.1); }
+.wf-SIGNED, .wf-ACCEPTED { color: #15803d; border-color: rgba(22,163,74,.32); background: rgba(22,163,74,.07); }
+.wf-SUBMITTED { color: #1d4ed8; border-color: rgba(30,99,214,.3); background: rgba(30,99,214,.07); }
+.wf-DECLINED, .wf-REJECTED { color: #b91c1c; border-color: rgba(220,38,38,.3); background: rgba(220,38,38,.07); }
 
 /* Site header */
 .site-header {
@@ -308,6 +313,28 @@ tbody tr:hover { background: var(--surface); }
 .kpi .lbl { font-size: 0.8rem; color: var(--muted); }
 .kpi .val { font: 700 1.9rem var(--font-display); margin-top: 6px; }
 
+/* Preparer operations */
+.operations-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.operation-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 20px; }
+.operation-card .icon-badge { margin: 0; width: 44px; height: 44px; }
+.operation-card h3 { font-size: 1rem; }
+.operation-card > b { color: var(--blue); font-size: .85rem; }
+.workflow-list { display: grid; gap: 14px; }
+.workflow-row { display: grid; grid-template-columns: minmax(210px, .7fr) minmax(460px, 1.3fr); gap: 22px; align-items: center; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-2); }
+.workflow-row-wide { grid-template-columns: minmax(210px, .55fr) minmax(560px, 1.45fr); }
+.workflow-person { display: grid; align-content: center; gap: 7px; }
+.workflow-person > a:hover { color: var(--blue); }
+.workflow-editor { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 12px; align-items: end; }
+.workflow-editor.compact { grid-template-columns: repeat(2, minmax(160px, 1fr)) auto; }
+.workflow-notes { grid-column: 1 / -1; }
+.workflow-notes .textarea { min-height: 76px; }
+.workflow-save { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+.workflow-editor.compact .workflow-save { grid-column: auto; }
+.workflow-filters { margin-top: 24px; }
+.appointment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.appointment-card { display: grid; align-content: start; gap: 16px; padding: 22px; }
+.appointment-actions { margin-top: auto; }
+
 /* Wizard */
 .wizard-steps { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
 .wizard-steps button {
@@ -342,9 +369,13 @@ tbody tr:hover { background: var(--surface); }
   .main { padding: 24px 18px; }
   .timeline { grid-template-columns: repeat(3, 1fr); row-gap: 20px; }
   .float-card.one { left: 10px; } .float-card.two { right: 10px; }
+  .operations-grid, .appointment-grid { grid-template-columns: 1fr 1fr; }
+  .workflow-row, .workflow-row-wide { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {
   .grid-2, .grid-3, .grid-4, .pricing, .steps, .stats-strip { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
   .cta-band { padding: 36px 22px; }
+  .operations-grid, .appointment-grid, .workflow-editor, .workflow-editor.compact { grid-template-columns: 1fr; }
+  .workflow-editor.compact .workflow-save { grid-column: 1 / -1; }
 }

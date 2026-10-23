@@ -3,7 +3,12 @@
 Perry Tax Pro is the standalone InnovaCare tax preparation portal deployed in
 the Firebase project `sygepec-v4`. It provides client registration, guided tax
 intake, secure document exchange, messaging, appointment requests, return
-tracking, and a preparer dashboard.
+tracking, and a preparer operations dashboard.
+
+The preparer workspace includes appointment confirmation queues, Form 8879
+signature-status tracking, and controlled e-file readiness/submission tracking.
+It records verified workflow events and acknowledgements; it does not transmit
+returns directly to the IRS.
 
 Production: <https://perry-tax-pro-sygepec-v4.web.app>
 

@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { STATUSES, money, fmtDate } from "@/lib/constants";
+import { STATUSES, money } from "@/lib/constants";
 import { StatusBadge } from "@/components/Status";
+import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 
 export default function ClientTable({ rows }) {
   const [q, setQ] = useState("");
@@ -25,20 +26,20 @@ export default function ClientTable({ rows }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Client</th><th>Year</th><th>Status</th><th>Docs</th><th>Est. Refund</th><th>Preparer</th><th>Updated</th><th /></tr>
+            <tr><th>Client</th><th>Status</th><th>Signature</th><th>E-file</th><th>Docs</th><th>Est. Refund</th><th>Preparer</th><th /></tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id}>
                 <td><b>{r.client_name}</b><div className="hint">{r.client_email}</div></td>
-                <td>{r.tax_year}</td>
                 <td><StatusBadge status={r.status} /></td>
+                <td><SignatureBadge status={r.signature_status} /></td>
+                <td><SubmissionBadge status={r.submission_status} /></td>
                 <td>{r.doc_count}</td>
                 <td style={{ color: r.refund == null ? "var(--faint)" : r.refund >= 0 ? "var(--teal)" : "var(--rose)" }}>
                   {r.refund == null ? "—" : (r.refund < 0 ? "−" : "") + money(Math.abs(r.refund))}
                 </td>
                 <td className="small">{r.preparer_name || <span className="muted">Unassigned</span>}</td>
-                <td className="small muted">{fmtDate(r.updated_at)}</td>
                 <td><Link href={`/admin/returns/${r.id}`} className="btn btn-ghost btn-sm">Open →</Link></td>
               </tr>
             ))}

@@ -10,6 +10,10 @@ function byDate(field, direction = "desc") {
 
 function returnDto(row) {
   if (!row) return null;
+  const signatureStatus = row.signatureStatus
+    || (["FILED", "ACCEPTED"].includes(row.status) ? "SIGNED" : "NOT_REQUESTED");
+  const submissionStatus = row.submissionStatus
+    || (row.status === "ACCEPTED" ? "ACCEPTED" : row.status === "FILED" ? "SUBMITTED" : "NOT_READY");
   return {
     id: row.id,
     client_id: row.clientId,
@@ -21,6 +25,15 @@ function returnDto(row) {
     client_email: row.clientEmail,
     client_phone: row.clientPhone || null,
     preparer_name: row.preparerName || null,
+    signature_status: signatureStatus,
+    signature_method: row.signatureMethod || "REMOTE",
+    signature_requested_at: row.signatureRequestedAt || null,
+    signed_at: row.signedAt || null,
+    submission_status: submissionStatus,
+    submission_reference: row.submissionReference || null,
+    submission_notes: row.submissionNotes || null,
+    submitted_at: row.submittedAt || null,
+    accepted_at: row.acceptedAt || null,
     intake: row.intake || {},
     doc_count: Number(row.docCount || 0),
     created_at: row.createdAt,

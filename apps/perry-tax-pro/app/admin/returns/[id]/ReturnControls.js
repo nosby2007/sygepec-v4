@@ -16,8 +16,9 @@ export default function ReturnControls({ returnId, status, preparerId, preparers
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: s, preparerId: p || null }),
     });
-    setState(res.ok ? { ok: true } : { error: "Update failed" });
-    router.refresh();
+    const data = await res.json().catch(() => ({}));
+    setState(res.ok ? { ok: true } : { error: data.error || "Update failed" });
+    if (res.ok) router.refresh();
   };
 
   return (

@@ -10,6 +10,29 @@ export const STATUSES = [
 export const statusLabel = (k) => STATUSES.find((s) => s.key === k)?.label || k;
 export const statusIndex = (k) => Math.max(0, STATUSES.findIndex((s) => s.key === k));
 
+export const SIGNATURE_STATUSES = [
+  { key: "NOT_REQUESTED", label: "Not requested" },
+  { key: "REQUESTED", label: "Signature requested" },
+  { key: "SIGNED", label: "Signed" },
+  { key: "DECLINED", label: "Declined" },
+];
+
+export const SIGNATURE_METHODS = [
+  { key: "REMOTE", label: "Remote / e-sign" },
+  { key: "IN_PERSON", label: "In person" },
+  { key: "OTHER", label: "Other verified method" },
+];
+
+export const SUBMISSION_STATUSES = [
+  { key: "NOT_READY", label: "Not ready" },
+  { key: "READY", label: "Ready to e-file" },
+  { key: "SUBMITTED", label: "Submitted" },
+  { key: "ACCEPTED", label: "Accepted" },
+  { key: "REJECTED", label: "Rejected / action needed" },
+];
+
+export const workflowLabel = (items, key) => items.find((item) => item.key === key)?.label || key;
+
 export const FILING_STATUSES = [
   { key: "SINGLE", label: "Single" },
   { key: "MFJ", label: "Married Filing Jointly" },

@@ -8,6 +8,8 @@ import { Timeline, StatusBadge } from "@/components/Status";
 import Messages from "@/components/Messages";
 import DocumentCenter from "@/components/DocumentCenter";
 import ReturnControls from "./ReturnControls";
+import WorkflowEditor from "@/components/WorkflowEditor";
+import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 
 export default async function Page({ params }) {
   const s = await requireRole("PREPARER");
@@ -28,11 +30,17 @@ export default async function Page({ params }) {
           <h1>{r.client_name}</h1>
           <p className="small">{r.client_email} · {r.client_phone || "no phone"} · Tax Year {r.tax_year}</p>
         </div>
-        <StatusBadge status={r.status} />
+        <div className="row"><StatusBadge status={r.status} /><SignatureBadge status={r.signature_status} /><SubmissionBadge status={r.submission_status} /></div>
       </div>
 
       <div className="card"><Timeline status={r.status} /></div>
       <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} />
+      <div className="card mt">
+        <div className="card-title">
+          <div><h3>Signature & e-file workflow</h3><p className="small">Verify Form 8879 before recording a submission or IRS acknowledgement.</p></div>
+        </div>
+        <WorkflowEditor item={r} />
+      </div>
 
       <div className="grid-3 mt" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
         <div className="card">
