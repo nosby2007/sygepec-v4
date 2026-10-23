@@ -7,7 +7,9 @@ export async function POST(req){
  const s=await getFirebaseSession();if(!s||s.role!=='CLIENT')return Response.json({error:'Unauthorized'},{status:401,headers:privateHeaders});
  const form=await req.formData().catch(()=>null);
  const entryId=String(form?.get('entryId')||''),file=form?.get('file');
- if(!/^[a-f0-9-]{36}$/i.test(entryId)||!file||typeof file==='string'||file.size<1||file.size>10*1024*1024)return Response.json({error:'Invalid receipt'},{status:400,headers:privateHeaders});
+ if(!/^[a-f0-9-]{36}$/i.test(entryId))return Response.json({error:'Invalid expense reference'},{status:400,headers:privateHeaders});
+ if(!file||typeof file==='string')return Response.json({error:'No receipt file provided'},{status:400,headers:privateHeaders});
+ if(file.size<1||file.size>10*1024*1024)return Response.json({error:'Receipt must be between 1 byte and 10 MB'},{status:400,headers:privateHeaders});
  const entry=await getDocument('taxBusinessEntries/'+entryId,s.idToken);
  if(!entry||entry.clientId!==s.uid||entry.kind!=='expense')return Response.json({error:'Expense not found'},{status:404,headers:privateHeaders});
  const bytes=new Uint8Array(await file.arrayBuffer());
