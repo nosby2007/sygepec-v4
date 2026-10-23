@@ -10,6 +10,13 @@ function taxPreparer() {
     && taxProfile().role == 'PREPARER';
 }
 
+function taxClient() {
+  return request.auth != null
+    && firestore.exists(/databases/(default)/documents/taxUsers/$(request.auth.uid))
+    && taxProfile().tenantId == 'perry-tax-pro'
+    && taxProfile().role == 'CLIENT';
+}
+
 function validTaxReturn(clientUid, returnId) {
   return firestore.exists(/databases/(default)/documents/taxReturns/$(returnId))
     && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.tenantId == 'perry-tax-pro'
@@ -33,8 +40,8 @@ match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
 }
 
 match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {
- allow read: if request.auth != null && request.auth.uid == clientUid;
- allow create: if request.auth != null && request.auth.uid == clientUid
+ allow read: if request.auth != null && (request.auth.uid == clientUid || taxPreparer());
+ allow create: if taxClient() && request.auth.uid == clientUid
   && firestore.exists(/databases/(default)/documents/taxBusinessEntries/$(entryId))
   && firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data.clientId == clientUid
   && firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data.kind == 'expense'

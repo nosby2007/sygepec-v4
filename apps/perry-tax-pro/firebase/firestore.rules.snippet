@@ -243,43 +243,51 @@ match /taxBusinessInvoices/{id} {
 
 match /taxBusinessCorrections/{id} {
  allow get, list: if taxSignedIn() && resource.data.tenantId == 'perry-tax-pro' && (resource.data.clientId == request.auth.uid || taxPreparer());
- allow create: if taxSignedIn() && request.resource.data.keys().hasOnly(['tenantId','clientId','entryId','taxYear','originalKind','originalCategory','originalAmountCents','kind','category','amountCents','reason','createdAt'])
+ allow create: if businessOwner() && request.resource.data.keys().hasOnly(['tenantId','clientId','entryId','taxYear','originalKind','originalCategory','originalAmountCents','kind','category','amountCents','reason','createdAt'])
   && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.clientId == request.auth.uid
   && exists(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId))
   && get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.clientId == request.auth.uid
   && request.resource.data.taxYear == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.taxYear
-  && request.resource.data.amountCents is int && request.resource.data.amountCents > 0
+  && request.resource.data.originalKind == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.kind
+  && request.resource.data.originalCategory == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.category
+  && request.resource.data.originalAmountCents == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.amountCents
+  && request.resource.data.amountCents is int && request.resource.data.amountCents > 0 && request.resource.data.amountCents <= 99999999999
   && request.resource.data.kind in ['income','expense']
-  && request.resource.data.reason is string && request.resource.data.reason.size() >= 5;
+  && request.resource.data.category is string && request.resource.data.category.size() > 0 && request.resource.data.category.size() <= 60
+  && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500;
  allow update, delete: if false;
 }
 match /taxBusinessMatches/{id} {
  allow get, list: if taxSignedIn() && resource.data.tenantId == 'perry-tax-pro' && (resource.data.clientId == request.auth.uid || taxPreparer());
- allow create: if taxSignedIn() && request.resource.data.keys().hasOnly(['tenantId','clientId','entryId','taxYear','bankReference','statementDate','amountCents','createdAt'])
+ allow create: if businessOwner() && request.resource.data.keys().hasOnly(['tenantId','clientId','entryId','taxYear','bankReference','statementDate','amountCents','createdAt'])
   && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.clientId == request.auth.uid
   && exists(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId))
   && get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.clientId == request.auth.uid
   && request.resource.data.taxYear == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.taxYear
-  && request.resource.data.bankReference is string && request.resource.data.bankReference.size() > 0;
+  && request.resource.data.amountCents == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.amountCents
+  && request.resource.data.bankReference is string && request.resource.data.bankReference.size() > 0 && request.resource.data.bankReference.size() <= 100
+  && request.resource.data.statementDate is string && request.resource.data.statementDate.size() == 10;
  allow update, delete: if false;
 }
 match /taxBusinessReceipts/{id} {
  allow get, list: if taxSignedIn() && resource.data.tenantId == 'perry-tax-pro' && (resource.data.clientId == request.auth.uid || taxPreparer());
- allow create: if taxSignedIn() && request.resource.data.keys().hasOnly(['tenantId','clientId','entryId','taxYear','storagePath','mime','size','createdAt'])
+ allow create: if businessOwner() && request.resource.data.keys().hasOnly(['tenantId','clientId','entryId','taxYear','storagePath','mime','size','createdAt'])
   && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.clientId == request.auth.uid
   && exists(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId))
   && get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.clientId == request.auth.uid
   && request.resource.data.taxYear == get(/databases/$(database)/documents/taxBusinessEntries/$(request.resource.data.entryId)).data.taxYear
   && request.resource.data.storagePath is string
   && request.resource.data.storagePath.matches('tax/perry-tax-pro/business/' + request.auth.uid + '/.*')
+  && request.resource.data.mime in ['application/pdf','image/jpeg','image/png']
   && request.resource.data.size is int && request.resource.data.size > 0 && request.resource.data.size <= 10485760;
  allow update, delete: if false;
 }
 match /taxBusinessYearEnd/{id} {
  allow get, list: if taxSignedIn() && resource.data.tenantId == 'perry-tax-pro' && (resource.data.clientId == request.auth.uid || taxPreparer());
- allow create: if taxSignedIn() && request.resource.data.keys().hasOnly(['tenantId','clientId','taxYear','status','report','createdAt'])
+ allow create: if businessOwner() && request.resource.data.keys().hasOnly(['tenantId','clientId','taxYear','status','report','createdAt'])
   && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.clientId == request.auth.uid
-  && request.resource.data.taxYear is int && request.resource.data.status == 'SUBMITTED_FOR_REVIEW'
+  && request.resource.data.taxYear is int && request.resource.data.taxYear >= 2020 && request.resource.data.taxYear <= 2100
+  && request.resource.data.status == 'SUBMITTED_FOR_REVIEW'
   && request.resource.data.report is map;
  allow update, delete: if false;
 }
