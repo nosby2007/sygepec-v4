@@ -158,3 +158,23 @@ match /taxBusinessEntries/{entryId} {
     && request.resource.data.description.size() <= 300;
   allow update, delete: if false;
 }
+
+match /taxBusinessCustomers/{customerId} {
+ allow get, list: if taxSignedIn()
+   && resource.data.tenantId == 'perry-tax-pro'
+   && resource.data.ownerUid == request.auth.uid;
+ allow create: if taxSignedIn()
+   && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','phone','email','notes','createdAt'])
+   && request.resource.data.tenantId == 'perry-tax-pro'
+   && request.resource.data.ownerUid == request.auth.uid
+   && request.resource.data.name is string
+   && request.resource.data.name.size() > 0
+   && request.resource.data.name.size() <= 100
+   && request.resource.data.phone is string
+   && request.resource.data.phone.size() <= 30
+   && request.resource.data.email is string
+   && request.resource.data.email.size() <= 254
+   && request.resource.data.notes is string
+   && request.resource.data.notes.size() <= 500;
+ allow update, delete: if false;
+}
