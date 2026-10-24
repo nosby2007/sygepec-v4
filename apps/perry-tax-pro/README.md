@@ -52,7 +52,20 @@ Open <http://localhost:3000>.
 npm run lint
 npm run build
 npm audit --omit=dev
+npm run test:rules
 ```
+
+`test:rules` wraps the snippets under `firebase/` in their service blocks and
+runs `firebase/test/rules.test.mjs` against the Firestore and Storage
+emulators. It needs the Firebase CLI and Java 21+. On Windows, if the Firestore
+emulator exits with "Unable to establish loopback connection", point Java at a
+short temp folder first:
+
+```bash
+JAVA_TOOL_OPTIONS="-Djdk.net.unixdomain.tmpdir=C:/Temp/jtmp" npm run test:rules
+```
+
+The Phase 1 audit and feature matrix are in `docs/AUDIT-PHASE1.md`.
 
 ## Preparer accounts
 

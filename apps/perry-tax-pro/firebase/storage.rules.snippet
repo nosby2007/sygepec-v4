@@ -31,9 +31,14 @@ match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
     && request.resource.size <= 10 * 1024 * 1024
     && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png|image/webp|image/heic)');
   allow update: if false;
+  // Matches the Firestore taxDocuments rule: clients cannot remove files from a filed return.
   allow delete: if request.auth != null
     && validTaxReturn(clientUid, returnId)
-    && (request.auth.uid == clientUid || taxPreparer());
+    && (
+      taxPreparer()
+      || (request.auth.uid == clientUid
+        && !(firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.status in ['FILED', 'ACCEPTED']))
+    );
 }
 
 match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {

@@ -46,3 +46,7 @@ next-env.d.ts
 
 /data
 /uploads
+
+# Emulator output (rules generated from the snippets, debug logs)
+firebase/test/.generated/
+*-debug.log

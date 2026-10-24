@@ -16,6 +16,13 @@ export function cleanText(value, max = 200) {
   return String(value || "").trim().replace(/[\u0000-\u001f\u007f]/g, "").slice(0, max);
 }
 
+// Firestore document IDs are interpolated into REST paths, so reject anything
+// that could add path segments ("/", "..") or query characters.
+export function safeId(value) {
+  const id = typeof value === "string" ? value : "";
+  return /^[A-Za-z0-9_-]{1,128}$/.test(id) ? id : "";
+}
+
 export function cleanEmail(value) {
   const email = cleanText(value, 254).toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";

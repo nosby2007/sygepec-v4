@@ -1,6 +1,7 @@
 import "server-only";
 import { getFirebaseSession } from "@/lib/auth";
 import { getDocument, mergeDocument, queryCollection, TAX_TENANT } from "@/lib/firebase";
+import { safeId } from "@/lib/security";
 
 function byDate(field, direction = "desc") {
   return (a, b) => direction === "desc"
@@ -109,6 +110,7 @@ export async function listClientReturns(clientId) {
 
 export async function getReturn(id) {
   const session = await activeSession();
+  if (!safeId(id)) return null;
   const row = await getDocument(`taxReturns/${id}`, session.idToken);
   if (!row || row.tenantId !== TAX_TENANT) return null;
   if (session.role !== "PREPARER" && row.clientId !== session.uid) return null;
@@ -116,7 +118,7 @@ export async function getReturn(id) {
 }
 
 export async function getReturnForSession(id, session) {
-  if (!session) return null;
+  if (!session || !safeId(id)) return null;
   const row = await getDocument(`taxReturns/${id}`, session.idToken);
   if (!row || row.tenantId !== TAX_TENANT) return null;
   if (session.role === "PREPARER" || row.clientId === session.uid) return returnDto(row);

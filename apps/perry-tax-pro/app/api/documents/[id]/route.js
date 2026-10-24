@@ -1,10 +1,10 @@
 import { getFirebaseSession } from "@/lib/auth";
 import { getReturnForSession } from "@/lib/data";
 import { deleteDocument, deleteObject, downloadObject, getDocument, incrementDocument, mergeDocument, TAX_TENANT } from "@/lib/firebase";
-import { cleanText, mutationGuard, privateHeaders } from "@/lib/security";
+import { mutationGuard, privateHeaders, safeId } from "@/lib/security";
 
 async function authorizedDocument(rawId, session) {
-  const id = cleanText(rawId, 128);
+  const id = safeId(rawId);
   const doc = id && await getDocument(`taxDocuments/${id}`, session.idToken);
   if (!doc || doc.tenantId !== TAX_TENANT) return null;
   const taxReturn = await getReturnForSession(doc.returnId, session);
@@ -34,11 +34,17 @@ export async function DELETE(req, { params }) {
   if (!result) return Response.json({ error: "Not found" }, { status: 404 });
   if (session.role === "CLIENT" && ["FILED", "ACCEPTED"].includes(result.taxReturn.status))
     return Response.json({ error: "Cannot remove documents from a filed return." }, { status: 400 });
-  await deleteObject(result.doc.storagePath, session.idToken);
-  await deleteDocument(`taxDocuments/${result.doc.id}`, session.idToken);
-  if (Number(result.taxReturn.doc_count || 0) > 0) {
-    await incrementDocument(`taxReturns/${result.taxReturn.id}`, "docCount", -1, session.idToken);
+  try {
+    await deleteObject(result.doc.storagePath, session.idToken);
+    await deleteDocument(`taxDocuments/${result.doc.id}`, session.idToken);
+  } catch {
+    return Response.json({ error: "The document could not be removed. Please try again." }, { status: 503, headers: privateHeaders });
   }
-  await mergeDocument(`taxReturns/${result.taxReturn.id}`, { updatedAt: new Date().toISOString() }, session.idToken);
+  // The file is gone at this point; docCount and updatedAt are display metadata,
+  // so a rejected follow-up write must not turn the delete into an error.
+  if (Number(result.taxReturn.doc_count || 0) > 0) {
+    await incrementDocument(`taxReturns/${result.taxReturn.id}`, "docCount", -1, session.idToken).catch(() => null);
+  }
+  await mergeDocument(`taxReturns/${result.taxReturn.id}`, { updatedAt: new Date().toISOString() }, session.idToken).catch(() => null);
   return Response.json({ ok: true }, { headers: privateHeaders });
 }

@@ -14,16 +14,20 @@ export async function POST(req) {
   const safeMessage = cleanText(message, 4000);
   if (!safeMessage) return Response.json({ error: "Message is empty" }, { status: 400 });
   const id = crypto.randomUUID();
-  await setDocument(`taxNotes/${id}`, {
-    tenantId: TAX_TENANT,
-    returnId: r.id,
-    clientId: r.client_id,
-    authorId: session.uid,
-    authorName: session.name,
-    authorRole: session.role,
-    message: safeMessage,
-    createdAt: new Date().toISOString(),
-  }, session.idToken, { createOnly: true });
-  await touchReturn(r.id, session);
+  try {
+    await setDocument(`taxNotes/${id}`, {
+      tenantId: TAX_TENANT,
+      returnId: r.id,
+      clientId: r.client_id,
+      authorId: session.uid,
+      authorName: session.name,
+      authorRole: session.role,
+      message: safeMessage,
+      createdAt: new Date().toISOString(),
+    }, session.idToken, { createOnly: true });
+  } catch {
+    return Response.json({ error: "The message could not be sent. Please try again." }, { status: 503, headers: privateHeaders });
+  }
+  await touchReturn(r.id, session).catch(() => null);
   return Response.json({ ok: true, id }, { headers: privateHeaders });
 }

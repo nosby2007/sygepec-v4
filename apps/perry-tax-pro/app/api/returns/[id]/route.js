@@ -21,14 +21,21 @@ export async function PUT(req, { params }) {
   if (session.role === "CLIENT") {
     if (["FILED", "ACCEPTED"].includes(r.status))
       return Response.json({ error: "This return has already been filed." }, { status: 400 });
+    // Once Form 8879 is out for signature the signed figures must not change underneath it.
+    if (r.status === "READY_TO_SIGN")
+      return Response.json({ error: "Your return is ready to sign. Message your preparer to request changes." }, { status: 409 });
     const intake = sanitizeIntake(body.intake);
     const status = intake.submitted && r.status === "INTAKE" ? "DOCS_PENDING" : r.status;
-    await mergeDocument(`taxReturns/${r.id}`, {
-      intake,
-      filingStatus: cleanText(intake.filingStatus, 10) || null,
-      status,
-      updatedAt: new Date().toISOString(),
-    }, session.idToken);
+    try {
+      await mergeDocument(`taxReturns/${r.id}`, {
+        intake,
+        filingStatus: cleanText(intake.filingStatus, 10) || null,
+        status,
+        updatedAt: new Date().toISOString(),
+      }, session.idToken);
+    } catch {
+      return Response.json({ error: "Your answers could not be saved. Please try again." }, { status: 503, headers: privateHeaders });
+    }
     return Response.json({ ok: true, status }, { headers: privateHeaders });
   }
 
@@ -109,6 +116,10 @@ export async function PUT(req, { params }) {
     changes.submissionReference = cleanText(body.submissionReference, 120) || null;
   if (Object.prototype.hasOwnProperty.call(body, "submissionNotes"))
     changes.submissionNotes = cleanText(body.submissionNotes, 1000) || null;
-  await mergeDocument(`taxReturns/${r.id}`, changes, session.idToken);
+  try {
+    await mergeDocument(`taxReturns/${r.id}`, changes, session.idToken);
+  } catch {
+    return Response.json({ error: "The return could not be updated. Please try again." }, { status: 503, headers: privateHeaders });
+  }
   return Response.json({ ok: true, status: changes.status || r.status }, { headers: privateHeaders });
 }

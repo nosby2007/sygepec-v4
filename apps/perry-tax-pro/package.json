@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:rules": "node firebase/test/build-rules.mjs && firebase emulators:exec --config firebase/test/firebase.json --project demo-perry-tax --only firestore,storage \"node --test firebase/test/rules.test.mjs\""
   },
   "dependencies": {
     "jose": "^6.2.13",

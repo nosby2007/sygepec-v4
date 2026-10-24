@@ -60,13 +60,32 @@ match /taxReturns/{returnId} {
   allow get, list: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
     && (resource.data.clientId == request.auth.uid || taxPreparer());
+  // Clients can reach Firestore directly with their own ID token, so a new return
+  // must start with every preparer-controlled workflow field at its initial value.
   allow create: if taxSignedIn()
     && taxClientAccount()
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'clientId', 'clientName', 'clientEmail', 'clientPhone', 'preparerId', 'preparerName',
+      'signatureStatus', 'signatureMethod', 'signatureRequestedAt', 'signedAt',
+      'submissionStatus', 'submissionReference', 'submissionNotes', 'submittedAt', 'acceptedAt',
+      'carryForwardFromReturnId', 'carryForwardFromTaxYear',
+      'taxYear', 'status', 'filingStatus', 'intake', 'docCount', 'createdAt', 'updatedAt'
+    ])
+    && returnId == request.auth.uid + '_' + string(request.resource.data.taxYear)
     && request.resource.data.clientId == request.auth.uid
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.status == 'INTAKE'
     && request.resource.data.preparerId == null
-    && request.resource.data.taxYear is int;
+    && request.resource.data.get('preparerName', null) == null
+    && request.resource.data.get('signatureStatus', 'NOT_REQUESTED') == 'NOT_REQUESTED'
+    && request.resource.data.get('signedAt', null) == null
+    && request.resource.data.get('submissionStatus', 'NOT_READY') == 'NOT_READY'
+    && request.resource.data.get('submittedAt', null) == null
+    && request.resource.data.get('acceptedAt', null) == null
+    && request.resource.data.get('docCount', 0) == 0
+    && request.resource.data.taxYear is int
+    && request.resource.data.taxYear >= 2020
+    && request.resource.data.taxYear <= 2100;
   allow update: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
     && (
@@ -77,7 +96,10 @@ match /taxReturns/{returnId} {
         && request.resource.data.createdAt == resource.data.createdAt)
       || (request.auth.uid == resource.data.clientId
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(['docCount'])
-        && request.resource.data.docCount == resource.data.docCount + 1)
+        && (request.resource.data.docCount == resource.data.docCount + 1
+          || (request.resource.data.docCount == resource.data.docCount - 1
+            && request.resource.data.docCount >= 0
+            && !(resource.data.status in ['FILED', 'ACCEPTED']))))
       || (
         resource.data.clientId == request.auth.uid
         && request.resource.data.clientId == resource.data.clientId
@@ -91,6 +113,11 @@ match /taxReturns/{returnId} {
           request.resource.data.status == resource.data.status
           || (resource.data.status == 'INTAKE' && request.resource.data.status == 'DOCS_PENDING')
         )
+        // Answers are frozen once Form 8879 is out for signature or the return is filed.
+        && (
+          !request.resource.data.diff(resource.data).changedKeys().hasAny(['intake', 'filingStatus'])
+          || resource.data.status in ['INTAKE', 'DOCS_PENDING', 'IN_REVIEW']
+        )
       )
     );
   allow delete: if false;
@@ -99,9 +126,17 @@ match /taxReturns/{returnId} {
 match /taxDocuments/{docId} {
   allow get, list: if canAccessTaxReturn(resource.data.returnId);
   allow create: if canAccessTaxReturn(request.resource.data.returnId)
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'returnId', 'clientId', 'type', 'filename', 'storagePath', 'mime', 'size', 'uploadedBy', 'createdAt'
+    ])
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == taxReturn(request.resource.data.returnId).clientId
-    && request.resource.data.uploadedBy == request.auth.uid;
+    && request.resource.data.uploadedBy == request.auth.uid
+    // The record may only point at this return's own Storage folder.
+    && request.resource.data.storagePath is string
+    && request.resource.data.storagePath.matches(
+      'tax/perry-tax-pro/' + request.resource.data.clientId + '/' + request.resource.data.returnId + '/' + docId + '/[^/]+'
+    );
   allow update: if false;
   allow delete: if canAccessTaxReturn(resource.data.returnId)
     && (
@@ -118,8 +153,12 @@ match /taxNotes/{noteId} {
   allow create: if canAccessTaxReturn(request.resource.data.returnId)
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == taxReturn(request.resource.data.returnId).clientId
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'returnId', 'clientId', 'authorId', 'authorName', 'authorRole', 'message', 'createdAt'
+    ])
     && request.resource.data.authorId == request.auth.uid
     && request.resource.data.authorRole == taxUser().role
+    && request.resource.data.authorName == taxUser().name
     && request.resource.data.message is string
     && request.resource.data.message.size() > 0
     && request.resource.data.message.size() <= 4000;
@@ -132,8 +171,12 @@ match /taxAppointments/{appointmentId} {
     && (resource.data.clientId == request.auth.uid || taxPreparer());
   allow create: if taxSignedIn()
     && taxClientAccount()
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'clientId', 'name', 'email', 'phone', 'scheduledAt', 'type', 'service', 'notes', 'status', 'createdAt'
+    ])
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == request.auth.uid
+    && request.resource.data.type in ['VIRTUAL', 'IN_PERSON']
     && request.resource.data.status == 'REQUESTED';
   allow update: if taxPreparer()
     && resource.data.tenantId == 'perry-tax-pro'

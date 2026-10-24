@@ -54,7 +54,7 @@ export default function BookForm({ defaults }) {
           {f.service} · {f.type === "VIRTUAL" ? "Virtual" : "In-person"} on{" "}
           <b style={{ color: "var(--text)" }}>{state.done.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}</b>
         </p>
-        <p className="small mt">A confirmation will be sent to {f.email}.</p>
+        <p className="small mt">Your request is pending. You&apos;ll see the confirmation in your portal under Appointments.</p>
       </div>
     );
 
@@ -102,8 +102,8 @@ export default function BookForm({ defaults }) {
           </div>
         </div>
         <div className="grid-2">
-          <div className="field"><label htmlFor="book-name">Full name</label><input id="book-name" className="input" required value={f.name} onChange={set("name")} /></div>
-          <div className="field"><label htmlFor="book-email">Email</label><input id="book-email" type="email" className="input" required value={f.email} onChange={set("email")} /></div>
+          <div className="field"><label htmlFor="book-name">Full name</label><input id="book-name" className="input" readOnly value={f.name} /><span className="hint">From your account</span></div>
+          <div className="field"><label htmlFor="book-email">Email</label><input id="book-email" type="email" className="input" readOnly value={f.email} /><span className="hint">From your account</span></div>
           <div className="field"><label htmlFor="book-phone">Phone</label><input id="book-phone" className="input" value={f.phone} onChange={set("phone")} /></div>
           <div className="field span-2"><label htmlFor="book-notes">Anything we should know?</label><textarea id="book-notes" className="textarea" value={f.notes} onChange={set("notes")} /></div>
         </div>

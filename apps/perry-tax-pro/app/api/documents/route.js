@@ -40,7 +40,11 @@ export async function POST(req) {
   const id = crypto.randomUUID();
   const storagePath = `tax/${TAX_TENANT}/${r.client_id}/${r.id}/${id}/document.${EXTENSIONS[mime]}`;
   const filename = String(file.name || `document.${EXTENSIONS[mime]}`).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 200);
-  await uploadObject(storagePath, bytes, mime, session.idToken);
+  try {
+    await uploadObject(storagePath, bytes, mime, session.idToken);
+  } catch {
+    return Response.json({ error: "The file could not be uploaded. Please try again." }, { status: 503, headers: privateHeaders });
+  }
   try {
     await setDocument(`taxDocuments/${id}`, {
       tenantId: TAX_TENANT,
@@ -55,10 +59,10 @@ export async function POST(req) {
       createdAt: new Date().toISOString(),
     }, session.idToken, { createOnly: true });
     await incrementDocument(`taxReturns/${r.id}`, "docCount", 1, session.idToken);
-  } catch (error) {
+  } catch {
     await deleteObject(storagePath, session.idToken).catch(() => null);
-    throw error;
+    return Response.json({ error: "The document could not be saved. Please try again." }, { status: 503, headers: privateHeaders });
   }
-  await touchReturn(r.id, session);
+  await touchReturn(r.id, session).catch(() => null);
   return Response.json({ ok: true, id }, { headers: privateHeaders });
 }
