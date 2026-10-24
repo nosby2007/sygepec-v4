@@ -34,7 +34,7 @@ export default function SlotPicker({ availability, value, onChange, idPrefix = "
               onClick={() => { setPicked(d.date); onChange(null); }}>
               <span className="tiny muted" style={{ textTransform: "uppercase", fontWeight: 700 }}>{dateLabel(d.date, { weekday: "short" })}</span>
               <span style={{ fontWeight: 700, fontSize: "1.2rem", fontFamily: "var(--font-display)" }}>{dateLabel(d.date, { day: "numeric" })}</span>
-              <span className="tiny muted">{d.slots.length ? dateLabel(d.date, { month: "short" }) : "Full"}</span>
+              <span className="tiny muted">{d.slots.length ? dateLabel(d.date, { month: "short" }) : "No times"}</span>
             </button>
           ))}
         </div>

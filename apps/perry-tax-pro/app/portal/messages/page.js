@@ -13,7 +13,7 @@ export default async function Page() {
   return (
     <>
       <PageHead kicker="Secure inbox" icon="chat" title="Messages" desc={`Secure conversation with ${who}`} />
-      <div className="grid-main" style={{ gridTemplateColumns: "minmax(0,1fr) 300px", alignItems: "start" }}>
+      <div className="wizard-layout">
         <div className="card">
           <div className="card-title">
             <div className="person"><Avatar name={who} /><div><b>{who}</b><span className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="live-dot" /> Typically replies within 1 business day</span></div></div>

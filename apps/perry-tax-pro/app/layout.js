@@ -5,6 +5,7 @@ const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", weight: [
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app"),
   title: { default: "InnovaCare Tax | Modern Tax Preparation", template: "%s | InnovaCare Tax" },
   description:
     "InnovaCare Tax offers expert individual, self-employed and small business tax preparation with a secure client portal, refund estimator and online booking.",

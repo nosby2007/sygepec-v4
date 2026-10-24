@@ -14,8 +14,11 @@ const taxLinks = [
 
 const businessLinks = [
   { href: "/portal/business", label: "Business Overview", icon: "chart" },
+  { href: "/portal/business/bookings", label: "Bookings", icon: "calendar" },
   { href: "/portal/business/customers", label: "Customers", icon: "users" },
   { href: "/portal/business/workspace", label: "Services & Billing", icon: "receipt" },
+  { href: "/portal/business/team", label: "Team", icon: "user" },
+  { href: "/portal/business/profile", label: "Public page", icon: "megaphone" },
   { href: "/portal/business/accounting", label: "Accounting", icon: "book" },
 ];
 

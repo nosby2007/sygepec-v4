@@ -185,6 +185,7 @@ describe("appointment booking", () => {
     denied(await book("bob", "ap3", { slotIds: free, status: "CONFIRMED" }));
     denied(await book("bob", "ap3", { slotIds: free, meetingUrl: "https://zoom.us/j/1" }));
     denied(await commit("bob", [create("taxAppointments/ap3", appointment("bob", { slotIds: [] }))]));
+    denied(await commit("bob", [create("taxAppointments/ap3", appointment("bob", { slotIds: free })), event("ap3", "bob")]));
   });
   test("slot locks must match their ID and belong to the client's own appointment", async () => {
     const id = `${cellOf(startMs + 4 * DAY)}_s1`;

@@ -93,7 +93,7 @@ function TimeGrid({ days, today, placed, weekly, timeZone, selectedId, onSelect 
                 style={{ top: px(a.minute - start), height: Math.max(px(a.duration_minutes) - 2, 22) }}
                 onClick={() => onSelect(a.id)}>
                 <b>{formatInZone(a.start_ms, timeZone, { hour: "numeric", minute: "2-digit" })}</b> {a.name}
-                <span className="cal-meta">{a.type === "VIRTUAL" ? "Video" : "In person"}{a.assignee_name ? ` · ${a.assignee_name}` : ""}</span>
+                <span className="cal-meta">{a.meta ?? `${a.type === "VIRTUAL" ? "Video" : "In person"}${a.assignee_name ? ` · ${a.assignee_name}` : ""}`}</span>
               </button>
             ))}
           </div>

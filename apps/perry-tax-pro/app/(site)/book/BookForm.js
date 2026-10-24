@@ -75,7 +75,7 @@ export default function BookForm({ defaults }) {
     );
 
   return (
-    <form onSubmit={submit} className="wizard-layout" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
+    <form onSubmit={submit} className="wizard-layout">
       <div className="card stack">
         <div className="wizard-progress" style={{ marginBottom: 0 }}><span style={{ width: `${progress * 100}%` }} /></div>
         <div className="field">

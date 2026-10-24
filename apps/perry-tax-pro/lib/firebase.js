@@ -6,6 +6,17 @@ const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
 export const TAX_TENANT = "perry-tax-pro";
 
+// Emulator hosts are honoured only outside production builds, so the integration tests
+// can run the real server code locally while a deployed server can never be redirected.
+const emulator = (name) => (process.env.NODE_ENV !== "production" ? process.env[name] : undefined);
+const AUTH_EMULATOR = emulator("FIREBASE_AUTH_EMULATOR_HOST");
+const FIRESTORE_EMULATOR = emulator("FIRESTORE_EMULATOR_HOST");
+const STORAGE_EMULATOR = emulator("FIREBASE_STORAGE_EMULATOR_HOST");
+const identityUrl = (method) => `${AUTH_EMULATOR ? `http://${AUTH_EMULATOR}/` : "https://"}identitytoolkit.googleapis.com/v1/accounts:${method}`;
+const TOKEN_URL = `${AUTH_EMULATOR ? `http://${AUTH_EMULATOR}/` : "https://"}securetoken.googleapis.com/v1/token`;
+const FIRESTORE_ORIGIN = FIRESTORE_EMULATOR ? `http://${FIRESTORE_EMULATOR}` : "https://firestore.googleapis.com";
+const STORAGE_ORIGIN = STORAGE_EMULATOR ? `http://${STORAGE_EMULATOR}` : "https://firebasestorage.googleapis.com";
+
 function required(value, name) {
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
   return value;
@@ -34,7 +45,7 @@ async function jsonRequest(url, init = {}) {
 
 export async function signInWithPassword(email, password) {
   const { apiKey } = firebaseConfig();
-  return jsonRequest(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+  return jsonRequest(`${identityUrl("signInWithPassword")}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
@@ -43,12 +54,12 @@ export async function signInWithPassword(email, password) {
 
 export async function signUpWithPassword(email, password, displayName) {
   const { apiKey } = firebaseConfig();
-  const created = await jsonRequest(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+  const created = await jsonRequest(`${identityUrl("signUp")}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
   });
-  await jsonRequest(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`, {
+  await jsonRequest(`${identityUrl("update")}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken: created.idToken, displayName, returnSecureToken: true }),
@@ -59,16 +70,27 @@ export async function signUpWithPassword(email, password, displayName) {
 export async function refreshIdToken(refreshToken) {
   const { apiKey } = firebaseConfig();
   const body = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken });
-  return jsonRequest(`https://securetoken.googleapis.com/v1/token?key=${apiKey}`, {
+  return jsonRequest(`${TOKEN_URL}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
 }
 
+// A throwaway identity for one guest booking. Rules tie the booking to this uid, and the
+// guest's private manage link carries its refresh token (encrypted).
+export async function signInAnonymously() {
+  const { apiKey } = firebaseConfig();
+  return jsonRequest(`${identityUrl("signUp")}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ returnSecureToken: true }),
+  });
+}
+
 export async function deleteFirebaseAccount(idToken) {
   const { apiKey } = firebaseConfig();
-  return jsonRequest(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${apiKey}`, {
+  return jsonRequest(`${identityUrl("delete")}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken }),
@@ -108,7 +130,7 @@ function decodeFields(fields = {}) {
 
 function docBase() {
   const { projectId } = firebaseConfig();
-  return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+  return `${FIRESTORE_ORIGIN}/v1/projects/${projectId}/databases/(default)/documents`;
 }
 
 function documentName(path) {
@@ -116,8 +138,9 @@ function documentName(path) {
   return `projects/${projectId}/databases/(default)/documents/${path}`;
 }
 
+// Without a token the request is unauthenticated and only reaches publicly readable data.
 function authHeaders(idToken) {
-  return { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" };
+  return { ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}), "Content-Type": "application/json" };
 }
 
 export function decodeDocument(document) {
@@ -208,14 +231,17 @@ export async function mergeDocument(path, changes, idToken) {
   return setDocument(path, { ...data, ...changes }, idToken);
 }
 
-function fieldFilter(fieldPath, op, value) {
-  return { fieldFilter: { field: { fieldPath }, op, value: encodeValue(value) } };
+// Filters on "__name__" take document IDs within the collection, which allows ID-prefix
+// range queries without a composite index.
+function fieldFilter(collectionId, fieldPath, op, value) {
+  const encoded = fieldPath === "__name__" ? { referenceValue: documentName(`${collectionId}/${value}`) } : encodeValue(value);
+  return { fieldFilter: { field: { fieldPath }, op, value: encoded } };
 }
 
 export async function queryCollection(collectionId, idToken, { filters = [], orderBy = [], limit = 200 } = {}) {
   const where = filters.length === 0 ? undefined : filters.length === 1
-    ? fieldFilter(...filters[0])
-    : { compositeFilter: { op: "AND", filters: filters.map((filter) => fieldFilter(...filter)) } };
+    ? fieldFilter(collectionId, ...filters[0])
+    : { compositeFilter: { op: "AND", filters: filters.map((filter) => fieldFilter(collectionId, ...filter)) } };
   const structuredQuery = {
     from: [{ collectionId }],
     ...(where ? { where } : {}),
@@ -237,7 +263,7 @@ export async function deleteDocument(path, idToken) {
 
 export async function uploadObject(path, bytes, contentType, idToken) {
   const { storageBucket } = firebaseConfig();
-  return jsonRequest(`https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o?uploadType=media&name=${encodeURIComponent(path)}`, {
+  return jsonRequest(`${STORAGE_ORIGIN}/v0/b/${storageBucket}/o?uploadType=media&name=${encodeURIComponent(path)}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${idToken}`, "Content-Type": contentType },
     body: bytes,
@@ -246,14 +272,14 @@ export async function uploadObject(path, bytes, contentType, idToken) {
 
 export async function downloadObject(path, idToken) {
   const { storageBucket } = firebaseConfig();
-  return fetch(`https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(path)}?alt=media`, {
-    headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store",
+  return fetch(`${STORAGE_ORIGIN}/v0/b/${storageBucket}/o/${encodeURIComponent(path)}?alt=media`, {
+    headers: idToken ? { Authorization: `Bearer ${idToken}` } : {}, cache: "no-store",
   });
 }
 
 export async function deleteObject(path, idToken) {
   const { storageBucket } = firebaseConfig();
-  const response = await fetch(`https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(path)}`, {
+  const response = await fetch(`${STORAGE_ORIGIN}/v0/b/${storageBucket}/o/${encodeURIComponent(path)}`, {
     method: "DELETE", headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store",
   });
   if (!response.ok && response.status !== 404) throw new Error("Firebase Storage delete failed");

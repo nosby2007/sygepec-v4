@@ -19,7 +19,7 @@ export default async function Page() {
           <h1 style={{ fontSize: "clamp(2rem,4vw,3rem)", margin: "16px 0 12px" }}>
             Book time with a <span className="grad-text">tax pro</span>
           </h1>
-          <p>In-office or virtual. We&apos;ll confirm by email within one business day.</p>
+          <p>In-office or virtual. We confirm within one business day; you&apos;ll see it in your portal.</p>
         </div>
         <BookForm defaults={s?.role === "CLIENT" ? { name: s.name, email: s.email } : {}} />
       </div>

@@ -29,8 +29,8 @@ export default function BusinessWorkspace() {
   const [services, setServices] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [service, setService] = useState({ name: "", price: "", durationMinutes: 60 });
-  const [booking, setBooking] = useState({ customerId: "", serviceId: "", start: "", notes: "" });
+  const [service, setService] = useState({ name: "", price: "", durationMinutes: 60, description: "", public: false });
+  const [editingService, setEditingService] = useState(null);
   const [invoice, setInvoice] = useState({ customerId: "", description: "", amount: "", dueDate: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -80,7 +80,7 @@ export default function BusinessWorkspace() {
 
   return <>
     <div className="page-head">
-      <div><div className="kicker"><Icon name="receipt" size={15} /> Small Business</div><h1>Services, calendar & invoices</h1><p className="desc small">Internal scheduling and draft billing. No automatic reminders, customer notifications, or payment processing yet.</p></div>
+      <div><div className="kicker"><Icon name="receipt" size={15} /> Small Business</div><h1>Services, calendar & invoices</h1><p className="desc small">Services, what customers can book online, and draft billing. No automatic reminders, customer notifications, or payment processing yet.</p></div>
       <Link href="/portal/business" className="btn btn-ghost"><Icon name="back" size={16} /> Bookkeeping</Link>
     </div>
     {error && <div className="alert alert-error" role="alert" style={{ marginBottom: 16 }}><Icon name="alert" size={16} />{error}</div>}
@@ -101,25 +101,26 @@ export default function BusinessWorkspace() {
         </div>
 
         {tab === "services" && <div className="fade-in">
-          <form className="form-grid" onSubmit={(event) => { event.preventDefault(); create("services", service, () => setService({ name: "", price: "", durationMinutes: 60 })); }}>
+          <form className="form-grid" onSubmit={(event) => { event.preventDefault(); create("services", service, () => setService({ name: "", price: "", durationMinutes: 60, description: "", public: false })); }}>
             <div className="field full"><label htmlFor="sv-name">Service</label><input id="sv-name" className="input" required maxLength={100} value={service.name} onChange={(event) => setService({ ...service, name: event.target.value })} /></div>
             <div className="field"><label htmlFor="sv-price">Price (USD)</label><div className="input-icon"><Icon name="dollar" size={15} /><input id="sv-price" className="input num" required inputMode="decimal" value={service.price} onChange={(event) => setService({ ...service, price: event.target.value })} /></div></div>
             <div className="field"><label htmlFor="sv-duration">Duration (minutes)</label><div className="input-icon"><Icon name="clock" size={15} /><input id="sv-duration" className="input num" type="number" min={15} max={480} required value={service.durationMinutes} onChange={(event) => setService({ ...service, durationMinutes: Number(event.target.value) })} /></div></div>
+            <div className="field full"><label htmlFor="sv-desc">Description (shown to customers)</label><textarea id="sv-desc" className="textarea" maxLength={1000} value={service.description} onChange={(event) => setService({ ...service, description: event.target.value })} /></div>
+            <label className="full row nowrap small"><input type="checkbox" checked={service.public} onChange={(event) => setService({ ...service, public: event.target.checked })} /> Show on my public page so customers can book it</label>
             <div className="full form-actions" style={{ marginTop: 0 }}><button className="btn btn-primary" disabled={busy}><Icon name="plus" size={16} /> Add service</button></div>
           </form>
           <div className="stack-sm mt">
             {services.length === 0 && <Empty icon="layers" title="No services yet">Add what you sell with a price and duration.</Empty>}
-            {services.map((item) => <div key={item.id} className="service-tile"><div className="row nowrap"><span className="kpi-icon"><Icon name="layers" size={16} /></span><b>{item.name}</b></div><div className="row nowrap"><span className="pill"><Icon name="clock" size={12} />{item.durationMinutes} min</span><b className="num">{money(item.priceCents)}</b></div></div>)}
+            {services.map((item) => editingService === item.id
+              ? <ServiceEditor key={item.id} service={item} onDone={async () => { setEditingService(null); applyWorkspace(await fetchWorkspace()); }} />
+              : <div key={item.id} className="service-tile"><div className="row nowrap" style={{ minWidth: 0 }}><span className="kpi-icon"><Icon name="layers" size={16} /></span><b className="truncate">{item.name}</b>{item.public && item.active !== false && <span className="pill info">Public</span>}{item.active === false && <span className="pill">Inactive</span>}</div><div className="row nowrap"><span className="pill"><Icon name="clock" size={12} />{item.durationMinutes} min</span><b className="num">{money(item.priceCents)}</b><button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingService(item.id)}>Edit</button></div></div>)}
           </div>
         </div>}
 
-        {tab === "schedule" && <form className="form-grid fade-in" onSubmit={(event) => { event.preventDefault(); create("bookings", booking, () => setBooking({ customerId: "", serviceId: "", start: "", notes: "" })); }}>
-          <div className="field"><label htmlFor="bk-customer">Customer</label><select id="bk-customer" className="select" required value={booking.customerId} onChange={(event) => setBooking({ ...booking, customerId: event.target.value })}><option value="">Select customer</option>{customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-          <div className="field"><label htmlFor="bk-service">Service</label><select id="bk-service" className="select" required value={booking.serviceId} onChange={(event) => setBooking({ ...booking, serviceId: event.target.value })}><option value="">Select service</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-          <div className="field full"><label htmlFor="bk-start">Local date and time</label><input id="bk-start" className="input" type="datetime-local" required value={booking.start} onChange={(event) => setBooking({ ...booking, start: event.target.value })} /></div>
-          <div className="field full"><label htmlFor="bk-notes">Notes</label><input id="bk-notes" className="input" maxLength={300} value={booking.notes} onChange={(event) => setBooking({ ...booking, notes: event.target.value })} /></div>
-          <div className="full form-actions" style={{ marginTop: 0 }}>{(!customers.length || !services.length) && <span className="hint">Add a customer and a service first.</span>}<button className="btn btn-primary" disabled={busy}><Icon name="calendar" size={16} /> Save appointment</button></div>
-        </form>}
+        {tab === "schedule" && <div className="fade-in stack-sm">
+          <p className="small">Scheduling now lives in <b>Bookings</b>: time zones, staff calendars, conflict checks and bookings from your public page in one calendar.</p>
+          <Link href="/portal/business/bookings" className="btn btn-primary" style={{ alignSelf: "flex-start" }}><Icon name="calendar" size={16} /> Open Bookings</Link>
+        </div>}
 
         {tab === "invoice" && <div className="fade-in">
           <form className="form-grid" onSubmit={(event) => { event.preventDefault(); create("invoices", invoice, () => setInvoice({ customerId: "", description: "", amount: "", dueDate: "" })); }}>
@@ -143,9 +144,9 @@ export default function BusinessWorkspace() {
 
       <div className="stack">
         <div className="card">
-          <div className="card-title"><div><h3>Appointment calendar</h3><div className="sub">Agenda list by scheduled date</div></div></div>
+          <div className="card-title"><div><h3>Earlier appointments</h3><div className="sub">Read-only, before online booking</div></div></div>
           <div className="agenda" style={{ maxHeight: 380, overflowY: "auto" }}>
-            {agenda.length === 0 && <Empty icon="calendar" title="Nothing scheduled">Use the Schedule tab to book work.</Empty>}
+            {agenda.length === 0 && <Empty icon="calendar" title="None">Use Bookings to schedule work.</Empty>}
             {agenda.map((item) => {
               const d = when(item.start);
               return (
@@ -157,7 +158,7 @@ export default function BusinessWorkspace() {
               );
             })}
           </div>
-          <p className="hint mt-sm">Conflict detection and time-zone support are not yet available.</p>
+          <p className="hint mt-sm">Appointments entered here before online booking. New bookings are in Bookings.</p>
         </div>
         <div className="card">
           <div className="card-title"><h3>Top customers by invoiced</h3></div>
@@ -166,4 +167,44 @@ export default function BusinessWorkspace() {
       </div>
     </div>
   </>;
+}
+
+function ServiceEditor({ service, onDone }) {
+  const [f, setF] = useState({ name: service.name, price: (service.priceCents / 100).toFixed(2), durationMinutes: service.durationMinutes, description: service.description || "", public: Boolean(service.public), active: service.active !== false });
+  const [state, setState] = useState({});
+  const save = async (event) => {
+    event.preventDefault();
+    setState({ busy: true });
+    const response = await fetch(`/api/business/services/${service.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return setState({ error: body.error || "Unable to save" });
+    onDone();
+  };
+  const upload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.set("target", `service:${service.id}`);
+    form.set("file", file);
+    setState({ busy: true });
+    const response = await fetch("/api/business/media", { method: "POST", body: form });
+    const body = await response.json().catch(() => ({}));
+    setState(response.ok ? { ok: "Photo updated." } : { error: body.error || "Upload failed" });
+  };
+  return (
+    <form className="card form-grid" style={{ boxShadow: "none" }} onSubmit={save}>
+      <div className="field full"><label htmlFor={`se-name-${service.id}`}>Service</label><input id={`se-name-${service.id}`} className="input" required maxLength={100} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+      <div className="field"><label htmlFor={`se-price-${service.id}`}>Price (USD)</label><input id={`se-price-${service.id}`} className="input num" inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></div>
+      <div className="field"><label htmlFor={`se-dur-${service.id}`}>Duration (min)</label><input id={`se-dur-${service.id}`} type="number" min={15} max={480} className="input num" value={f.durationMinutes} onChange={(e) => setF({ ...f, durationMinutes: Number(e.target.value) })} /></div>
+      <div className="field full"><label htmlFor={`se-desc-${service.id}`}>Description</label><textarea id={`se-desc-${service.id}`} className="textarea" maxLength={1000} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
+      <div className="full row">
+        <label className="row nowrap small"><input type="checkbox" checked={f.public} onChange={(e) => setF({ ...f, public: e.target.checked })} /> On public page</label>
+        <label className="row nowrap small"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Active</label>
+        <label className="btn btn-ghost btn-sm"><Icon name="upload" size={14} /> Photo<input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={upload} /></label>
+      </div>
+      {state.error && <div className="full alert alert-error"><Icon name="alert" size={16} />{state.error}</div>}
+      {state.ok && <div className="full alert alert-success"><Icon name="check" size={16} />{state.ok}</div>}
+      <div className="full row"><button className="btn btn-primary btn-sm" disabled={Boolean(state.busy)}>Save</button><button type="button" className="btn btn-ghost btn-sm" onClick={onDone}>Close</button></div>
+    </form>
+  );
 }

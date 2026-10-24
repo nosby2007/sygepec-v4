@@ -51,3 +51,19 @@ match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {
   && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png)');
  allow update, delete: if false;
 }
+
+// Public business images (logo, cover, service photos). Anyone may read them; only the
+// business account itself may upload, images only, 2 MB at most.
+match /biz/{businessId}/public/{fileName} {
+  allow read: if true;
+  allow create: if request.auth != null
+    && request.auth.uid == businessId
+    && taxProfile().tenantId == 'perry-tax-pro'
+    && taxProfile().accountType == 'BUSINESS'
+    && fileName.matches('[A-Za-z0-9_-]+[.](jpg|png|webp)')
+    && request.resource.size > 0
+    && request.resource.size <= 2 * 1024 * 1024
+    && request.resource.contentType.matches('image/(jpeg|png|webp)');
+  allow update: if false;
+  allow delete: if request.auth != null && request.auth.uid == businessId;
+}

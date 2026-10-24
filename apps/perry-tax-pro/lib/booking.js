@@ -119,29 +119,54 @@ export function coveredCells(startMs, minutes, settings) {
 
 export const lockId = (cell, seat) => `${cell}_s${seat}`;
 
-function seatsByCell(locks, excludeAppointmentId) {
+// A lock occupies one resource for one cell: a numbered seat ("s1".."sN") when bookings
+// share interchangeable capacity, or a staff member's ID when each person has a calendar.
+// Tax locks store `seat`; business locks store `resource`; old ones only encode it in the ID.
+function lockParts(lock) {
+  if (lock.cell) return { cell: lock.cell, resource: lock.resource ?? `s${lock.seat}` };
+  const [cell, seat] = String(lock.id).split("_s");
+  return { cell, resource: `s${seat}` };
+}
+
+function busyByCell(locks, excludeId) {
   const map = new Map();
   for (const lock of locks) {
-    if (excludeAppointmentId && lock.appointmentId === excludeAppointmentId) continue;
-    const [cell, seat] = String(lock.id).split("_s");
+    if (excludeId && (lock.appointmentId === excludeId || lock.bookingId === excludeId)) continue;
+    const { cell, resource } = lockParts(lock);
     if (!map.has(cell)) map.set(cell, new Set());
-    map.get(cell).add(Number(seat));
+    map.get(cell).add(resource);
   }
   return map;
 }
 
-// First seat that is free in every cell, or null when the slot is full.
-export function pickSeat(cells, locks, settings, excludeAppointmentId) {
-  const taken = seatsByCell(locks, excludeAppointmentId);
-  for (let seat = 1; seat <= settings.capacity; seat++) {
-    if (cells.every((cell) => !taken.get(cell)?.has(seat))) return seat;
+export const seatResources = (settings) => Array.from({ length: settings.capacity }, (_, i) => ({ key: `s${i + 1}` }));
+
+function withinHours(weekly, date, startMin, endMin) {
+  return (weekly[weekdayOf(date)] || []).some((w) => minutesOf(w.start) <= startMin && endMin <= minutesOf(w.end));
+}
+
+// First resource that is free in every cell (and, when `hours` is given, working then),
+// or null when the slot is full. A resource's own `weekly` overrides the business hours.
+export function pickResource({ cells, locks, resources, excludeId, hours }) {
+  const taken = busyByCell(locks, excludeId);
+  for (const resource of resources) {
+    if (hours && !withinHours(resource.weekly || hours.weekly, hours.date, hours.startMin, hours.endMin)) continue;
+    if (cells.every((cell) => !taken.get(cell)?.has(resource.key))) return resource.key;
   }
   return null;
 }
 
-// Bookable start times, grouped by office-local date.
-export function availableSlots({ settings, service, minutes: override, from, days, nowMs, locks = [], excludeAppointmentId }) {
+// First seat that is free in every cell, or null when the slot is full.
+export function pickSeat(cells, locks, settings, excludeAppointmentId) {
+  const key = pickResource({ cells, locks, resources: seatResources(settings), excludeId: excludeAppointmentId });
+  return key ? Number(key.slice(1)) : null;
+}
+
+// Bookable start times, grouped by office-local date. Each slot names the resource that
+// would take it; candidate times come from the business hours and every resource's hours.
+export function availableSlots({ settings, service, minutes: override, from, days, nowMs, locks = [], excludeAppointmentId, resources }) {
   const minutes = override || serviceMinutes(settings, service);
+  const pool = resources || seatResources(settings);
   const today = zonedParts(new Date(nowMs), settings.timeZone).date;
   const lastDay = addDays(today, settings.horizonDays);
   const earliest = nowMs + settings.minNoticeHours * 3_600_000;
@@ -152,14 +177,20 @@ export function availableSlots({ settings, service, minutes: override, from, day
     if (date < today || date > lastDay) continue;
     const slots = [];
     if (!closed.has(date)) {
-      for (const window of settings.weekly[weekdayOf(date)] || []) {
-        const close = minutesOf(window.end);
-        for (let t = minutesOf(window.start); t + minutes <= close; t += settings.slotMinutes) {
-          const startMs = zonedTimeToUtc(date, timeOf(t), settings.timeZone).getTime();
-          if (startMs < earliest) continue;
-          if (!pickSeat(coveredCells(startMs, minutes, settings), locks, settings, excludeAppointmentId)) continue;
-          slots.push({ start: new Date(startMs).toISOString(), startMs, time: timeOf(t) });
-        }
+      const day = weekdayOf(date);
+      const windows = [settings.weekly, ...pool.map((r) => r.weekly).filter(Boolean)].flatMap((weekly) => weekly[day] || []);
+      const starts = new Set();
+      for (const window of windows) {
+        for (let t = minutesOf(window.start); t + minutes <= minutesOf(window.end); t += settings.slotMinutes) starts.add(t);
+      }
+      for (const t of [...starts].sort((a, b) => a - b)) {
+        const startMs = zonedTimeToUtc(date, timeOf(t), settings.timeZone).getTime();
+        if (startMs < earliest) continue;
+        const resource = pickResource({
+          cells: coveredCells(startMs, minutes, settings), locks, resources: pool, excludeId: excludeAppointmentId,
+          hours: { weekly: settings.weekly, date, startMin: t, endMin: t + minutes },
+        });
+        if (resource) slots.push({ start: new Date(startMs).toISOString(), startMs, time: timeOf(t), resource });
       }
     }
     out.push({ date, slots });
@@ -168,11 +199,16 @@ export function availableSlots({ settings, service, minutes: override, from, day
 }
 
 // Server-side check that a requested start is one of the slots the client could have seen.
-export function isSlotOffered({ settings, service, minutes, startMs, nowMs, locks, excludeAppointmentId }) {
-  if (!Number.isFinite(startMs)) return false;
+// Returns the resource that would take it, or null.
+export function offeredResource({ settings, service, minutes, startMs, nowMs, locks, excludeAppointmentId, resources }) {
+  if (!Number.isFinite(startMs)) return null;
   const date = zonedParts(new Date(startMs), settings.timeZone).date;
-  const [day] = availableSlots({ settings, service, minutes, from: date, days: 1, nowMs, locks, excludeAppointmentId });
-  return Boolean(day?.slots.some((slot) => slot.startMs === startMs));
+  const [day] = availableSlots({ settings, service, minutes, from: date, days: 1, nowMs, locks, excludeAppointmentId, resources });
+  return day?.slots.find((slot) => slot.startMs === startMs)?.resource || null;
+}
+
+export function isSlotOffered(options) {
+  return Boolean(offeredResource(options));
 }
 
 // True while the client may still cancel or reschedule on their own.

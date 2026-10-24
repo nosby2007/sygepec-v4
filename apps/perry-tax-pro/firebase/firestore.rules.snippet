@@ -218,7 +218,10 @@ match /taxAppointments/{appointmentId} {
     && request.resource.data.slotIds is list
     && request.resource.data.slotIds.size() > 0
     && request.resource.data.slotIds.size() <= 24
-    && request.resource.data.rescheduleCount == 0;
+    && request.resource.data.rescheduleCount == 0
+    // The slot locks must be written in the same commit (checked at both ends of the list).
+    && existsAfter(/databases/$(database)/documents/taxAppointmentSlots/$(request.resource.data.slotIds[0]))
+    && existsAfter(/databases/$(database)/documents/taxAppointmentSlots/$(request.resource.data.slotIds[request.resource.data.slotIds.size() - 1]));
   allow update: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.tenantId == resource.data.tenantId
@@ -399,15 +402,29 @@ match /taxBusinessCustomers/{customerId} {
  allow update, delete: if false;
 }
 
+function validBusinessService(d) {
+  return d.keys().hasOnly(['tenantId','ownerUid','name','priceCents','durationMinutes','description','active','public','imagePath','createdAt','updatedAt'])
+    && d.tenantId == 'perry-tax-pro' && d.ownerUid == request.auth.uid
+    && d.name is string && d.name.size() > 0 && d.name.size() <= 100
+    && d.priceCents is int && d.priceCents > 0 && d.priceCents <= 99999999999
+    && d.durationMinutes is int && d.durationMinutes >= 15 && d.durationMinutes <= 480
+    && d.get('description', '') is string && d.get('description', '').size() <= 1000
+    && d.get('active', true) is bool && d.get('public', false) is bool
+    && (d.get('imagePath', null) == null || d.imagePath.matches('biz/' + request.auth.uid + '/public/[A-Za-z0-9_-]+[.](jpg|png|webp)'));
+}
+
+// Owners manage their services; services marked public and active are readable by anyone
+// so the business's booking page can list them.
 match /taxBusinessServices/{id} {
- allow get, list: if businessOwner() && resource.data.tenantId == 'perry-tax-pro' && resource.data.ownerUid == request.auth.uid;
- allow create: if businessOwner()
-  && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','priceCents','durationMinutes','createdAt'])
-  && request.resource.data.tenantId == 'perry-tax-pro' && request.resource.data.ownerUid == request.auth.uid
-  && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
-  && request.resource.data.priceCents is int && request.resource.data.priceCents > 0 && request.resource.data.priceCents <= 99999999999
-  && request.resource.data.durationMinutes is int && request.resource.data.durationMinutes >= 15 && request.resource.data.durationMinutes <= 480;
- allow update, delete: if false;
+ allow get, list: if resource.data.tenantId == 'perry-tax-pro'
+  && ((businessOwner() && resource.data.ownerUid == request.auth.uid)
+    || (resource.data.get('public', false) == true && resource.data.get('active', true) == true));
+ allow create: if businessOwner() && validBusinessService(request.resource.data);
+ allow update: if businessOwner()
+  && resource.data.ownerUid == request.auth.uid
+  && validBusinessService(request.resource.data)
+  && request.resource.data.createdAt == resource.data.createdAt;
+ allow delete: if false;
 }
 match /taxBusinessBookings/{id} {
  allow get, list: if businessOwner() && resource.data.tenantId == 'perry-tax-pro' && resource.data.ownerUid == request.auth.uid;
@@ -496,4 +513,233 @@ match /taxBusinessYearEnd/{id} {
   && request.resource.data.status == 'SUBMITTED_FOR_REVIEW'
   && request.resource.data.report is map;
  allow update, delete: if false;
+}
+
+// ---- Business profiles and public booking ----------------------------------------
+// businessId is the owner's uid (the same value existing records store as ownerUid).
+
+function bizProfileOf(businessId) {
+  return get(/databases/$(database)/documents/bizProfiles/$(businessId)).data;
+}
+
+function bizBookingAt(bookingId) {
+  return /databases/$(database)/documents/bizBookings/$(bookingId);
+}
+
+function bizSlugValid(slug) {
+  return slug is string
+    && slug.matches('[a-z0-9][a-z0-9-]{1,38}[a-z0-9]')
+    && !(slug in ['directory', 'register', 'admin', 'portal', 'api', 'new', 'book', 'booking']);
+}
+
+function bizImageValid(path) {
+  return path == null
+    || (path is string && path.matches('biz/' + request.auth.uid + '/public/[A-Za-z0-9_-]+[.](jpg|png|webp)'));
+}
+
+match /bizProfiles/{businessId} {
+  allow get: if resource.data.status == 'PUBLISHED'
+    || (businessOwner() && businessId == request.auth.uid);
+  allow list: if resource.data.status == 'PUBLISHED' && resource.data.tenantId == 'perry-tax-pro';
+  allow create, update: if businessOwner()
+    && businessId == request.auth.uid
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'businessId', 'ownerUid', 'name', 'slug', 'tagline', 'description', 'phone', 'email', 'address',
+      'city', 'state', 'zip', 'website', 'logoPath', 'coverPath', 'status', 'publicBooking', 'autoConfirm', 'booking',
+      'createdAt', 'updatedAt'
+    ])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.businessId == request.auth.uid
+    && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 100
+    && bizSlugValid(request.resource.data.slug)
+    && getAfter(/databases/$(database)/documents/bizSlugs/$(request.resource.data.slug)).data.businessId == request.auth.uid
+    && request.resource.data.description is string && request.resource.data.description.size() <= 2000
+    && request.resource.data.tagline is string && request.resource.data.tagline.size() <= 140
+    && request.resource.data.status in ['DRAFT', 'PUBLISHED']
+    && request.resource.data.publicBooking is bool
+    && request.resource.data.autoConfirm is bool
+    && bizImageValid(request.resource.data.get('logoPath', null))
+    && bizImageValid(request.resource.data.get('coverPath', null))
+    && request.resource.data.booking is map
+    && request.resource.data.booking.minNoticeHours is int && request.resource.data.booking.minNoticeHours >= 0 && request.resource.data.booking.minNoticeHours <= 336
+    && request.resource.data.booking.horizonDays is int && request.resource.data.booking.horizonDays >= 1 && request.resource.data.booking.horizonDays <= 180
+    && request.resource.data.booking.cancelCutoffHours is int && request.resource.data.booking.cancelCutoffHours >= 0 && request.resource.data.booking.cancelCutoffHours <= 336
+    && request.resource.data.booking.maxReschedules is int && request.resource.data.booking.maxReschedules >= 0 && request.resource.data.booking.maxReschedules <= 10;
+  allow delete: if false;
+}
+
+// One document per public link, created with the profile, so two businesses can never
+// claim the same link.
+match /bizSlugs/{slug} {
+  allow get: if true;
+  allow list: if false;
+  allow create: if businessOwner()
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.businessId == request.auth.uid
+    && bizSlugValid(slug)
+    && getAfter(/databases/$(database)/documents/bizProfiles/$(request.auth.uid)).data.slug == slug;
+  allow update: if false;
+  allow delete: if businessOwner()
+    && resource.data.businessId == request.auth.uid
+    && getAfter(/databases/$(database)/documents/bizProfiles/$(request.auth.uid)).data.slug != slug;
+}
+
+function validBizStaff(d) {
+  return d.keys().hasOnly(['tenantId', 'businessId', 'name', 'title', 'bio', 'active', 'bookable', 'serviceIds', 'weekly', 'createdAt', 'updatedAt'])
+    && d.tenantId == 'perry-tax-pro'
+    && d.businessId == request.auth.uid
+    && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+    && d.title is string && d.title.size() <= 80
+    && d.bio is string && d.bio.size() <= 500
+    && d.active is bool && d.bookable is bool
+    && d.serviceIds is list && d.serviceIds.size() <= 50
+    && (d.weekly == null || d.weekly is map);
+}
+
+// Bookable team members are public (name, title, bio, hours) so guests can choose one.
+match /bizStaff/{staffId} {
+  allow get, list: if resource.data.tenantId == 'perry-tax-pro'
+    && ((resource.data.active == true && resource.data.bookable == true)
+      || (businessOwner() && resource.data.businessId == request.auth.uid));
+  allow create: if businessOwner() && validBizStaff(request.resource.data);
+  allow update: if businessOwner()
+    && resource.data.businessId == request.auth.uid
+    && validBizStaff(request.resource.data)
+    && request.resource.data.createdAt == resource.data.createdAt;
+  allow delete: if false;
+}
+
+// The booked service and staff member must match what the business publishes, so a guest
+// cannot change the price, length or person by writing to Firestore directly.
+function bizServiceMatches(d, mustBePublic) {
+  let s = get(/databases/$(database)/documents/taxBusinessServices/$(d.serviceId)).data;
+  return s.ownerUid == d.businessId
+    && s.name == d.serviceName
+    && s.priceCents == d.priceCents
+    && s.durationMinutes == d.durationMinutes
+    && (!mustBePublic || (s.get('public', false) == true && s.get('active', true) == true));
+}
+
+function bizStaffMatches(d) {
+  return d.staffId == null
+    ? d.staffName == null
+    : (get(/databases/$(database)/documents/bizStaff/$(d.staffId)).data.businessId == d.businessId
+      && get(/databases/$(database)/documents/bizStaff/$(d.staffId)).data.active == true
+      && get(/databases/$(database)/documents/bizStaff/$(d.staffId)).data.bookable == true
+      && get(/databases/$(database)/documents/bizStaff/$(d.staffId)).data.name == d.staffName);
+}
+
+function bizBookingFields(d) {
+  return d.keys().hasOnly([
+      'tenantId', 'businessId', 'serviceId', 'serviceName', 'priceCents', 'durationMinutes', 'staffId', 'staffName',
+      'startMs', 'scheduledAt', 'timeZone', 'status', 'source', 'guestUid', 'customerName', 'customerEmail',
+      'customerPhone', 'notes', 'slotIds', 'rescheduleCount', 'cancelledBy', 'cancelReason', 'createdAt', 'updatedAt'
+    ])
+    && d.tenantId == 'perry-tax-pro'
+    && d.startMs is int
+    && d.customerName is string && d.customerName.size() >= 2 && d.customerName.size() <= 100
+    && d.customerEmail is string && d.customerEmail.size() <= 254
+    && (d.customerPhone == null || (d.customerPhone is string && d.customerPhone.size() <= 30))
+    && d.notes is string && d.notes.size() <= 500
+    && d.slotIds is list && d.slotIds.size() <= 24;
+}
+
+function bizGuestWindowOpen() {
+  return resource.data.startMs - request.time.toMillis() > bizProfileOf(resource.data.businessId).booking.cancelCutoffHours * 3600000;
+}
+
+function bizStartAllowed(d) {
+  let rules = bizProfileOf(d.businessId).booking;
+  return d.startMs > request.time.toMillis() + rules.minNoticeHours * 3600000 - 300000
+    && d.startMs < request.time.toMillis() + (rules.horizonDays + 1) * 86400000;
+}
+
+match /bizBookings/{bookingId} {
+  allow get, list: if resource.data.tenantId == 'perry-tax-pro'
+    && ((businessOwner() && resource.data.businessId == request.auth.uid)
+      || (request.auth != null && resource.data.guestUid == request.auth.uid));
+  allow create: if request.auth != null
+    && bizBookingFields(request.resource.data)
+    && request.resource.data.slotIds.size() > 0
+    && request.resource.data.rescheduleCount == 0
+    // The slot locks must be written in the same commit (checked at both ends of the list).
+    && existsAfter(/databases/$(database)/documents/bizSlots/$(request.resource.data.slotIds[0]))
+    && existsAfter(/databases/$(database)/documents/bizSlots/$(request.resource.data.slotIds[request.resource.data.slotIds.size() - 1]))
+    && bizStaffMatches(request.resource.data)
+    && (
+      // A guest booking from the public page.
+      (request.resource.data.source == 'PUBLIC'
+        && request.resource.data.guestUid == request.auth.uid
+        && bizProfileOf(request.resource.data.businessId).status == 'PUBLISHED'
+        && bizProfileOf(request.resource.data.businessId).publicBooking == true
+        && request.resource.data.status == (bizProfileOf(request.resource.data.businessId).autoConfirm == true ? 'CONFIRMED' : 'REQUESTED')
+        && request.resource.data.customerEmail.matches('[^@ ]+@[^@ ]+[.][^@ ]+')
+        && bizServiceMatches(request.resource.data, true)
+        && bizStartAllowed(request.resource.data))
+      // A booking the owner enters for a customer.
+      || (request.resource.data.source == 'OWNER'
+        && businessOwner()
+        && request.resource.data.businessId == request.auth.uid
+        && request.resource.data.guestUid == null
+        && request.resource.data.status == 'CONFIRMED'
+        && request.resource.data.startMs > request.time.toMillis()
+        && bizServiceMatches(request.resource.data, false))
+    );
+  allow update: if bizBookingFields(request.resource.data)
+    && request.resource.data.businessId == resource.data.businessId
+    && request.resource.data.guestUid == resource.data.guestUid
+    && (
+      (businessOwner()
+        && resource.data.businessId == request.auth.uid
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status', 'slotIds', 'cancelledBy', 'cancelReason', 'startMs', 'scheduledAt', 'timeZone', 'staffId', 'staffName', 'updatedAt'
+        ])
+        && request.resource.data.status in ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
+        && bizStaffMatches(request.resource.data))
+      || (request.auth != null
+        && resource.data.guestUid == request.auth.uid
+        && resource.data.status in ['REQUESTED', 'CONFIRMED']
+        && bizGuestWindowOpen()
+        && (
+          (request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'slotIds', 'cancelledBy', 'cancelReason', 'updatedAt'])
+            && request.resource.data.status == 'CANCELLED'
+            && request.resource.data.slotIds.size() == 0
+            && request.resource.data.cancelledBy == 'CUSTOMER')
+          || (request.resource.data.diff(resource.data).changedKeys().hasOnly(['startMs', 'scheduledAt', 'timeZone', 'slotIds', 'staffId', 'staffName', 'status', 'rescheduleCount', 'updatedAt'])
+            && request.resource.data.slotIds.size() > 0
+            && request.resource.data.rescheduleCount == resource.data.rescheduleCount + 1
+            && request.resource.data.rescheduleCount <= bizProfileOf(resource.data.businessId).booking.maxReschedules
+            && request.resource.data.status == (bizProfileOf(resource.data.businessId).autoConfirm == true ? resource.data.status : 'REQUESTED')
+            && bizStaffMatches(request.resource.data)
+            && bizStartAllowed(request.resource.data))
+        ))
+    );
+  allow delete: if false;
+}
+
+// Busy markers for business calendars: one per occupied cell and staff member (or seat),
+// created with the booking under "must not exist" preconditions. Public, no personal data.
+match /bizSlots/{slotId} {
+  allow get, list: if true;
+  allow create: if request.auth != null
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'bookingId', 'cell', 'resource', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.cell is string && request.resource.data.cell.matches('[0-9]{8}T[0-9]{4}Z')
+    && request.resource.data.resource is string && request.resource.data.resource.matches('[A-Za-z0-9-]{1,64}')
+    && slotId == request.resource.data.businessId + '_' + request.resource.data.cell + '_' + request.resource.data.resource
+    && existsAfter(bizBookingAt(request.resource.data.bookingId))
+    && getAfter(bizBookingAt(request.resource.data.bookingId)).data.businessId == request.resource.data.businessId
+    && getAfter(bizBookingAt(request.resource.data.bookingId)).data.slotIds.hasAny([slotId])
+    && (getAfter(bizBookingAt(request.resource.data.bookingId)).data.staffId == null
+      ? request.resource.data.resource.matches('s[0-9]+')
+      : request.resource.data.resource == getAfter(bizBookingAt(request.resource.data.bookingId)).data.staffId)
+    && (getAfter(bizBookingAt(request.resource.data.bookingId)).data.guestUid == request.auth.uid
+      || (businessOwner() && request.resource.data.businessId == request.auth.uid));
+  allow update: if false;
+  allow delete: if request.auth != null
+    && ((businessOwner() && resource.data.businessId == request.auth.uid)
+      || (get(bizBookingAt(resource.data.bookingId)).data.guestUid == request.auth.uid
+        && !getAfter(bizBookingAt(resource.data.bookingId)).data.slotIds.hasAny([slotId])));
 }
