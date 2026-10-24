@@ -83,6 +83,21 @@ function appointmentDto(row) {
     notes: row.notes || "",
     status: row.status,
     created_at: row.createdAt,
+    // Appointments booked before availability booking have no startMs or duration.
+    start_ms: Number.isFinite(row.startMs) ? row.startMs : Date.parse(row.scheduledAt),
+    duration_minutes: row.durationMinutes || 45,
+    time_zone: row.timeZone || null,
+    client_time_zone: row.clientTimeZone || null,
+    assignee_id: row.assigneeId || null,
+    assignee_name: row.assigneeName || null,
+    meeting_url: row.meetingUrl || null,
+    meeting_instructions: row.meetingInstructions || null,
+    meeting_provider: row.meetingProvider || null,
+    meeting_updated_at: row.meetingUpdatedAt || null,
+    reschedule_count: row.rescheduleCount || 0,
+    cancelled_by: row.cancelledBy || null,
+    cancel_reason: row.cancelReason || null,
+    online_changes: Number.isFinite(row.startMs),
   };
 }
 
@@ -161,7 +176,7 @@ export async function listAppointments(clientId) {
   if (clientId && session.role === "PREPARER") {
     filters.splice(0, filters.length, ["clientId", "EQUAL", String(clientId)], ["tenantId", "EQUAL", TAX_TENANT]);
   }
-  const rows = await queryCollection("taxAppointments", session.idToken, { filters });
+  const rows = await queryCollection("taxAppointments", session.idToken, { filters, limit: 1000 });
   return rows.filter((row) => row.tenantId === TAX_TENANT).sort(byDate("scheduledAt", "asc")).map(appointmentDto);
 }
 

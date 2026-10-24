@@ -131,12 +131,143 @@ describe("taxDocuments, taxNotes and taxAppointments", () => {
     denied(await write("alice", "taxNotes/n2", note({ authorName: "Your Preparer" }), true));
     denied(await write("alice", "taxNotes/n3", note({ authorRole: "PREPARER" }), true));
   });
-  const appointment = (extra = {}) => ({ tenantId: T, clientId: "alice", name: "User alice", email: "alice@example.test", phone: null, scheduledAt: "2026-11-02T15:00:00.000Z", type: "VIRTUAL", service: "Individual Return", notes: "", status: "REQUESTED", createdAt: now, ...extra });
-  test("a client books only plain requests, without preparer-managed fields", async () => {
-    ok(await write("alice", "taxAppointments/a1", appointment(), true));
-    denied(await write("alice", "taxAppointments/a2", appointment({ status: "CONFIRMED" }), true));
-    denied(await write("alice", "taxAppointments/a3", appointment({ meetingLink: "https://example.test/j/1" }), true));
-    denied(await write("bob", "taxAppointments/a4", appointment(), true));
+});
+
+describe("appointment booking", () => {
+  const docName = (path) => `projects/${PROJECT}/databases/(default)/documents/${path}`;
+  const commit = (uid, writes) => status(fetch(`${DOCS}:commit`, { method: "POST", headers: headers(uid), body: JSON.stringify({ writes }) }));
+  const create = (path, data) => ({ update: { name: docName(path), fields: fields(data) }, currentDocument: { exists: false } });
+  const replace = (path, data) => ({ update: { name: docName(path), fields: fields(data) }, currentDocument: { exists: true } });
+  const drop = (path) => ({ delete: docName(path) });
+
+  const DAY = 86_400_000;
+  const cellOf = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").slice(0, 13) + "Z";
+  const startMs = Math.floor((Date.now() + 10 * DAY) / 1_800_000) * 1_800_000;
+  const cells = [cellOf(startMs), cellOf(startMs + 1_800_000)];
+  const slotIds = cells.map((c) => `${c}_s1`);
+  const appointment = (uid, extra = {}) => ({
+    tenantId: T, clientId: uid, name: `User ${uid}`, email: `${uid}@example.test`, phone: null,
+    scheduledAt: new Date(startMs).toISOString(), startMs, durationMinutes: 45, timeZone: "America/New_York", clientTimeZone: null,
+    type: "VIRTUAL", service: "Individual Return", notes: "", status: "REQUESTED", slotIds, rescheduleCount: 0, createdAt: now, updatedAt: now, ...extra,
+  });
+  const lock = (appointmentId, slotId) => {
+    const [cell, seat] = slotId.split("_s");
+    return create(`taxAppointmentSlots/${slotId}`, { tenantId: T, appointmentId, cell, seat: Number(seat), createdAt: now });
+  };
+  const event = (appointmentId, uid, extra = {}) => create(`taxAppointmentEvents/${appointmentId}-${extra.action || "BOOKED"}-${Math.random().toString(36).slice(2)}`, {
+    tenantId: T, appointmentId, clientId: uid, actorId: uid, actorName: `User ${uid}`, actorRole: "CLIENT",
+    action: "BOOKED", detail: "", visibility: "client", channel: null, createdAt: now, ...extra,
+  });
+  const book = (uid, id, extra = {}) => commit(uid, [
+    create(`taxAppointments/${id}`, appointment(uid, extra)), ...(extra.slotIds || slotIds).map((s) => lock(id, s)), event(id, uid),
+  ]);
+
+  test("a client books atomically: appointment, slot locks and history in one commit", async () => {
+    ok(await book("alice", "ap1"));
+    ok(await read("bob", `taxAppointmentSlots/${slotIds[0]}`));
+    denied(await read("bob", "taxAppointments/ap1"));
+  });
+  test("a second booking on a taken slot fails as a whole", async () => {
+    const code = await book("bob", "ap2");
+    assert.ok(code === 409 || code === 400, `expected a precondition failure, got ${code}`);
+    assert.equal(await read("owner", "taxAppointments/ap2"), 404);
+  });
+  test("simultaneous bookings of the same slot: exactly one wins", async () => {
+    const racers = ["alice", "bob", "alice", "bob", "alice", "bob", "alice", "bob", "alice", "bob"];
+    const slot = [`${cellOf(startMs + 2 * DAY)}_s1`];
+    const results = await Promise.all(racers.map((uid, i) => book(uid, `race${i}`, { slotIds: slot, startMs: startMs + 2 * DAY })));
+    assert.equal(results.filter((code) => code === 200).length, 1, `results: ${results.join(",")}`);
+    assert.ok(results.every((code) => [200, 400, 409].includes(code)), `results: ${results.join(",")}`);
+  });
+  test("clients cannot book in the past, pre-confirm, add a meeting link or skip slot locks", async () => {
+    const free = [`${cellOf(startMs + 3 * DAY)}_s1`];
+    denied(await book("bob", "ap3", { slotIds: free, startMs: Date.now() - DAY }));
+    denied(await book("bob", "ap3", { slotIds: free, status: "CONFIRMED" }));
+    denied(await book("bob", "ap3", { slotIds: free, meetingUrl: "https://zoom.us/j/1" }));
+    denied(await commit("bob", [create("taxAppointments/ap3", appointment("bob", { slotIds: [] }))]));
+  });
+  test("slot locks must match their ID and belong to the client's own appointment", async () => {
+    const id = `${cellOf(startMs + 4 * DAY)}_s1`;
+    denied(await commit("bob", [create(`taxAppointmentSlots/${id}`, { tenantId: T, appointmentId: "ap1", cell: id.split("_s")[0], seat: 1, createdAt: now })]));
+    denied(await commit("bob", [
+      create("taxAppointments/ap4", appointment("bob", { slotIds: [id] })),
+      create(`taxAppointmentSlots/${id}`, { tenantId: T, appointmentId: "ap4", cell: cellOf(startMs + 5 * DAY), seat: 1, createdAt: now }),
+      event("ap4", "bob"),
+    ]));
+  });
+  test("another client cannot release someone else's slot", async () => {
+    denied(await commit("bob", [drop(`taxAppointmentSlots/${slotIds[0]}`)]));
+  });
+  test("a client cancels before the cut-off, releasing their slots", async () => {
+    ok(await commit("alice", [
+      replace("taxAppointments/ap1", appointment("alice", { status: "CANCELLED", slotIds: [], cancelledBy: "CLIENT", cancelReason: "conflict" })),
+      ...slotIds.map((s) => drop(`taxAppointmentSlots/${s}`)),
+      event("ap1", "alice", { action: "CANCELLED" }),
+    ]));
+  });
+  test("inside the cut-off a client can no longer cancel; a preparer still can", async () => {
+    const soon = Math.floor((Date.now() + 2 * 3_600_000) / 1_800_000) * 1_800_000;
+    const ids = [`${cellOf(soon)}_s1`];
+    await seed("taxAppointments/ap5", appointment("alice", { startMs: soon, scheduledAt: new Date(soon).toISOString(), slotIds: ids }));
+    denied(await commit("alice", [replace("taxAppointments/ap5", appointment("alice", { startMs: soon, scheduledAt: new Date(soon).toISOString(), status: "CANCELLED", slotIds: [], cancelledBy: "CLIENT", cancelReason: null }))]));
+    ok(await commit("prep", [replace("taxAppointments/ap5", appointment("alice", { startMs: soon, scheduledAt: new Date(soon).toISOString(), status: "CANCELLED", slotIds: [], cancelledBy: "PREPARER", cancelReason: null }))]));
+  });
+  test("client reschedules are counted and limited", async () => {
+    const moved = startMs + 6 * DAY;
+    const ids = [`${cellOf(moved)}_s1`];
+    await seed("taxAppointments/ap6", appointment("alice", { slotIds: [] }));
+    const next = (count) => appointment("alice", { startMs: moved, scheduledAt: new Date(moved).toISOString(), slotIds: ids, rescheduleCount: count });
+    denied(await commit("alice", [replace("taxAppointments/ap6", next(2)), lock("ap6", ids[0])]));
+    ok(await commit("alice", [replace("taxAppointments/ap6", next(1)), lock("ap6", ids[0]), event("ap6", "alice", { action: "RESCHEDULED" })]));
+    await seed("taxAppointments/ap7", appointment("alice", { slotIds: [], rescheduleCount: 3 }));
+    const later = [`${cellOf(moved + DAY)}_s1`];
+    denied(await commit("alice", [replace("taxAppointments/ap7", appointment("alice", { startMs: moved + DAY, slotIds: later, rescheduleCount: 4 })), lock("ap7", later[0])]));
+  });
+  test("only preparers set meeting links, and only https Zoom links", async () => {
+    await seed("taxAppointments/ap8", appointment("alice", { slotIds: [] }));
+    const withLink = (url) => appointment("alice", { slotIds: [], status: "CONFIRMED", meetingUrl: url, meetingInstructions: "Passcode 1", meetingProvider: "ZOOM_MANUAL", meetingUpdatedAt: now });
+    denied(await commit("alice", [replace("taxAppointments/ap8", withLink("https://us02web.zoom.us/j/1"))]));
+    denied(await commit("prep", [replace("taxAppointments/ap8", withLink("https://evil.test/j/1"))]));
+    denied(await commit("prep", [replace("taxAppointments/ap8", withLink("http://zoom.us/j/1"))]));
+    ok(await commit("prep", [replace("taxAppointments/ap8", withLink("https://us02web.zoom.us/j/1?pwd=x"))]));
+  });
+  test("history: clients see only client entries and cannot forge staff ones", async () => {
+    await seed("taxAppointmentEvents/internal1", { tenantId: T, appointmentId: "ap8", clientId: "alice", actorId: "prep", actorName: "User prep", actorRole: "PREPARER", action: "NOTE", detail: "x", visibility: "internal", channel: null, createdAt: now });
+    await seed("taxAppointmentEvents/client1", { tenantId: T, appointmentId: "ap8", clientId: "alice", actorId: "prep", actorName: "User prep", actorRole: "PREPARER", action: "CONFIRMED", detail: "", visibility: "client", channel: null, createdAt: now });
+    denied(await read("alice", "taxAppointmentEvents/internal1"));
+    ok(await read("alice", "taxAppointmentEvents/client1"));
+    denied(await read("bob", "taxAppointmentEvents/client1"));
+    denied(await commit("alice", [event("ap8", "alice", { action: "NOTE", visibility: "internal" })]));
+    denied(await commit("alice", [event("ap8", "alice", { action: "CONFIRMED" })]));
+    denied(await commit("alice", [event("ap8", "alice", { actorName: "Your Preparer" })]));
+    ok(await commit("prep", [event("ap8", "alice", { actorId: "prep", actorName: "User prep", actorRole: "PREPARER", action: "MEETING_SHARED", visibility: "internal", channel: "EMAIL_MANUAL" })]));
+  });
+  test("the app's history and slot queries are allowed; broader ones are not", async () => {
+    const query = (uid, collectionId, filters) => {
+      const where = { compositeFilter: { op: "AND", filters: filters.map(([fieldPath, op, value]) => ({ fieldFilter: { field: { fieldPath }, op, value: encode(value) } })) } };
+      return status(fetch(`${DOCS}:runQuery`, { method: "POST", headers: headers(uid), body: JSON.stringify({ structuredQuery: { from: [{ collectionId }], where, limit: 50 } }) }));
+    };
+    const tenant = ["tenantId", "EQUAL", T];
+    ok(await query("alice", "taxAppointmentEvents", [["clientId", "EQUAL", "alice"], ["visibility", "EQUAL", "client"], tenant]));
+    ok(await query("alice", "taxAppointmentEvents", [["appointmentId", "EQUAL", "ap8"], tenant, ["clientId", "EQUAL", "alice"], ["visibility", "EQUAL", "client"]]));
+    denied(await query("alice", "taxAppointmentEvents", [["appointmentId", "EQUAL", "ap8"], tenant, ["clientId", "EQUAL", "alice"]]));
+    ok(await query("prep", "taxAppointmentEvents", [["appointmentId", "EQUAL", "ap8"], tenant]));
+    ok(await query("bob", "taxAppointmentSlots", [["cell", "GREATER_THAN_OR_EQUAL", "20200101T0000Z"], ["cell", "LESS_THAN", "20991231T0000Z"]]));
+    ok(await query("prep", "taxAppointments", [tenant]));
+    ok(await query("alice", "taxAppointments", [["clientId", "EQUAL", "alice"], tenant]));
+    denied(await query("alice", "taxAppointments", [tenant]));
+  });
+  test("booking settings: readable by members, writable by preparers only", async () => {
+    const settings = {
+      tenantId: T, timeZone: "America/New_York", slotMinutes: 30, bufferMinutes: 0, minNoticeHours: 12, horizonDays: 30, capacity: 1,
+      cancelCutoffHours: 24, maxReschedules: 3, weekly: { 1: [{ start: "09:00", end: "17:00" }] }, services: [], closedDates: [],
+      updatedAt: now, updatedBy: "prep", updatedByName: "User prep",
+    };
+    denied(await write("alice", "taxSettings/booking", { ...settings, updatedBy: "alice" }));
+    denied(await write("prep", "taxSettings/booking", { ...settings, capacity: 50 }));
+    ok(await write("prep", "taxSettings/booking", settings));
+    ok(await read("alice", "taxSettings/booking"));
+    denied(await read("nobody", "taxSettings/booking"));
   });
 });
 

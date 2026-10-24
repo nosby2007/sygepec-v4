@@ -1,14 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { fmtDate } from "@/lib/constants";
+import { useRouter } from "next/navigation";
+import { formatInZone } from "@/lib/timezone";
 import Icon from "@/components/Icon";
 import { Avatar, Empty } from "@/components/ui";
 
 const FILTERS = ["ACTION_NEEDED", "UPCOMING", "COMPLETED", "CANCELLED", "ALL"];
 
-export default function AppointmentBoard({ appointments }) {
-  const [rows, setRows] = useState(appointments);
+const ACTIONS = { CONFIRMED: "confirm", COMPLETED: "complete", CANCELLED: "cancel" };
+
+export default function AppointmentBoard({ appointments, timeZone, onManage }) {
+  const router = useRouter();
+  // Optimistic status overrides until the refreshed server data arrives.
+  const [pending, setPending] = useState({});
+  const rows = useMemo(() => appointments.map((item) => (pending[item.id] ? { ...item, status: pending[item.id] } : item)), [appointments, pending]);
+  const fmtDate = (value, options) => formatInZone(value, timeZone, options);
   const [filter, setFilter] = useState("ACTION_NEEDED");
   const [error, setError] = useState("");
   const [now] = useState(() => Date.now());
@@ -28,18 +35,17 @@ export default function AppointmentBoard({ appointments }) {
   }), [rows, now]);
 
   const change = async (id, status) => {
-    const previous = rows;
     setError("");
-    setRows((current) => current.map((item) => item.id === id ? { ...item, status } : item));
-    const response = await fetch("/api/appointments", {
+    setPending((current) => ({ ...current, [id]: status }));
+    const response = await fetch(`/api/appointments/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({ action: ACTIONS[status] }),
     });
-    if (!response.ok) {
-      setRows(previous);
-      setError("The appointment could not be updated. Please try again.");
-    }
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) setError(body.error || "The appointment could not be updated. Please try again.");
+    else router.refresh();
+    setPending(({ [id]: _, ...rest }) => rest);
   };
 
   return (
@@ -76,6 +82,8 @@ export default function AppointmentBoard({ appointments }) {
               {item.status === "REQUESTED" && <button className="btn btn-primary btn-sm" onClick={() => change(item.id, "CONFIRMED")}><Icon name="check" size={14} /> Confirm</button>}
               {item.status === "CONFIRMED" && <button className="btn btn-primary btn-sm" onClick={() => change(item.id, "COMPLETED")}><Icon name="check" size={14} /> Complete</button>}
               {!["COMPLETED", "CANCELLED"].includes(item.status) && <button className="btn btn-danger btn-sm" onClick={() => change(item.id, "CANCELLED")}>Cancel</button>}
+              <button className="btn btn-ghost btn-sm" onClick={() => onManage(item.id)}>Manage</button>
+              {item.type === "VIRTUAL" && item.status === "CONFIRMED" && !item.meeting_url && <span className="pill warn">No video link</span>}
             </div>
           </article>
         ))}

@@ -165,6 +165,37 @@ match /taxNotes/{noteId} {
   allow update, delete: if false;
 }
 
+// ---- Tax appointments: availability booking, slot locks, history, settings ----
+
+function taxMember() {
+  return taxSignedIn()
+    && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+    && taxUser().tenantId == 'perry-tax-pro';
+}
+
+function bookingRule(field, fallback) {
+  return exists(/databases/$(database)/documents/taxSettings/booking)
+    ? get(/databases/$(database)/documents/taxSettings/booking).data.get(field, fallback)
+    : fallback;
+}
+
+function taxAppointment(appointmentId) {
+  return /databases/$(database)/documents/taxAppointments/$(appointmentId);
+}
+
+// Mirrors clientCanChange(): clients act on their own only before the cut-off.
+function clientChangeWindowOpen() {
+  return resource.data.get('startMs', 0) - request.time.toMillis() > bookingRule('cancelCutoffHours', 24) * 3600000;
+}
+
+// Meeting links are https Zoom URLs only, so nothing else can be presented as the meeting.
+function validMeetingUrl(data) {
+  return data.get('meetingUrl', null) == null
+    || (data.meetingUrl is string
+      && data.meetingUrl.size() <= 500
+      && data.meetingUrl.matches('https://([A-Za-z0-9-]+[.])*(zoom[.]us|zoomgov[.]com)(/[^ ]*)?'));
+}
+
 match /taxAppointments/{appointmentId} {
   allow get, list: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
@@ -172,16 +203,134 @@ match /taxAppointments/{appointmentId} {
   allow create: if taxSignedIn()
     && taxClientAccount()
     && request.resource.data.keys().hasOnly([
-      'tenantId', 'clientId', 'name', 'email', 'phone', 'scheduledAt', 'type', 'service', 'notes', 'status', 'createdAt'
+      'tenantId', 'clientId', 'name', 'email', 'phone', 'scheduledAt', 'startMs', 'durationMinutes', 'timeZone',
+      'clientTimeZone', 'type', 'service', 'notes', 'status', 'slotIds', 'rescheduleCount', 'createdAt', 'updatedAt'
     ])
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == request.auth.uid
     && request.resource.data.type in ['VIRTUAL', 'IN_PERSON']
-    && request.resource.data.status == 'REQUESTED';
-  allow update: if taxPreparer()
+    && request.resource.data.status == 'REQUESTED'
+    && request.resource.data.startMs is int
+    && request.resource.data.startMs > request.time.toMillis()
+    && request.resource.data.durationMinutes is int
+    && request.resource.data.durationMinutes >= 15
+    && request.resource.data.durationMinutes <= 240
+    && request.resource.data.slotIds is list
+    && request.resource.data.slotIds.size() > 0
+    && request.resource.data.slotIds.size() <= 24
+    && request.resource.data.rescheduleCount == 0;
+  allow update: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
-    && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'updatedAt'])
-    && request.resource.data.status in ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
+    && request.resource.data.tenantId == resource.data.tenantId
+    && request.resource.data.clientId == resource.data.clientId
+    && (
+      (taxPreparer()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status', 'confirmedAt', 'scheduledAt', 'startMs', 'durationMinutes', 'timeZone', 'slotIds',
+          'cancelledBy', 'cancelReason', 'assigneeId', 'assigneeName', 'meetingUrl', 'meetingInstructions',
+          'meetingProvider', 'meetingUpdatedAt', 'zoomMeetingId', 'updatedAt'
+        ])
+        && request.resource.data.status in ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'CANCELLED']
+        && validMeetingUrl(request.resource.data))
+      || (resource.data.clientId == request.auth.uid
+        && resource.data.status in ['REQUESTED', 'CONFIRMED']
+        && clientChangeWindowOpen()
+        && (
+          // Cancel: releases every slot.
+          (request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'slotIds', 'cancelledBy', 'cancelReason', 'updatedAt'])
+            && request.resource.data.status == 'CANCELLED'
+            && request.resource.data.slotIds.size() == 0
+            && request.resource.data.cancelledBy == 'CLIENT')
+          // Reschedule: goes back to the preparer for confirmation, a limited number of times.
+          || (request.resource.data.diff(resource.data).changedKeys().hasOnly(['scheduledAt', 'startMs', 'timeZone', 'slotIds', 'status', 'rescheduleCount', 'updatedAt'])
+            && request.resource.data.status == 'REQUESTED'
+            && request.resource.data.startMs is int
+            && request.resource.data.startMs > request.time.toMillis()
+            && request.resource.data.slotIds.size() > 0
+            && request.resource.data.slotIds.size() <= 24
+            && request.resource.data.rescheduleCount == resource.data.get('rescheduleCount', 0) + 1
+            && request.resource.data.rescheduleCount <= bookingRule('maxReschedules', 3))
+        ))
+    );
+  allow delete: if false;
+}
+
+// One document per occupied grid cell and seat, created in the same commit as the
+// appointment with "must not exist" preconditions; that is what prevents double booking.
+// They hold no client data, so any portal member may read them to see busy times.
+match /taxAppointmentSlots/{slotId} {
+  allow get, list: if taxMember();
+  allow create: if taxSignedIn()
+    && request.resource.data.keys().hasOnly(['tenantId', 'appointmentId', 'cell', 'seat', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.cell is string
+    && request.resource.data.cell.matches('[0-9]{8}T[0-9]{4}Z')
+    && request.resource.data.seat is int
+    && request.resource.data.seat >= 1
+    && request.resource.data.seat <= 10
+    && slotId == request.resource.data.cell + '_s' + string(request.resource.data.seat)
+    && existsAfter(taxAppointment(request.resource.data.appointmentId))
+    && getAfter(taxAppointment(request.resource.data.appointmentId)).data.slotIds.hasAny([slotId])
+    && (taxPreparer() || getAfter(taxAppointment(request.resource.data.appointmentId)).data.clientId == request.auth.uid);
+  allow update: if false;
+  // A client may release only slots their own appointment no longer holds.
+  allow delete: if taxSignedIn()
+    && (taxPreparer()
+      || (get(taxAppointment(resource.data.appointmentId)).data.clientId == request.auth.uid
+        && !getAfter(taxAppointment(resource.data.appointmentId)).data.slotIds.hasAny([slotId])));
+}
+
+// Append-only appointment history. Entries marked internal are for staff only.
+match /taxAppointmentEvents/{eventId} {
+  allow get, list: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && (taxPreparer() || (resource.data.clientId == request.auth.uid && resource.data.visibility == 'client'));
+  allow create: if taxSignedIn()
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'appointmentId', 'clientId', 'actorId', 'actorName', 'actorRole', 'action', 'detail', 'visibility', 'channel', 'createdAt'
+    ])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.actorId == request.auth.uid
+    && request.resource.data.actorRole == taxUser().role
+    && request.resource.data.actorName == taxUser().name
+    && request.resource.data.detail is string
+    && request.resource.data.detail.size() <= 500
+    && existsAfter(taxAppointment(request.resource.data.appointmentId))
+    && getAfter(taxAppointment(request.resource.data.appointmentId)).data.clientId == request.resource.data.clientId
+    && (
+      (taxPreparer()
+        && request.resource.data.visibility in ['client', 'internal']
+        && request.resource.data.action in ['CONFIRMED', 'COMPLETED', 'CANCELLED', 'RESCHEDULED', 'ASSIGNED', 'MEETING_UPDATED', 'MEETING_SHARED', 'NOTE'])
+      || (request.resource.data.clientId == request.auth.uid
+        && request.resource.data.visibility == 'client'
+        && request.resource.data.action in ['BOOKED', 'CANCELLED', 'RESCHEDULED'])
+    );
+  allow update, delete: if false;
+}
+
+match /taxSettings/{settingId} {
+  allow get: if taxMember();
+  allow list: if false;
+  allow create, update: if taxPreparer()
+    && settingId == 'booking'
+    && request.resource.data.keys().hasOnly([
+      'tenantId', 'timeZone', 'slotMinutes', 'bufferMinutes', 'minNoticeHours', 'horizonDays', 'capacity',
+      'cancelCutoffHours', 'maxReschedules', 'weekly', 'services', 'closedDates', 'updatedAt', 'updatedBy', 'updatedByName'
+    ])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.updatedBy == request.auth.uid
+    && request.resource.data.timeZone is string
+    && request.resource.data.timeZone.size() <= 64
+    && request.resource.data.slotMinutes in [15, 30, 60]
+    && request.resource.data.bufferMinutes is int && request.resource.data.bufferMinutes >= 0 && request.resource.data.bufferMinutes <= 120
+    && request.resource.data.minNoticeHours is int && request.resource.data.minNoticeHours >= 0 && request.resource.data.minNoticeHours <= 336
+    && request.resource.data.horizonDays is int && request.resource.data.horizonDays >= 1 && request.resource.data.horizonDays <= 180
+    && request.resource.data.capacity is int && request.resource.data.capacity >= 1 && request.resource.data.capacity <= 10
+    && request.resource.data.cancelCutoffHours is int && request.resource.data.cancelCutoffHours >= 0 && request.resource.data.cancelCutoffHours <= 336
+    && request.resource.data.maxReschedules is int && request.resource.data.maxReschedules >= 0 && request.resource.data.maxReschedules <= 10
+    && request.resource.data.weekly is map
+    && request.resource.data.services is list && request.resource.data.services.size() <= 20
+    && request.resource.data.closedDates is list && request.resource.data.closedDates.size() <= 200;
   allow delete: if false;
 }
 

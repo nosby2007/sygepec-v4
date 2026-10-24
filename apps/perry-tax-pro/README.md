@@ -52,8 +52,12 @@ Open <http://localhost:3000>.
 npm run lint
 npm run build
 npm audit --omit=dev
+npm test
 npm run test:rules
 ```
+
+`npm test` runs the unit tests for the booking engine, time zones and the Zoom
+client (no network, no Firebase).
 
 `test:rules` wraps the snippets under `firebase/` in their service blocks and
 runs `firebase/test/rules.test.mjs` against the Firestore and Storage
@@ -65,7 +69,9 @@ short temp folder first:
 JAVA_TOOL_OPTIONS="-Djdk.net.unixdomain.tmpdir=C:/Temp/jtmp" npm run test:rules
 ```
 
-The Phase 1 audit and feature matrix are in `docs/AUDIT-PHASE1.md`.
+The Phase 1 audit and feature matrix are in `docs/AUDIT-PHASE1.md`. Booking,
+calendar and Zoom links (Phase 2), including the rollout order and Zoom setup,
+are in `docs/PHASE2-BOOKING.md`.
 
 ## Preparer accounts
 

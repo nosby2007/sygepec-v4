@@ -26,6 +26,7 @@ async function jsonRequest(url, init = {}) {
     const error = new Error(body?.error?.message || body?.error || "Firebase request failed");
     error.status = response.status;
     error.code = body?.error?.message;
+    error.reason = body?.error?.status;
     throw error;
   }
   return body;
@@ -153,6 +154,35 @@ export async function createDocuments(documents, idToken) {
     headers: authHeaders(idToken),
     body: JSON.stringify({ writes }),
   });
+}
+
+// Write builders for commitWrites(). A commit applies all of its writes or none, and the
+// preconditions make it fail when another request got there first.
+export const createWrite = (path, data) => ({
+  update: { name: documentName(path), fields: encodeFields(data) },
+  currentDocument: { exists: false },
+});
+
+// Replaces the whole document, but only if it is unchanged since `updateTime` was read.
+export const replaceWrite = (path, data, updateTime) => ({
+  update: { name: documentName(path), fields: encodeFields(data) },
+  currentDocument: updateTime ? { updateTime } : { exists: true },
+});
+
+export const deleteWrite = (path) => ({ delete: documentName(path) });
+
+export async function commitWrites(writes, idToken) {
+  return jsonRequest(`${docBase()}:commit`, {
+    method: "POST",
+    headers: authHeaders(idToken),
+    body: JSON.stringify({ writes }),
+  });
+}
+
+// True when a commit failed because a precondition no longer held (a slot was taken or
+// the document changed), as opposed to a permission or network failure.
+export function isConflict(error) {
+  return error?.status === 409 || ["ALREADY_EXISTS", "FAILED_PRECONDITION", "ABORTED"].includes(error?.reason);
 }
 
 export async function incrementDocument(path, fieldPath, amount, idToken) {

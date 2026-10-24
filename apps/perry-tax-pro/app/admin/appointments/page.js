@@ -1,12 +1,20 @@
-import { listAppointments } from "@/lib/data";
+import Link from "next/link";
+import { getFirebaseSession } from "@/lib/auth";
+import { listAppointments, listPreparers } from "@/lib/data";
+import { getBookingSettings } from "@/lib/appointments";
 import { upcomingDaily, countBy } from "@/lib/analytics";
-import AppointmentBoard from "./AppointmentBoard";
+import { zonedParts } from "@/lib/timezone";
+import { zoomConfigured } from "@/lib/zoom";
+import AppointmentWorkspace from "./AppointmentWorkspace";
+import Icon from "@/components/Icon";
 import { NumberCount } from "@/components/Motion";
 import { BarChart, Donut, PALETTE } from "@/components/charts";
 import { Kpi, PageHead } from "@/components/ui";
 
 export default async function Page() {
-  const appointments = await listAppointments();
+  const session = await getFirebaseSession();
+  const [appointments, preparers, settings] = await Promise.all([listAppointments(), listPreparers(), getBookingSettings(session.idToken)]);
+  const today = zonedParts(new Date(), settings.timeZone).date;
   const requested = appointments.filter((item) => item.status === "REQUESTED").length;
   const confirmed = appointments.filter((item) => item.status === "CONFIRMED" && new Date(item.scheduled_at) >= new Date()).length;
   const completed = appointments.filter((item) => item.status === "COMPLETED").length;
@@ -16,7 +24,9 @@ export default async function Page() {
 
   return (
     <>
-      <PageHead kicker="Scheduling operations" icon="calendar" title="Appointments" desc="Confirm requests, complete sessions and keep the week balanced." />
+      <PageHead kicker="Scheduling operations" icon="calendar" title="Appointments" desc="Confirm requests, complete sessions and keep the week balanced.">
+        <Link id="booking-settings" href="/admin/appointments/settings" className="btn btn-ghost"><Icon name="clock" size={16} /> Availability & rules</Link>
+      </PageHead>
       <div className="grid-3 stagger">
         <Kpi label="Needs confirmation" icon="bell" tone="gold" value={<NumberCount value={requested} />} valueStyle={{ color: requested ? "var(--gold-ink)" : "var(--text)" }} foot={requested ? "Respond within one business day" : "All caught up"} />
         <Kpi label="Upcoming confirmed" icon="calendar" value={<NumberCount value={confirmed} />} foot="Scheduled from today" />
@@ -38,7 +48,7 @@ export default async function Page() {
           </div>
         </div>
       </div>
-      <AppointmentBoard appointments={appointments} />
+      <AppointmentWorkspace appointments={appointments} settings={settings} preparers={preparers} zoomEnabled={zoomConfigured()} today={today} />
     </>
   );
 }
