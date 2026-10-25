@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "node --test --no-warnings --import ./test/node-hooks.mjs lib/booking.test.mjs lib/zoom.test.mjs",
     "test:rules": "node firebase/test/build-rules.mjs && firebase emulators:exec --config firebase/test/firebase.json --project demo-perry-tax --only firestore,storage \"node --test firebase/test/rules.test.mjs\"",
-    "test:integration": "node firebase/test/build-rules.mjs && firebase emulators:exec --config firebase/test/firebase.json --project demo-perry-tax --only firestore,auth,storage \"node --test --no-warnings --import ./test/node-hooks.mjs test/business.integration.test.mjs\""
+    "test:integration": "node firebase/test/build-rules.mjs && firebase emulators:exec --config firebase/test/firebase.json --project demo-perry-tax --only firestore,auth,storage \"node --test --no-warnings --import ./test/node-hooks.mjs test/business.integration.test.mjs test/cms.integration.test.mjs\""
   },
   "dependencies": {
     "jose": "^6.2.13",

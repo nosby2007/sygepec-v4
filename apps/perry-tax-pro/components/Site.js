@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { getSiteSettings } from "@/lib/cms";
 import Icon from "@/components/Icon";
 
 export function Logo() {
@@ -25,9 +26,9 @@ export async function SiteHeader() {
         <div className="container">
           <Logo />
           <nav className="nav" aria-label="Main">
-            <Link href="/#services">Services</Link>
+            <Link href="/services">Services</Link>
             <Link href="/business">Business</Link>
-            <Link href="/#how">How It Works</Link>
+            <Link href="/blog">Blog</Link>
             <Link href="/#pricing">Pricing</Link>
             <Link href="/estimator">Refund Estimator</Link>
             <Link href="/book">Book</Link>
@@ -50,7 +51,13 @@ export async function SiteHeader() {
   );
 }
 
-export function SiteFooter() {
+// Contact details come from the CMS (Website > Contact details); until they are saved the
+// footer keeps the original text.
+export async function SiteFooter() {
+  const site = await getSiteSettings().catch(() => ({}));
+  const email = site.email || "hello@innovacaretax.com";
+  const phone = site.phone || "(555) 010-2000";
+  const hours = site.hours || "Mon–Sat · 9am–7pm";
   return (
     <footer className="site-footer">
       <div className="container">
@@ -68,22 +75,25 @@ export function SiteFooter() {
           </div>
           <div>
             <h4>Services</h4>
-            <Link href="/#services">Individual Returns</Link>
-            <Link href="/#services">Self-Employed</Link>
+            <Link href="/services">All services</Link>
             <Link href="/business">InnovaCare Business</Link>
-            <Link href="/#services">IRS Notices</Link>
+            <Link href="/business/directory">Business directory</Link>
+            <Link href="/team">Our team</Link>
           </div>
           <div>
-            <h4>Tools</h4>
+            <h4>Resources</h4>
+            <Link href="/blog">Blog</Link>
+            <Link href="/updates">Updates</Link>
             <Link href="/estimator">Refund Estimator</Link>
             <Link href="/book">Book Appointment</Link>
             <Link href="/portal">Client Portal</Link>
           </div>
           <div>
             <h4>Contact</h4>
-            <a href="mailto:hello@innovacaretax.com"><Icon name="mail" size={15} /> hello@innovacaretax.com</a>
-            <a href="tel:+15550102000"><Icon name="phone" size={15} /> (555) 010-2000</a>
-            <span className="small muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon name="clock" size={15} /> Mon–Sat · 9am–7pm</span>
+            <a href={`mailto:${email}`}><Icon name="mail" size={15} /> {email}</a>
+            <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}><Icon name="phone" size={15} /> {phone}</a>
+            <span className="small muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon name="clock" size={15} /> {hours}</span>
+            <Link href="/contact">Contact form</Link>
           </div>
         </div>
         <div className="copyright row between">

@@ -241,6 +241,16 @@ export async function updateService(session, rawId, input, { imagePath } = {}) {
 
 // ---- Public reads (no token: only what the rules make public) -------------------
 
+// The public directory: only PUBLISHED profiles are listable, and only public fields leave here.
+export async function publishedBusinesses() {
+  const rows = await queryCollection("bizProfiles", null, {
+    filters: [["status", "EQUAL", "PUBLISHED"], ["tenantId", "EQUAL", TAX_TENANT]], limit: 500,
+  }).catch(() => []);
+  return rows
+    .map(({ id, name, slug, tagline, city, state, logoPath, publicBooking }) => ({ businessId: id, name, slug, tagline: tagline || "", city: city || "", state: state || "", logoPath: logoPath || null, publicBooking: publicBooking === true }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function resolveBusiness(slugInput) {
   const slug = cleanSlug(slugInput);
   if (!slug) return null;

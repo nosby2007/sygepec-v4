@@ -67,3 +67,16 @@ match /biz/{businessId}/public/{fileName} {
   allow update: if false;
   allow delete: if request.auth != null && request.auth.uid == businessId;
 }
+
+// Images for the public site (services, posts, team). Readable by anyone; only
+// preparers upload, images only, 2 MB at most.
+match /cms/public/{fileName} {
+  allow read: if true;
+  allow create: if taxPreparer()
+    && fileName.matches('[A-Za-z0-9_-]+[.](jpg|png|webp)')
+    && request.resource.size > 0
+    && request.resource.size <= 2 * 1024 * 1024
+    && request.resource.contentType.matches('image/(jpeg|png|webp)');
+  allow update: if false;
+  allow delete: if taxPreparer();
+}

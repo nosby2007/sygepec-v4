@@ -743,3 +743,100 @@ match /bizSlots/{slotId} {
       || (get(bizBookingAt(resource.data.bookingId)).data.guestUid == request.auth.uid
         && !getAfter(bizBookingAt(resource.data.bookingId)).data.slotIds.hasAny([slotId])));
 }
+
+// ---- Public-site content (CMS) ---------------------------------------------------
+// A single entry is readable once `visibleFrom` has passed, so scheduled entries go
+// live on time with no job. Lists are limited to PUBLISHED entries (a list query cannot
+// prove a time comparison); the public schedule index points the site at due ones.
+// Drafts and archived entries have no visibleFrom.
+
+function cmsVisible() {
+  return resource.data.visibleFrom is int && resource.data.visibleFrom <= request.time.toMillis();
+}
+
+function validCmsEntry(d) {
+  return d.keys().hasOnly([
+      'tenantId', 'type', 'slug', 'title', 'summary', 'body', 'fields', 'imagePath', 'status', 'visibleFrom',
+      'publishedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy', 'updatedByName', 'version'
+    ])
+    && d.tenantId == 'perry-tax-pro'
+    && d.type in ['PAGE', 'SERVICE', 'POST', 'UPDATE', 'TEAM']
+    && d.slug is string && d.slug.matches('[a-z0-9]([a-z0-9-]{0,78}[a-z0-9])?')
+    && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+    && d.summary is string && d.summary.size() <= 400
+    && d.body is string && d.body.size() <= 30000
+    && d.fields is map
+    && (d.imagePath == null || (d.imagePath is string && d.imagePath.matches('cms/public/[A-Za-z0-9_-]+[.](jpg|png|webp)')))
+    && d.status in ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED']
+    && (d.status in ['PUBLISHED', 'SCHEDULED']) == (d.visibleFrom is int)
+    && (d.visibleFrom == null || d.visibleFrom is int)
+    && d.updatedBy == request.auth.uid
+    && d.version is int;
+}
+
+match /cmsEntries/{entryId} {
+  allow get: if cmsVisible() || taxPreparer();
+  allow list: if (resource.data.status == 'PUBLISHED' && resource.data.tenantId == 'perry-tax-pro') || taxPreparer();
+  allow create: if taxPreparer() && validCmsEntry(request.resource.data) && request.resource.data.version == 1;
+  allow update: if taxPreparer()
+    && validCmsEntry(request.resource.data)
+    && request.resource.data.type == resource.data.type
+    && request.resource.data.createdAt == resource.data.createdAt
+    && request.resource.data.version == resource.data.version + 1;
+  allow delete: if false;
+}
+
+// One snapshot per save; never edited or removed, so the history is trustworthy.
+match /cmsRevisions/{revisionId} {
+  allow get, list: if taxPreparer();
+  allow create: if taxPreparer()
+    && request.resource.data.keys().hasOnly(['tenantId', 'entryId', 'version', 'action', 'snapshot', 'savedBy', 'savedByName', 'savedAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.savedBy == request.auth.uid
+    && request.resource.data.snapshot is map
+    && existsAfter(/databases/$(database)/documents/cmsEntries/$(request.resource.data.entryId))
+    && getAfter(/databases/$(database)/documents/cmsEntries/$(request.resource.data.entryId)).data.version == request.resource.data.version;
+  allow update, delete: if false;
+}
+
+match /cmsSettings/{settingId} {
+  allow get: if true;
+  allow list: if false;
+  // Entry IDs and publication times of scheduled entries; no content.
+  allow create, update: if taxPreparer()
+    && settingId == 'schedule'
+    && request.resource.data.keys().hasOnly(['tenantId', 'items', 'updatedAt', 'updatedBy'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.items is map
+    && request.resource.data.updatedBy == request.auth.uid;
+  allow create, update: if taxPreparer()
+    && settingId == 'site'
+    && request.resource.data.keys().hasOnly(['tenantId', 'phone', 'email', 'address', 'hours', 'updatedAt', 'updatedBy'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.updatedBy == request.auth.uid
+    && request.resource.data.phone is string && request.resource.data.phone.size() <= 30
+    && request.resource.data.email is string && request.resource.data.email.size() <= 254
+    && request.resource.data.address is string && request.resource.data.address.size() <= 200
+    && request.resource.data.hours is string && request.resource.data.hours.size() <= 120;
+  allow delete: if false;
+}
+
+// Contact form: anyone signed in (the form uses a throwaway anonymous identity) may
+// leave one message; only staff can read messages or mark them handled.
+match /cmsMessages/{messageId} {
+  allow create: if request.auth != null
+    && request.resource.data.keys().hasOnly(['tenantId', 'name', 'email', 'phone', 'topic', 'message', 'status', 'senderUid', 'createdAt', 'handledBy', 'handledAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.senderUid == request.auth.uid
+    && request.resource.data.status == 'NEW'
+    && request.resource.data.handledBy == null
+    && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 100
+    && request.resource.data.email is string && request.resource.data.email.matches('[^@ ]+@[^@ ]+[.][^@ ]+') && request.resource.data.email.size() <= 254
+    && request.resource.data.message is string && request.resource.data.message.size() >= 10 && request.resource.data.message.size() <= 3000
+    && request.resource.data.topic is string && request.resource.data.topic.size() <= 60;
+  allow get, list: if taxPreparer() && resource.data.tenantId == 'perry-tax-pro';
+  allow update: if taxPreparer()
+    && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'handledBy', 'handledAt'])
+    && request.resource.data.status in ['NEW', 'HANDLED'];
+  allow delete: if false;
+}

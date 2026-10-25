@@ -8,6 +8,7 @@ const links = [
   { href: "/admin/appointments", label: "Appointments", icon: "calendar" },
   { href: "/admin/signatures", label: "Signatures", icon: "pen" },
   { href: "/admin/submissions", label: "Submissions", icon: "send" },
+  { href: "/admin/content", label: "Website", icon: "megaphone" },
 ];
 
 export default async function AdminLayout({ children }) {

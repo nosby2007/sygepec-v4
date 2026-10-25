@@ -75,7 +75,8 @@ The Phase 1 audit and feature matrix are in `docs/AUDIT-PHASE1.md`. Booking,
 calendar and Zoom links (Phase 2), including the rollout order and Zoom setup,
 are in `docs/PHASE2-BOOKING.md`. Public Business booking, team calendars and
 running the app locally against the emulators (Phase 3) are in
-`docs/PHASE3-BUSINESS-BOOKING.md`.
+`docs/PHASE3-BUSINESS-BOOKING.md`. Public pages, the CMS, blog and updates
+(Phase 4) are in `docs/PHASE4-CONTENT.md`.
 
 ## Preparer accounts
 
