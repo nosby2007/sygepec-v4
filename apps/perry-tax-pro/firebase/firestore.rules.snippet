@@ -349,9 +349,8 @@ function businessOwner() {
 }
 
 match /taxBusinessEntries/{entryId} {
-  allow get, list: if businessOwner()
-    && resource.data.tenantId == 'perry-tax-pro'
-    && resource.data.clientId == request.auth.uid;
+  allow get, list: if resource.data.tenantId == 'perry-tax-pro'
+    && ((businessOwner() && resource.data.clientId == request.auth.uid) || taxPreparer());
   allow create: if businessOwner()
     && request.resource.data.keys().hasOnly([
       'tenantId','clientId','taxYear','kind','category','amountCents','date','description','createdAt'
@@ -512,7 +511,36 @@ match /taxBusinessYearEnd/{id} {
   && request.resource.data.taxYear is int && request.resource.data.taxYear >= 2020 && request.resource.data.taxYear <= 2100
   && request.resource.data.status == 'SUBMITTED_FOR_REVIEW'
   && request.resource.data.report is map;
- allow update, delete: if false;
+ allow update: if taxPreparer()
+  && resource.data.tenantId == 'perry-tax-pro'
+  && request.resource.data.tenantId == resource.data.tenantId
+  && request.resource.data.clientId == resource.data.clientId
+  && request.resource.data.taxYear == resource.data.taxYear
+  && request.resource.data.report == resource.data.report
+  && request.resource.data.createdAt == resource.data.createdAt
+  && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+    'status','priority','dueDate','assignedPreparerId','assignedPreparerName','internalNote',
+    'reviewedAt','completedAt','updatedAt','updatedBy','updatedByName'
+  ])
+  && request.resource.data.status in ['SUBMITTED_FOR_REVIEW','IN_REVIEW','NEEDS_INFO','READY_FOR_PREPARATION','COMPLETED']
+  && request.resource.data.get('priority', 'NORMAL') in ['NORMAL','HIGH','URGENT']
+  && (request.resource.data.get('dueDate', null) == null
+    || (request.resource.data.dueDate is string && request.resource.data.dueDate.matches('20[0-9][0-9]-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])')))
+  && request.resource.data.get('internalNote', '') is string
+  && request.resource.data.get('internalNote', '').size() <= 1200
+  && request.resource.data.updatedBy == request.auth.uid
+  && request.resource.data.updatedByName == taxUser().name
+  && (
+    (request.resource.data.get('assignedPreparerId', null) == null && request.resource.data.get('assignedPreparerName', null) == null)
+    || (
+      request.resource.data.assignedPreparerId is string
+      && exists(/databases/$(database)/documents/taxUsers/$(request.resource.data.assignedPreparerId))
+      && get(/databases/$(database)/documents/taxUsers/$(request.resource.data.assignedPreparerId)).data.tenantId == 'perry-tax-pro'
+      && get(/databases/$(database)/documents/taxUsers/$(request.resource.data.assignedPreparerId)).data.role == 'PREPARER'
+      && request.resource.data.assignedPreparerName == get(/databases/$(database)/documents/taxUsers/$(request.resource.data.assignedPreparerId)).data.name
+    )
+  );
+ allow delete: if false;
 }
 
 // ---- Business profiles and public booking ----------------------------------------

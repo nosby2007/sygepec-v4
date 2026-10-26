@@ -72,6 +72,8 @@ before(async () => {
   await seed("taxUsers/prep", user("prep", { role: "PREPARER", accountType: null }));
   await seed("taxUsers/bizA", user("bizA", { accountType: "BUSINESS" }));
   await seed("taxUsers/bizB", user("bizB", { accountType: "BUSINESS" }));
+  await seed("taxBusinessEntries/adminReviewEntry", { tenantId: T, clientId: "bizA", taxYear: 2026, kind: "income", category: "Services", amountCents: 50000, date: "2026-10-01", description: "Review", createdAt: now });
+  await seed("taxBusinessYearEnd/handoff1", { tenantId: T, clientId: "bizA", taxYear: 2026, status: "SUBMITTED_FOR_REVIEW", report: { entryCount: 1 }, createdAt: now });
   for (const [id, status] of [["review", "IN_REVIEW"], ["sign", "READY_TO_SIGN"], ["filed", "FILED"], ["docs", "DOCS_PENDING"]]) {
     await seed(`taxReturns/alice_${id}`, newReturn("alice", 2025, { status, docCount: 1 }));
   }
@@ -281,6 +283,20 @@ describe("business isolation", () => {
     const entry = { tenantId: T, clientId: "alice", taxYear: 2026, kind: "expense", category: "Supplies", amountCents: 1000, date: "2026-10-01", description: "", createdAt: now };
     denied(await write("alice", "taxBusinessEntries/e1", entry, true));
     ok(await write("bizA", "taxBusinessEntries/e2", { ...entry, clientId: "bizA" }, true));
+  });
+  test("preparers can inspect business ledger evidence while unrelated tax clients cannot", async () => {
+    ok(await read("prep", "taxBusinessEntries/adminReviewEntry"));
+    denied(await read("alice", "taxBusinessEntries/adminReviewEntry"));
+  });
+  test("only preparers manage a submitted business tax handoff without changing its snapshot", async () => {
+    const managed = {
+      tenantId: T, clientId: "bizA", taxYear: 2026, status: "IN_REVIEW", report: { entryCount: 1 }, createdAt: now,
+      priority: "HIGH", dueDate: "2026-11-15", assignedPreparerId: "prep", assignedPreparerName: "User prep",
+      internalNote: "Review source records", reviewedAt: now, completedAt: null, updatedAt: now, updatedBy: "prep", updatedByName: "User prep",
+    };
+    denied(await write("bizA", "taxBusinessYearEnd/handoff1", managed));
+    ok(await write("prep", "taxBusinessYearEnd/handoff1", managed));
+    denied(await write("prep", "taxBusinessYearEnd/handoff1", { ...managed, report: { entryCount: 99 } }));
   });
 });
 

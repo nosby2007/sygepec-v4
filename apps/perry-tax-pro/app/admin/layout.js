@@ -8,6 +8,7 @@ const links = [
   { href: "/admin/appointments", label: "Appointments", icon: "calendar" },
   { href: "/admin/signatures", label: "Signatures", icon: "pen" },
   { href: "/admin/submissions", label: "Submissions", icon: "send" },
+  { href: "/admin/business", label: "Business Tax", icon: "building" },
   { href: "/admin/content", label: "Website", icon: "megaphone" },
 ];
 

@@ -621,6 +621,29 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .workflow-save { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
 .workflow-editor.compact .workflow-save { grid-column: auto; }
 .workflow-filters { margin-top: 24px; }
+.business-tax-flow { display: grid; gap: 10px; }
+.business-tax-node { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); transition: transform .25s var(--ease), border-color .25s, background .25s; animation: fadeIn .55s var(--ease) both; }
+.business-tax-node:nth-child(2) { animation-delay: 70ms; } .business-tax-node:nth-child(3) { animation-delay: 140ms; } .business-tax-node:nth-child(4) { animation-delay: 210ms; }
+.business-tax-node:hover { transform: translateX(4px); border-color: rgba(30,99,214,.24); background: #fff; }
+.business-tax-node > span { width: 40px; height: 40px; display: grid; place-items: center; color: var(--blue); background: rgba(30,99,214,.08); border-radius: 12px; }
+.business-tax-node b, .business-tax-node small { display: block; }
+.business-tax-node small { color: var(--faint); font-size: .74rem; }
+.business-tax-arrow { color: var(--teal-2); }
+.readiness-cell { min-width: 120px; display: grid; grid-template-columns: 1fr 34px; align-items: center; gap: 8px; }
+.readiness-cell .meter { margin: 0; }
+.readiness-cell small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.select.compact { min-width: 150px; padding: 8px 34px 8px 10px; font-size: .8rem; }
+.business-case-editor { border-top: 3px solid var(--teal); }
+.business-audit-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+.business-audit-list span { padding: 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); }
+.business-audit-list b, .business-audit-list small { display: block; }
+.business-audit-list b { font: 700 1.45rem var(--font-display); }
+.business-audit-list small { color: var(--faint); font-size: .72rem; }
+.business-case-timeline { display: grid; gap: 14px; margin-top: 18px; }
+.business-case-timeline > div { position: relative; display: grid; gap: 2px; padding-left: 24px; }
+.business-case-timeline > div::before { content: ""; position: absolute; left: 3px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 5px rgba(20,184,166,.1); }
+.business-case-timeline > div:not(:last-child)::after { content: ""; position: absolute; left: 7px; top: 18px; height: calc(100% + 4px); width: 1px; background: var(--border-strong); }
+.business-case-timeline small { color: var(--faint); }
 .appointment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .appointment-card { display: grid; align-content: start; gap: 14px; padding: 22px; animation: fadeIn 0.5s var(--ease) both; }
 .appointment-card.flag { border-top: 3px solid var(--gold); }
@@ -791,6 +814,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .hide-sm { display: none; }
   .msg { max-width: 94%; }
   .page-banner { padding: 24px 20px; }
+  .business-audit-list { grid-template-columns: 1fr; }
+  .business-tax-node { grid-template-columns: 36px 1fr; }
+  .business-tax-arrow { display: none; }
 }
 .reveal.in.card-hover:hover { transform: translateY(-4px); transition-duration: 0.35s; }
 

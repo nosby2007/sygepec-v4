@@ -20,6 +20,12 @@ signature-status tracking, and controlled e-file readiness/submission tracking.
 It records verified workflow events and acknowledgements; it does not transmit
 returns directly to the IRS.
 
+The Business Tax admin workspace provides tenant-scoped oversight of business
+ledgers, receipt coverage, bank reconciliation, year-end handoffs, preparer
+assignment, review priorities, deadlines, and internal case notes. It supports
+the preparation workflow but does not determine deductibility or file business
+returns automatically.
+
 Production: <https://perry-tax-pro-sygepec-v4.web.app>
 
 ## Architecture
