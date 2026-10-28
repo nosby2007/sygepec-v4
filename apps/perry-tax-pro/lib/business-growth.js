@@ -155,7 +155,10 @@ export async function sendReminder(session, rawBookingId, channel) {
     if (!mailerConfigured()) throw new BusinessError("Email sending is not set up yet. Copy the message and send it yourself.", 409);
     if (!booking.customerEmail) throw new BusinessError("This booking has no email address.");
     const dto = { name: booking.customerName, service: booking.serviceName, start_ms: booking.startMs, time_zone: booking.timeZone };
-    await sendEmail({ to: booking.customerEmail, subject: `Reminder: ${booking.serviceName} with ${profile?.name || "us"}`, text: reminderText(dto, profile, bookingSettingsOf(profile)), replyTo: profile?.email || undefined, fromName: profile?.name });
+    // Provider refusals (billing, invalid key, bounced address) must not look like a sent reminder.
+    await sendEmail({ to: booking.customerEmail, subject: `Reminder: ${booking.serviceName} with ${profile?.name || "us"}`, text: reminderText(dto, profile, bookingSettingsOf(profile)), replyTo: profile?.email || undefined, fromName: profile?.name }).catch(() => {
+      throw new BusinessError("The email provider did not accept this message. Copy the reminder and send it yourself.", 502);
+    });
   }
   const next = { ...strip(booking), reminderSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await commitWrites([replaceWrite(`bizBookings/${id}`, next, booking.updateTime)], session.idToken);
