@@ -14,36 +14,55 @@ export function Logo() {
   );
 }
 
+const NAV = [
+  ["/services", "Services"],
+  ["/business", "Small business"],
+  ["/#pricing", "Pricing"],
+  ["/blog", "Resources"],
+  ["/team", "Our team"],
+  ["/contact", "Contact"],
+];
+
+const tel = (phone) => `tel:${phone.replace(/[^\d+]/g, "")}`;
+
 export async function SiteHeader() {
-  const s = await getSession();
+  const [s, site] = await Promise.all([getSession(), getSiteSettings().catch(() => ({}))]);
+  const portal = s ? (s.role === "PREPARER" ? "/admin" : s.accountType === "BUSINESS" ? "/portal/business" : "/portal") : null;
   return (
     <>
-      <div className="announce">
-        <b>2026 filing season is open.</b> Book early for priority review.
-        <Link href="/estimator">Estimate your refund →</Link>
+      <div className="pub-topbar">
+        <div className="container">
+          <span className="tagline">Personal and small-business tax preparation, all year.</span>
+          <div className="links">
+            {site.phone && <a href={tel(site.phone)}><Icon name="phone" size={14} /> {site.phone}</a>}
+            <Link href={portal || "/login"}><Icon name="upload" size={14} /> Upload documents</Link>
+            <Link href="/book"><Icon name="calendar" size={14} /> Book a visit</Link>
+          </div>
+        </div>
       </div>
       <header className="site-header">
         <div className="container">
           <Logo />
           <nav className="nav" aria-label="Main">
-            <Link href="/services">Services</Link>
-            <Link href="/business">Business</Link>
-            <Link href="/blog">Blog</Link>
-            <Link href="/#pricing">Pricing</Link>
-            <Link href="/estimator">Refund Estimator</Link>
-            <Link href="/book">Book</Link>
+            {NAV.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
           </nav>
-          <div className="row">
+          <div className="row nowrap">
             {s ? (
-              <Link id="nav-portal" href={s.role === "PREPARER" ? "/admin" : s.accountType === "BUSINESS" ? "/portal/business" : "/portal"} className="btn btn-primary btn-sm">
-                {s.role === "PREPARER" ? "Dashboard" : "My Portal"} <Icon name="arrow" size={16} className="icon-arrow" />
+              <Link id="nav-portal" href={portal} className="btn btn-ghost btn-sm">
+                {s.role === "PREPARER" ? "Dashboard" : "My portal"}
               </Link>
             ) : (
-              <>
-                <Link id="nav-login" href="/login" className="btn btn-ghost btn-sm">Log in</Link>
-                <Link id="nav-register" href="/register" className="btn btn-primary btn-sm">Get Started <Icon name="arrow" size={16} className="icon-arrow" /></Link>
-              </>
+              <Link id="nav-login" href="/login" className="pub-login">Log in</Link>
             )}
+            <Link id="nav-register" href={s ? "/book" : "/register"} className="btn btn-primary btn-sm hide-sm">{s ? "Book a visit" : "Start my return"}</Link>
+            <details className="pub-menu">
+              <summary>Menu</summary>
+              <nav aria-label="Mobile">
+                {NAV.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
+                <Link href="/book">Book a visit</Link>
+                {!s && <Link href="/register">Start my return</Link>}
+              </nav>
+            </details>
           </div>
         </div>
       </header>
@@ -51,13 +70,10 @@ export async function SiteHeader() {
   );
 }
 
-// Contact details come from the CMS (Website > Contact details); until they are saved the
-// footer keeps the original text.
+// Contact details come from the CMS (Website > Contact details). Anything not saved
+// there is left out rather than shown as placeholder text.
 export async function SiteFooter() {
   const site = await getSiteSettings().catch(() => ({}));
-  const email = site.email || "hello@innovacaretax.com";
-  const phone = site.phone || "(555) 010-2000";
-  const hours = site.hours || "Mon–Sat · 9am–7pm";
   return (
     <footer className="site-footer">
       <div className="container">
@@ -65,40 +81,36 @@ export async function SiteFooter() {
           <div>
             <Logo />
             <p className="small mt" style={{ maxWidth: 340 }}>
-              Accurate, stress-free tax preparation for individuals, families, gig workers and small businesses.
+              Tax preparation for individuals, families, self-employed workers and small businesses, with a secure
+              portal for your documents.
             </p>
-            <div className="footer-badges">
-              <span><Icon name="lock" size={14} /> Encrypted portal</span>
-              <span><Icon name="shield" size={14} /> IRS e-file provider</span>
-              <span><Icon name="star" size={14} /> 4.9 client rating</span>
-            </div>
           </div>
           <div>
             <h4>Services</h4>
             <Link href="/services">All services</Link>
-            <Link href="/business">InnovaCare Business</Link>
+            <Link href="/business">Small business</Link>
             <Link href="/business/directory">Business directory</Link>
-            <Link href="/team">Our team</Link>
           </div>
           <div>
             <h4>Resources</h4>
-            <Link href="/blog">Blog</Link>
+            <Link href="/blog">Articles</Link>
             <Link href="/updates">Updates</Link>
-            <Link href="/estimator">Refund Estimator</Link>
-            <Link href="/book">Book Appointment</Link>
-            <Link href="/portal">Client Portal</Link>
+            <Link href="/estimator">Refund estimator</Link>
+            <Link href="/book">Book an appointment</Link>
+            <Link href="/login">Client login</Link>
           </div>
           <div>
             <h4>Contact</h4>
-            <a href={`mailto:${email}`}><Icon name="mail" size={15} /> {email}</a>
-            <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}><Icon name="phone" size={15} /> {phone}</a>
-            <span className="small muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon name="clock" size={15} /> {hours}</span>
-            <Link href="/contact">Contact form</Link>
+            {site.phone && <a href={tel(site.phone)}><Icon name="phone" size={15} /> {site.phone}</a>}
+            {site.email && <a href={`mailto:${site.email}`}><Icon name="mail" size={15} /> {site.email}</a>}
+            {site.address && <span className="small muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon name="building" size={15} /> {site.address}</span>}
+            {site.hours && <span className="small muted" style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon name="clock" size={15} /> {site.hours}</span>}
+            <Link href="/contact">Send us a message</Link>
           </div>
         </div>
         <div className="copyright row between">
           <span>© {new Date().getFullYear()} InnovaCare Tax. All rights reserved.</span>
-          <span>Estimates are for informational purposes and are not tax advice.</span>
+          <span>Estimates are for information only and are not tax advice.</span>
         </div>
       </div>
     </footer>

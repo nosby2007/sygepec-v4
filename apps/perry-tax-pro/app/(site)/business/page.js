@@ -1,91 +1,95 @@
 import Link from "next/link";
+import Image from "next/image";
 import Icon from "@/components/Icon";
-import { Reveal } from "@/components/Motion";
-import { BarChart, Donut, Legend, PALETTE } from "@/components/charts";
 
 export const metadata = {
   title: "InnovaCare Business",
-  description: "A separate daily management service for small businesses: bookkeeping, customers, services, appointments and invoices.",
+  description: "A separate workspace for small businesses: bookkeeping, customers, online booking, reminders, invoices and a tax-ready year end.",
 };
 
-const modules = [
-  ["receipt", "", "Daily bookkeeping", "Record income and expenses as they happen and keep receipts tied to each transaction."],
-  ["users", "teal", "Customer follow-up", "Maintain a private customer directory and organize the follow-up needed to retain clients."],
-  ["calendar", "gold", "Services and appointments", "Define services, schedule work and keep daily operations connected."],
-  ["book", "violet", "Invoices and accounting", "Prepare invoices, reconcile activity and assemble a clean year-end accounting package."],
-  ["megaphone", "rose", "Marketing support", "Build promotions and retention campaigns with guided support as the marketing workspace expands."],
-  ["briefcase", "green", "Tax-ready handoff", "Turn year-round records into an organized package for professional tax preparation."],
-];
-
-// Illustrative workspace preview.
-const sample = [
-  { label: "Jan", values: [4.2, 2.6] }, { label: "Feb", values: [4.8, 2.9] }, { label: "Mar", values: [5.6, 3.1] },
-  { label: "Apr", values: [5.1, 3.4] }, { label: "May", values: [6.4, 3.2] }, { label: "Jun", values: [7.1, 3.6] },
+const features = [
+  ["receipt", "Daily bookkeeping", "Record income and expenses as they happen, with the receipt attached to each one."],
+  ["calendar", "Online booking", "Your own booking page with services, team calendars and video or in-person visits."],
+  ["users", "Customer list", "Every customer's visits, notes, follow-ups and marketing consent in one place."],
+  ["bell", "Reminders", "Appointment reminders by email, or copied to send from your phone."],
+  ["megaphone", "Email campaigns", "Send offers only to customers who agreed, with one-click unsubscribe."],
+  ["star", "Customer feedback", "Ask for a review after each visit and choose which ones to show on your page."],
+  ["bank", "Bank reconciliation", "Match your records to your statements and see what is still open."],
+  ["download", "Your data, any time", "Export your books and customer list to CSV whenever you like."],
+  ["briefcase", "Tax-ready year end", "Hand your books to a preparer for your Schedule C, partnership or corporate return."],
 ];
 
 export default function BusinessPage() {
   return (
     <main>
-      <section className="hero">
-        <span className="blob b1" /><span className="blob b2" />
-        <div className="container hero-grid">
-          <div className="fade-in">
-            <span className="eyebrow"><span className="dot" /> InnovaCare Business</span>
-            <h1 style={{ fontSize: "clamp(2.2rem,4.6vw,3.6rem)" }}>A dedicated workspace for running your small business <span className="shimmer-text">every day.</span></h1>
-            <p className="lead">Business is a separate service—not an add-on shown to every tax client. It brings bookkeeping, customer follow-up, services, appointments and invoices into one secure workspace.</p>
-            <div className="row mt">
-              <Link href="/business/register" className="btn btn-primary btn-lg">Create Business Workspace <Icon name="arrow" size={18} className="icon-arrow" /></Link>
-              <Link href="/book" className="btn btn-ghost btn-lg"><Icon name="calendar" size={18} /> Talk to an Advisor</Link>
-            </div>
-            <div className="trust">
-              <div><Icon name="lock" size={16} /> <b>Private</b> per-business data</div>
-              <div><Icon name="download" size={16} /> <b>CSV</b> export anytime</div>
-              <div><Icon name="briefcase" size={16} /> <b>Tax-ready</b> year-end</div>
-            </div>
-          </div>
-          <div className="hero-visual fade-in">
-            <div className="mock" style={{ color: "var(--text)" }}>
-              <div className="mock-bar"><i /><i /><i /><span>Sample business overview</span></div>
-              <div className="grid-3" style={{ gap: 10, marginBottom: 12 }}>
-                {[["Income", "$33.2k", "pos-text"], ["Expenses", "$18.8k", "neg-text"], ["Net", "$14.4k", "grad-text"]].map(([l, v, c]) => (
-                  <div key={l} style={{ padding: 12, borderRadius: 12, background: "var(--surface-2)" }}>
-                    <div className="tiny muted">{l}</div>
-                    <b className={c} style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem" }}>{v}</b>
-                  </div>
-                ))}
-              </div>
-              <BarChart data={sample} series={[{ name: "Income", color: PALETTE.teal }, { name: "Expenses", color: PALETTE.blue }]} height={180} format={(v) => `$${v}k`} label="Sample monthly income and expenses" />
-              <div className="row between mt-sm">
-                <Legend items={[{ label: "Income", color: PALETTE.teal }, { label: "Expenses", color: PALETTE.blue }]} />
-                <Donut size={70} thickness={10} label="Sample expense mix" segments={[{ label: "Supplies", value: 40, color: PALETTE.blue }, { label: "Rent", value: 35, color: PALETTE.teal }, { label: "Other", value: 25, color: PALETTE.gold }]} />
-              </div>
+      <section className="pub-hero">
+        <Image src="/photos/shop.jpg" alt="A salon owner helping a customer at the front desk" fill priority sizes="100vw" style={{ objectFit: "cover", objectPosition: "60% 50%" }} />
+        <div className="container">
+          <div className="copy">
+            <span className="eyebrow">InnovaCare Business</span>
+            <h1>Everything a small business runs on, in one place.</h1>
+            <p>Books, customers, bookings and invoices in a workspace of its own, separate from personal tax returns, and ready for your accountant at year end.</p>
+            <div className="actions">
+              <Link href="/business/register" className="btn btn-primary btn-lg">Create a business workspace</Link>
+              <Link href="/book" className="btn btn-light btn-lg">Talk to an advisor</Link>
             </div>
           </div>
         </div>
       </section>
-      <section className="section">
+
+      <section className="pub-section">
         <div className="container">
-          <Reveal className="section-head"><span className="eyebrow">Business services</span><h2>Operations today, cleaner books at tax time</h2></Reveal>
-          <div className="grid-3">
-            {modules.map(([icon, tone, title, text], i) => (
-              <Reveal as="article" key={title} delay={(i % 3) * 90} className="card card-hover">
-                <div className={`icon-badge ${tone}`}><Icon name={icon} size={22} /></div>
+          <div className="pub-head">
+            <span className="eyebrow">What&apos;s included</span>
+            <h2>Run the day. Grow the customer list. File with clean books.</h2>
+          </div>
+          <div className="pub-features">
+            {features.map(([icon, title, text]) => (
+              <div key={title}>
+                <Icon name={icon} size={26} />
                 <h3>{title}</h3>
-                <p className="small">{text}</p>
-              </Reveal>
+                <p>{text}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
-      <section className="container" style={{ paddingBottom: 40 }}>
-        <Reveal className="cta-band cta-dark">
-          <h2>Bring your business <span className="grad-text">into focus.</span></h2>
-          <p className="mt" style={{ marginTop: 12 }}>Set up your workspace in minutes. Your personal tax portal stays separate.</p>
-          <div className="row mt" style={{ justifyContent: "center" }}>
-            <Link href="/business/register" className="btn btn-primary btn-lg">Get started</Link>
+
+      <section className="pub-split alt">
+        <div className="media"><Image src="/photos/gig.jpg" alt="A food vendor checking bookings on his phone" fill sizes="(max-width: 980px) 100vw, 50vw" style={{ objectFit: "cover", objectPosition: "35% 30%" }} /></div>
+        <div className="text">
+          <span className="eyebrow">Your own page</span>
+          <h2>Let customers find you and book.</h2>
+          <p>Publish a page with your services, prices, hours and reviews. Customers pick a time, get a confirmation and a reminder, and you see the day ahead at a glance.</p>
+          <Link href="/business/directory" className="pub-link">See the business directory <Icon name="arrow" size={16} /></Link>
+        </div>
+      </section>
+
+      <section className="pub-split reverse">
+        <div className="media"><Image src="/photos/paperwork.jpg" alt="Tax forms, a calculator and a pen on a desk" fill sizes="(max-width: 980px) 100vw, 50vw" /></div>
+        <div className="text">
+          <span className="eyebrow">Year end</span>
+          <h2>Your books become your return.</h2>
+          <p>When the year closes, send your books to a preparer from inside the workspace. They review the numbers, ask about anything missing and prepare your business return for your signature.</p>
+          <ul className="pub-list">
+            <li><Icon name="check" size={18} />Sole proprietors (Schedule C)</li>
+            <li><Icon name="check" size={18} />Partnerships and S corporations, with K-1s</li>
+            <li><Icon name="check" size={18} />C corporations</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="pub-cta">
+        <div className="container">
+          <div>
+            <h2>Set up your workspace in a few minutes.</h2>
+            <p>Your personal tax portal stays separate.</p>
+          </div>
+          <div className="row">
+            <Link href="/business/register" className="btn btn-dark btn-lg">Get started</Link>
             <Link href="/login" className="btn btn-ghost btn-lg">Log in</Link>
           </div>
-        </Reveal>
+        </div>
       </section>
     </main>
   );

@@ -1,269 +1,203 @@
 import Link from "next/link";
 import Image from "next/image";
 import Icon from "@/components/Icon";
-import { Reveal, NumberCount } from "@/components/Motion";
-import { AreaChart, Donut, Legend, ProgressRing, Sparkline, PALETTE } from "@/components/charts";
+import { getSiteSettings } from "@/lib/cms";
 
-const services = [
-  { icon: "user", tone: "", title: "Individual & Family", text: "W-2 income, dependents, credits like CTC and EITC. Maximize every dollar you're owed." },
-  { icon: "car", tone: "teal", title: "Self-Employed & Gig", text: "1099-NEC, rideshare, delivery and freelance income with expense tracking and SE tax planning." },
-  { icon: "building", tone: "gold", title: "InnovaCare Business", text: "A separate daily workspace for bookkeeping, customers, services, appointments and invoices.", href: "/business" },
-  { icon: "trending", tone: "violet", title: "Tax Planning", text: "Year-round strategy sessions to lower next year's bill before it happens." },
-  { icon: "mail", tone: "rose", title: "IRS Notices & Amendments", text: "Got a letter? We review, respond and amend prior-year returns when needed." },
-  { icon: "lock", tone: "green", title: "Secure Client Portal", text: "Upload documents, message your preparer and track your return 24/7." },
-];
-
-const steps = [
-  { title: "Create your account", text: "Sign up in under a minute and access your secure portal." },
-  { title: "Answer a few questions", text: "Our guided intake tailors a document checklist just for you." },
-  { title: "Upload your documents", text: "Snap a photo or upload PDFs of your W-2s, 1099s and more." },
-  { title: "Review, sign & file", text: "Your preparer reviews everything, you e-sign, and we e-file." },
-];
+// Photos are free-licence Unsplash images stored under /public/photos (see docs/PHOTOS.md).
+// Replace them with photos of the real office and team when available.
 
 const tiers = [
   { name: "Essential", price: 149, desc: "Simple W-2 returns", features: ["Federal + 1 state return", "Standard deduction", "Child Tax Credit & EITC", "Secure portal & e-file"] },
   { name: "Plus", price: 249, featured: true, desc: "Families & side income", features: ["Everything in Essential", "Itemized deductions", "1099 / gig income", "Education & childcare credits", "Dedicated preparer"] },
 ];
 
-const testimonials = [
-  { name: "Danielle R.", role: "Nurse & mom of two", text: "Uploading everything from my phone was so easy. My preparer found credits I'd missed for years." },
-  { name: "Marcus T.", role: "Rideshare driver", text: "They finally made sense of my mileage and 1099s. Bigger refund and zero stress." },
-  { name: "Priya & Sam K.", role: "Small business owners", text: "Professional, fast and always responsive in the portal. We'll never go back to DIY." },
+const steps = [
+  { title: "Book or sign up", text: "Book a visit or create your account online. It takes a minute." },
+  { title: "Tell us about your year", text: "A short questionnaire builds the list of documents we need from you." },
+  { title: "Send your documents", text: "Upload photos or PDFs from your phone, or bring them to your appointment." },
+  { title: "Review and sign", text: "Your preparer walks you through the return. You approve and sign before it is filed." },
 ];
 
-const forms = ["W-2 wages", "1099-NEC", "1099-K", "1099-INT", "1099-DIV", "1098 mortgage", "1098-E student loans", "Child Tax Credit", "EITC", "Schedule C", "IRS notices", "Amended returns"];
-
-const stats = [
-  { icon: "file", value: 12000, suffix: "+", label: "Returns filed" },
-  { icon: "dollar", prefix: "$", value: 38, suffix: "M+", label: "Refunds secured" },
-  { icon: "refresh", value: 98, suffix: "%", label: "Client retention" },
-  { icon: "star", value: 15, suffix: "+", label: "Years experience" },
+const bring = [
+  "Photo ID for you and your spouse",
+  "Social Security cards or ITIN letters for everyone on the return",
+  "W-2s and any 1099s (NEC, K, INT, DIV, R)",
+  "1098 mortgage interest and property tax bills",
+  "1098-T tuition and 1098-E student loan interest",
+  "Childcare provider name, address and amount paid",
+  "Health insurance forms (1095-A if from the Marketplace)",
+  "Last year's return and any IRS letters",
+  "Bank routing and account number for direct deposit",
+  "Self-employed: income totals, expenses and mileage",
 ];
 
-// Illustrative product preview shown in the "portal" section.
-const preview = [
-  { label: "Jan", value: 0 }, { label: "Feb", value: 1150 }, { label: "Mar", value: 2240 },
-  { label: "Apr", value: 2890 }, { label: "May", value: 3260 }, { label: "Jun", value: 3482 },
-];
+export default async function Home() {
+  const site = await getSiteSettings().catch(() => ({}));
+  const contact = [
+    site.phone && { label: "Call us", value: site.phone, href: `tel:${site.phone.replace(/[^\d+]/g, "")}` },
+    site.email && { label: "Email", value: site.email, href: `mailto:${site.email}` },
+    site.address && { label: "Visit", value: site.address },
+    site.hours && { label: "Hours", value: site.hours },
+  ].filter(Boolean);
 
-export default function Home() {
   return (
     <main>
-      <section className="hero">
-        <span className="blob b1" /><span className="blob b2" /><span className="blob b3" />
-        <div className="container hero-grid">
-          <div className="fade-in">
-            <span className="eyebrow"><span className="dot" /> Now filing 2026 tax returns</span>
-            <h1>
-              Taxes done right.<br />
-              <span className="shimmer-text">Refunds done faster.</span>
-            </h1>
-            <p className="lead">
-              InnovaCare Tax pairs expert preparers with a modern, secure portal so you can file from anywhere, track
-              every step and keep more of what you earn.
-            </p>
-            <div className="row mt">
-              <Link id="hero-start" href="/register" className="btn btn-primary btn-lg">Start My Return <Icon name="arrow" size={18} className="icon-arrow" /></Link>
-              <Link id="hero-estimate" href="/estimator" className="btn btn-ghost btn-lg"><Icon name="chart" size={18} /> Estimate My Refund</Link>
-            </div>
-            <div className="trust">
-              <div className="avatars" aria-hidden="true">
-                {["D", "M", "P", "S"].map((l, i) => <span key={l} className={`c${i + 1}`} style={{ background: ["#93c5fd", "#5eead4", "#fcd34d", "#c4b5fd"][i] }}>{l}</span>)}
-              </div>
-              <div><Icon name="star" size={16} /> <b>4.9/5</b> client rating</div>
-              <div><Icon name="shield" size={16} /> <b>IRS</b> e-file provider</div>
-              <div><Icon name="bolt" size={16} /> <b>48-hr</b> avg. turnaround</div>
-            </div>
-          </div>
-          <div className="hero-visual fade-in">
-            <div className="hero-frame">
-              <Image src="/hero.png" alt="InnovaCare Tax preparer helping a family with their return" width={1024} height={768} className="hero-img" priority />
-            </div>
-            <div className="glass float-card one">
-              <div className="small muted">Estimated refund</div>
-              <div className="big-num grad-text"><NumberCount prefix="$" value={3482} /></div>
-              <Sparkline values={[2, 4, 3, 6, 5, 8, 9]} color={PALETTE.teal} width={140} height={30} />
-            </div>
-            <div className="glass float-card two">
-              <div className="row nowrap">
-                <span className="check-anim"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
-                <div><div className="small muted">Return status</div><div style={{ fontWeight: 700 }}>Accepted by IRS</div></div>
-              </div>
-            </div>
-            <div className="glass float-card three">
-              <div className="row nowrap">
-                <ProgressRing value={0.83} size={52} thickness={6}><b style={{ fontSize: "0.8rem" }}>83%</b></ProgressRing>
-                <div><div className="small muted">Documents</div><div style={{ fontWeight: 700 }}>5 of 6 received</div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="container">
-        <div className="stats-strip">
-          {stats.map((s, i) => (
-            <Reveal key={s.label} delay={i * 90} className="card stat card-hover">
-              <div className="icon-badge"><Icon name={s.icon} size={22} /></div>
-              <div className="big-num grad-text"><NumberCount prefix={s.prefix} value={s.value} suffix={s.suffix} /></div>
-              <div className="small muted">{s.label}</div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <section className="section-tight">
+      <section className="pub-hero">
+        <Image src="/photos/consult.jpg" alt="A tax preparer going over a return with a client at a table" fill priority sizes="100vw" style={{ objectFit: "cover", objectPosition: "70% 40%" }} />
         <div className="container">
-          <p className="center small muted" style={{ marginBottom: 18, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase" }}>Every form, every credit, handled by a pro</p>
-          <div className="marquee">
-            <div className="marquee-track">
-              {[...forms, ...forms].map((f, i) => (
-                <span key={i} className="marquee-item" aria-hidden={i >= forms.length}><Icon name="check" size={16} /> {f}</span>
+          <div className="copy">
+            <span className="eyebrow">InnovaCare Tax Services</span>
+            <h1>Tax preparation you can sit down and talk through.</h1>
+            <p>Personal returns, self-employed income and small-business books, prepared by a person you can reach, with a secure portal for your documents.</p>
+            <div className="actions">
+              <Link id="hero-book" href="/book" className="btn btn-primary btn-lg">Book an appointment</Link>
+              <Link id="hero-start" href="/register" className="btn btn-light btn-lg">Start my return online</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="pub-quick" aria-label="Quick links">
+        <div className="container">
+          <Link href="/register"><Icon name="file" size={26} /><span><b>Start a return</b><span className="sub">Create your account and answer a few questions</span></span></Link>
+          <Link href="/login"><Icon name="upload" size={26} /><span><b>Upload documents</b><span className="sub">Send W-2s, 1099s and receipts securely</span></span></Link>
+          <Link href="/estimator"><Icon name="chart" size={26} /><span><b>Estimate your refund</b><span className="sub">A quick estimate before you file</span></span></Link>
+        </div>
+      </section>
+
+      <section id="services" className="pub-split">
+        <div className="media"><Image src="/photos/family.jpg" alt="A mother and daughter looking at a laptop together on the sofa" fill sizes="(max-width: 980px) 100vw, 50vw" /></div>
+        <div className="text">
+          <span className="eyebrow">Individuals & families</span>
+          <h2>Your return, prepared and checked by a person.</h2>
+          <p>W-2 income, dependents and the credits families most often miss. We ask the questions, check the numbers and explain what you are signing.</p>
+          <ul className="pub-list">
+            <li><Icon name="check" size={18} />Child Tax Credit, EITC, education and childcare credits</li>
+            <li><Icon name="check" size={18} />Federal and state returns, filed electronically</li>
+            <li><Icon name="check" size={18} />Prior-year and amended returns</li>
+          </ul>
+          <Link href="/services" className="pub-link">See all services <Icon name="arrow" size={16} /></Link>
+        </div>
+      </section>
+
+      <section className="pub-split reverse alt">
+        <div className="media"><Image src="/photos/gig.jpg" alt="A food vendor in an apron checking his phone at his stall" fill sizes="(max-width: 980px) 100vw, 50vw" style={{ objectFit: "cover", objectPosition: "35% 30%" }} /></div>
+        <div className="text">
+          <span className="eyebrow">Self-employed & gig work</span>
+          <h2>1099s, mileage and expenses, sorted.</h2>
+          <p>Rideshare, delivery, freelance and side businesses. We organise your income and expenses, work out self-employment tax and help you plan quarterly payments.</p>
+          <ul className="pub-list">
+            <li><Icon name="check" size={18} />1099-NEC and 1099-K income</li>
+            <li><Icon name="check" size={18} />Schedule C with mileage and home-office deductions</li>
+            <li><Icon name="check" size={18} />Estimated tax planning for next year</li>
+          </ul>
+          <Link href="/book" className="pub-link">Book a consultation <Icon name="arrow" size={16} /></Link>
+        </div>
+      </section>
+
+      <section className="pub-split">
+        <div className="media"><Image src="/photos/owner.jpg" alt="A smiling business owner holding a tablet" fill sizes="(max-width: 980px) 100vw, 50vw" style={{ objectFit: "cover", objectPosition: "50% 25%" }} /></div>
+        <div className="text">
+          <span className="eyebrow">Small business</span>
+          <h2>Run the business all year. We handle the return.</h2>
+          <p>InnovaCare Business is a separate workspace for bookkeeping, customers, online booking and invoices, so your books are ready when it is time to file.</p>
+          <ul className="pub-list">
+            <li><Icon name="check" size={18} />Daily bookkeeping with receipts attached</li>
+            <li><Icon name="check" size={18} />Your own booking page, reminders and customer list</li>
+            <li><Icon name="check" size={18} />Schedule C, partnership and corporate returns</li>
+          </ul>
+          <Link href="/business" className="pub-link">Explore InnovaCare Business <Icon name="arrow" size={16} /></Link>
+        </div>
+      </section>
+
+      <section id="how" className="pub-band">
+        <div className="container">
+          <div className="pub-head">
+            <span className="eyebrow">How it works</span>
+            <h2>Four steps, in person or online.</h2>
+          </div>
+          <div className="pub-steps">
+            {steps.map((s, i) => (
+              <div key={s.title}>
+                <div className="num">{String(i + 1).padStart(2, "0")}</div>
+                <h3>{s.title}</h3>
+                <p>{s.text}</p>
+              </div>
+            ))}
+          </div>
+          <div className="pub-bring">
+            <div>
+              <h3>What to bring</h3>
+              <p>The usual documents for a personal return. Your portal checklist is tailored to your answers.</p>
+            </div>
+            <ul>{bring.map((b) => <li key={b}><Icon name="check" size={16} />{b}</li>)}</ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="pub-section paper">
+        <div className="container">
+          <div className="pub-head center">
+            <span className="eyebrow">Pricing</span>
+            <h2>Clear prices before we start.</h2>
+            <p>Starting prices for common returns. You pay when your return is ready to file.</p>
+          </div>
+          <div className="pub-prices">
+            {tiers.map((t) => (
+              <div key={t.name} className={`pub-price ${t.featured ? "featured" : ""}`}>
+                <div><h3 style={{ margin: 0 }}>{t.name}</h3><p className="small" style={{ margin: "4px 0 0" }}>{t.desc}</p></div>
+                <div className="amount">${t.price}<small>starting</small></div>
+                <ul>{t.features.map((f) => <li key={f}><Icon name="check" size={16} />{f}</li>)}</ul>
+                <Link href="/register" className={`btn btn-block ${t.featured ? "btn-primary" : "btn-ghost"}`}>Choose {t.name}</Link>
+              </div>
+            ))}
+          </div>
+          <p className="pub-note">Self-employed, rental and business returns are quoted after a short consultation.</p>
+        </div>
+      </section>
+
+      <section className="pub-split reverse">
+        <div className="media"><Image src="/photos/couple-docs.jpg" alt="An older couple reviewing paperwork at home" fill sizes="(max-width: 980px) 100vw, 50vw" /></div>
+        <div className="text">
+          <span className="eyebrow">IRS letters & planning</span>
+          <h2>Got a letter from the IRS?</h2>
+          <p>Bring it in or upload it. We read it with you, explain what it means and help you respond, or amend a past return if something was missed.</p>
+          <ul className="pub-list">
+            <li><Icon name="check" size={18} />Notice review and response</li>
+            <li><Icon name="check" size={18} />Amended returns for prior years</li>
+            <li><Icon name="check" size={18} />Planning sessions to lower next year&apos;s bill</li>
+          </ul>
+          <Link href="/contact" className="pub-link">Ask us about a notice <Icon name="arrow" size={16} /></Link>
+        </div>
+      </section>
+
+      {contact.length > 0 && (
+        <section className="pub-section paper">
+          <div className="container">
+            <div className="pub-head">
+              <span className="eyebrow">Contact</span>
+              <h2>Talk to us.</h2>
+            </div>
+            <div className="pub-contact">
+              {contact.map((c) => (
+                <div key={c.label}><b>{c.label}</b>{c.href ? <a href={c.href}>{c.value}</a> : <span>{c.value}</span>}</div>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section id="services" className="section" style={{ paddingTop: 40 }}>
+      <section className="pub-cta">
         <div className="container">
-          <Reveal className="section-head">
-            <span className="eyebrow">Services</span>
-            <h2>Expert help for every tax situation</h2>
-            <p>From your first W-2 to your growing business, we&apos;ve got you covered.</p>
-          </Reveal>
-          <div className="grid-3">
-            {services.map((s, i) => (
-              <Reveal as="article" key={s.title} delay={(i % 3) * 90} className="card card-hover">
-                <div className={`icon-badge ${s.tone}`}><Icon name={s.icon} size={22} /></div>
-                <h3>{s.title}</h3>
-                <p className="small">{s.text}</p>
-                {s.href && <Link href={s.href} className="small grad-text" style={{ display: "inline-flex", gap: 6, alignItems: "center", marginTop: 10, fontWeight: 600 }}>Explore the separate Business service <Icon name="arrow" size={14} /></Link>}
-              </Reveal>
-            ))}
+          <div>
+            <h2>Ready when you are.</h2>
+            <p>Book a visit, or start your return online today.</p>
+          </div>
+          <div className="row">
+            <Link href="/book" className="btn btn-dark btn-lg">Book an appointment</Link>
+            <Link href="/register" className="btn btn-ghost btn-lg">Create account</Link>
           </div>
         </div>
-      </section>
-
-      <section className="section" style={{ paddingTop: 0 }}>
-        <div className="container feature-split">
-          <Reveal>
-            <span className="eyebrow">Your client portal</span>
-            <h2 style={{ margin: "16px 0 12px" }}>See your refund take shape, step by step.</h2>
-            <p>Every return has a live timeline, a tailored document checklist and a direct line to your preparer. No more wondering where things stand.</p>
-            <ul className="feature-list">
-              <li><Icon name="check" size={18} /><span><b>Live progress tracking</b> from intake to IRS acceptance.</span></li>
-              <li><Icon name="check" size={18} /><span><b>Smart checklist</b> built from your questionnaire answers.</span></li>
-              <li><Icon name="check" size={18} /><span><b>Secure messaging</b> and encrypted document uploads.</span></li>
-              <li><Icon name="check" size={18} /><span><b>Year-over-year history</b> so next season starts in minutes.</span></li>
-            </ul>
-            <Link href="/register" className="btn btn-primary mt">Open my portal <Icon name="arrow" size={16} className="icon-arrow" /></Link>
-          </Reveal>
-          <Reveal delay={120}>
-            <div className="mock glow-border">
-              <div className="mock-bar"><i /><i /><i /><span>Sample client dashboard</span></div>
-              <div className="row between" style={{ marginBottom: 6 }}>
-                <div>
-                  <div className="small muted">Estimated refund</div>
-                  <div className="big-num grad-text">$3,482</div>
-                </div>
-                <span className="pill up"><Icon name="trending" size={14} /> +18% vs last year</span>
-              </div>
-              <AreaChart data={preview} height={190} color={PALETTE.blue} label="Sample refund estimate progression" format={(v) => `$${(v / 1000).toFixed(1)}k`} />
-              <div className="donut-wrap mt-sm">
-                <Donut size={110} thickness={14} center="5/6" sub="documents" label="Sample document checklist" segments={[{ label: "Received", value: 5, color: PALETTE.teal }, { label: "Needed", value: 1, color: PALETTE.gold }]} />
-                <Legend items={[{ label: "W-2 · 1099 received", color: PALETTE.teal }, { label: "1098-E needed", color: PALETTE.gold }]} />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="container" style={{ paddingBottom: 20 }}>
-        <Reveal className="cta-band cta-dark">
-          <span className="eyebrow">A separate service</span>
-          <h2 style={{ marginTop: 14 }}>Run a small business every day—not only at tax time.</h2>
-          <p className="mt" style={{ marginTop: 12, maxWidth: 640, marginInline: "auto" }}>InnovaCare Business has its own registration and workspace for daily finances, customer retention, services, billing and accounting support.</p>
-          <div className="row mt" style={{ justifyContent: "center" }}>
-            <Link href="/business" className="btn btn-primary btn-lg"><Icon name="briefcase" size={18} /> Explore Business</Link>
-          </div>
-        </Reveal>
-      </section>
-
-      <section id="how" className="section">
-        <div className="container">
-          <Reveal className="section-head">
-            <span className="eyebrow">How It Works</span>
-            <h2>File in four simple steps</h2>
-          </Reveal>
-          <div className="steps">
-            {steps.map((s, i) => (
-              <Reveal key={s.title} delay={i * 100} className="card step card-hover">
-                <h3>{s.title}</h3>
-                <p className="small">{s.text}</p>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="pricing" className="section" style={{ paddingTop: 20 }}>
-        <div className="container">
-          <Reveal className="section-head">
-            <span className="eyebrow">Pricing</span>
-            <h2>Transparent, upfront pricing</h2>
-            <p>No surprise fees. Pay only when your return is ready to file.</p>
-          </Reveal>
-          <div className="pricing">
-            {tiers.map((t, i) => (
-              <Reveal key={t.name} delay={i * 120} className={`card price-card card-hover ${t.featured ? "featured glow-border" : ""}`}>
-                {t.featured && <span className="ribbon">MOST POPULAR</span>}
-                <div>
-                  <h3>{t.name}</h3>
-                  <p className="small">{t.desc}</p>
-                </div>
-                <div className="price">${t.price}<span> starting</span></div>
-                <ul>{t.features.map((f) => <li key={f}>{f}</li>)}</ul>
-                <Link href="/register" className={`btn btn-block ${t.featured ? "btn-primary" : "btn-ghost"}`}>Choose {t.name}</Link>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section" style={{ paddingTop: 20 }}>
-        <div className="container">
-          <Reveal className="section-head">
-            <span className="eyebrow">Testimonials</span>
-            <h2>Loved by our clients</h2>
-          </Reveal>
-          <div className="grid-3">
-            {testimonials.map((t, i) => (
-              <Reveal as="figure" key={t.name} delay={i * 100} className="card card-hover">
-                <div className="stars">★★★★★</div>
-                <blockquote className="quote">“{t.text}”</blockquote>
-                <figcaption className="row">
-                  <div className={`avatar c${i + 1}`}>{t.name[0]}</div>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{t.name}</div>
-                    <div className="small muted">{t.role}</div>
-                  </div>
-                </figcaption>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="container" style={{ paddingBottom: 40 }}>
-        <Reveal className="cta-band cta-dark">
-          <h2>Ready to get <span className="grad-text">your maximum refund?</span></h2>
-          <p className="mt" style={{ marginTop: 12 }}>Book a free 15-minute consultation or start your return online today.</p>
-          <div className="row mt" style={{ justifyContent: "center" }}>
-            <Link href="/book" className="btn btn-primary btn-lg"><Icon name="calendar" size={18} /> Book an Appointment</Link>
-            <Link href="/register" className="btn btn-ghost btn-lg">Create Account</Link>
-          </div>
-        </Reveal>
       </section>
     </main>
   );

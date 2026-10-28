@@ -52,16 +52,6 @@ export default function AuthForm({ mode, accountType = "TAX" }) {
           <ul className="feature-list">
             {perks.map(([b, t]) => <li key={b}><Icon name="check" size={18} /><span><b style={{ color: "#fff" }}>{b}</b> {t}</span></li>)}
           </ul>
-          <div className="mini">
-            <div className="row nowrap">
-              <span className="avatar c2">D</span>
-              <div>
-                <div className="stars" style={{ marginBottom: 2, fontSize: ".8rem" }}>★★★★★</div>
-                <div className="small">“My preparer found credits I&apos;d missed for years.”</div>
-                <div className="tiny muted">Danielle R. · Client since 2022</div>
-              </div>
-            </div>
-          </div>
         </aside>
         <form onSubmit={submit} className="auth-card stack">
           <div>
