@@ -91,6 +91,7 @@ function BookingDetail({ booking: b, zone, staff, busy, onAction, onClose }) {
         {b.status === "CONFIRMED" && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => onAction(b.id, "complete")}>Mark done</button>}
         {b.status === "CONFIRMED" && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onAction(b.id, "no_show")}>No-show</button>}
         {active && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMove(move ? null : { date: local.date, time: local.time, staffId: b.staff_id || "" })}><Icon name="refresh" size={14} /> Move</button>}
+        <GrowthActions booking={b} />
       </div>
       {move && (
         <div className="stack-sm">
@@ -157,5 +158,38 @@ function NewBooking({ zone, staff, services, onClose, onSaved }) {
         </>
       )}
     </form>
+  );
+}
+
+// Links a booking to the CRM and, once done, to a feedback request.
+function GrowthActions({ booking }) {
+  const router = useRouter();
+  const [state, setState] = useState({});
+  const call = async (body) => {
+    setState({ busy: true });
+    const res = await fetch("/api/business/growth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setState({ error: data.error || "That did not work." }); return null; }
+    setState({});
+    return data.result;
+  };
+  const toCrm = async () => {
+    const r = await call({ action: "customerFromBooking", bookingId: booking.id });
+    if (r) router.push(`/portal/business/customers?c=${r.id}`);
+  };
+  const feedback = async () => {
+    const r = await call({ action: "requestFeedback", bookingId: booking.id });
+    if (r?.url) {
+      await navigator.clipboard.writeText(`Hi ${booking.name.split(" ")[0]}, thank you for visiting! Would you tell us how it went? ${r.url}`).catch(() => {});
+      setState({ ok: "Feedback link copied. Send it to the customer." });
+    }
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-ghost btn-sm" disabled={state.busy} onClick={toCrm}><Icon name="users" size={14} /> Customer card</button>
+      {booking.status === "COMPLETED" && <button type="button" className="btn btn-ghost btn-sm" disabled={state.busy} onClick={feedback}><Icon name="star" size={14} /> Get feedback link</button>}
+      {state.error && <span className="small" style={{ color: "var(--rose)" }}>{state.error}</span>}
+      {state.ok && <span className="small pos-text">{state.ok}</span>}
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
 import { Empty } from "@/components/ui";
 import { publicServices, publicStaff, resolveBusiness } from "@/lib/business-booking";
+import { publicFeedback } from "@/lib/business-growth";
 import { addressLine, mediaUrl, money, weeklySummary } from "@/lib/business-display";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
@@ -23,7 +24,8 @@ export async function generateMetadata({ params }) {
 export default async function BusinessProfilePage({ params }) {
   const profile = await resolveBusiness((await params).slug);
   if (!profile) notFound();
-  const [services, staff] = await Promise.all([publicServices(profile.businessId), publicStaff(profile.businessId)]);
+  const [services, staff, reviews] = await Promise.all([publicServices(profile.businessId), publicStaff(profile.businessId), publicFeedback(profile.businessId)]);
+  const average = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : null;
   const hours = weeklySummary(profile.booking?.weekly);
   const address = addressLine(profile);
   const bookHref = `/business/${profile.slug}/book`;
@@ -85,6 +87,21 @@ export default async function BusinessProfilePage({ params }) {
                 ))}
               </div>
             </div>
+            {reviews.length > 0 && (
+              <div className="card">
+                <div className="card-title"><h2>What customers say</h2><span className="pill"><Icon name="star" size={12} /> {average.toFixed(1)} from {reviews.length} featured review{reviews.length === 1 ? "" : "s"}</span></div>
+                <div className="stack-sm">
+                  {reviews.map((r) => (
+                    <blockquote key={r.id} className="biz-review">
+                      <span className="stars" aria-label={`${r.rating} out of 5`}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+                      {r.comment && <p className="small" style={{ margin: "6px 0" }}>{r.comment}</p>}
+                      <span className="small muted">{r.displayName} · {r.serviceName}</span>
+                    </blockquote>
+                  ))}
+                </div>
+                <p className="hint mt-sm">Shown with each customer&apos;s permission, chosen by the business from feedback after real visits.</p>
+              </div>
+            )}
             {staff.length > 0 && (
               <div className="card">
                 <h2>Team</h2>

@@ -340,6 +340,7 @@ function bookingDto(row) {
     cancelled_by: row.cancelledBy || null,
     cancel_reason: row.cancelReason || null,
     created_at: row.createdAt,
+    reminder_sent_at: row.reminderSentAt || null,
     type: "IN_PERSON",
   };
 }

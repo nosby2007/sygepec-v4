@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole, getFirebaseSession } from "@/lib/auth";
-import { loadBusinessTaxCase, BUSINESS_TAX_STATUSES, BUSINESS_TAX_PRIORITIES } from "@/lib/business-admin";
+import { BUSINESS_TAX_STATUSES, BUSINESS_TAX_PRIORITIES } from "@/lib/business-admin";
 import { queryCollection, TAX_TENANT } from "@/lib/firebase";
 import { monthlyLedger } from "@/lib/analytics";
 import { BarChart, HBars, PALETTE } from "@/components/charts";
@@ -9,6 +9,8 @@ import { MoneyCount, NumberCount, Reveal } from "@/components/Motion";
 import { Kpi, PageHead } from "@/components/ui";
 import Icon from "@/components/Icon";
 import BusinessTaxCaseEditor from "./BusinessTaxCaseEditor";
+import BusinessReturnPanel from "./BusinessReturnPanel";
+import { loadReturn } from "@/lib/business-return-server";
 
 const moneyCents = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format((value || 0) / 100);
 const date = (value) => value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
@@ -17,8 +19,10 @@ export default async function BusinessTaxCasePage({ params }) {
   await requireRole("PREPARER");
   const session = await getFirebaseSession();
   const { id } = await params;
-  const record = await loadBusinessTaxCase(session, id);
-  if (!record) notFound();
+  const loaded = await loadReturn(session, id);
+  if (!loaded) notFound();
+  const { record } = loaded;
+  const { updateTime: _u, createTime: _c, ...returnData } = loaded.ret;
   const users = await queryCollection("taxUsers", session.idToken, { filters: [["tenantId", "EQUAL", TAX_TENANT]], limit: 1000 });
   const preparers = users.filter((user) => user.role === "PREPARER").map((user) => ({ id: user.uid || user.id, name: user.name }));
   const months = monthlyLedger(record.entries, record.report.taxYear).map((month) => ({ label: month.label, values: [month.income, month.expense] }));
@@ -40,6 +44,8 @@ export default async function BusinessTaxCasePage({ params }) {
       </div>
 
       <BusinessTaxCaseEditor report={record.report} preparers={preparers} statuses={BUSINESS_TAX_STATUSES} priorities={BUSINESS_TAX_PRIORITIES} />
+
+      <BusinessReturnPanel key={returnData.version} caseId={record.report.id} initial={returnData} books={loaded.books} events={loaded.events.map(({ id: eventId, action, detail, actorName, createdAt }) => ({ id: eventId, action, detail, actorName, createdAt }))} />
 
       <Reveal className="grid-main mt">
         <div className="card"><div className="card-title"><div><h3>Monthly books</h3><div className="sub">Income and expenses for {record.report.taxYear}</div></div></div><BarChart data={months} series={[{ name: "Income", color: PALETTE.teal }, { name: "Expenses", color: PALETTE.gold }]} format={moneyCents} label="Monthly books" /></div>

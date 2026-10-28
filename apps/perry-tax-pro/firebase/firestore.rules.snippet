@@ -381,12 +381,31 @@ match /taxBusinessEntries/{entryId} {
   allow update, delete: if false;
 }
 
+function validCrmFields(d) {
+  return d.get('stage', 'LEAD') in ['LEAD', 'ACTIVE', 'VIP', 'LAPSED']
+    && d.get('tags', []) is list && d.get('tags', []).size() <= 10
+    && (d.get('followUpAt', null) == null || (d.followUpAt is string && d.followUpAt.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')))
+    && d.get('marketingConsent', false) is bool
+    && (d.get('marketingConsent', false) == false || d.get('consentAt', null) is string);
+}
+
 match /taxBusinessCustomers/{customerId} {
  allow get, list: if businessOwner()
    && resource.data.tenantId == 'perry-tax-pro'
    && resource.data.ownerUid == request.auth.uid;
+ allow update: if businessOwner()
+   && resource.data.ownerUid == request.auth.uid
+   && request.resource.data.ownerUid == resource.data.ownerUid
+   && request.resource.data.tenantId == resource.data.tenantId
+   && request.resource.data.createdAt == resource.data.createdAt
+   && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','phone','email','notes','createdAt','stage','tags','followUpAt','marketingConsent','consentAt','consentSource','source','updatedAt'])
+   && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+   && request.resource.data.email is string && request.resource.data.email.size() <= 254
+   && request.resource.data.notes is string && request.resource.data.notes.size() <= 500
+   && validCrmFields(request.resource.data);
  allow create: if businessOwner()
-   && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','phone','email','notes','createdAt'])
+   && request.resource.data.keys().hasOnly(['tenantId','ownerUid','name','phone','email','notes','createdAt','stage','tags','followUpAt','marketingConsent','consentAt','consentSource','source','updatedAt'])
+   && validCrmFields(request.resource.data)
    && request.resource.data.tenantId == 'perry-tax-pro'
    && request.resource.data.ownerUid == request.auth.uid
    && request.resource.data.name is string
@@ -398,7 +417,7 @@ match /taxBusinessCustomers/{customerId} {
    && request.resource.data.email.size() <= 254
    && request.resource.data.notes is string
    && request.resource.data.notes.size() <= 500;
- allow update, delete: if false;
+ allow delete: if false;
 }
 
 function validBusinessService(d) {
@@ -663,7 +682,7 @@ function bizBookingFields(d) {
   return d.keys().hasOnly([
       'tenantId', 'businessId', 'serviceId', 'serviceName', 'priceCents', 'durationMinutes', 'staffId', 'staffName',
       'startMs', 'scheduledAt', 'timeZone', 'status', 'source', 'guestUid', 'customerName', 'customerEmail',
-      'customerPhone', 'notes', 'slotIds', 'rescheduleCount', 'cancelledBy', 'cancelReason', 'createdAt', 'updatedAt'
+      'customerPhone', 'notes', 'slotIds', 'rescheduleCount', 'cancelledBy', 'cancelReason', 'createdAt', 'updatedAt', 'reminderSentAt'
     ])
     && d.tenantId == 'perry-tax-pro'
     && d.startMs is int
@@ -722,7 +741,7 @@ match /bizBookings/{bookingId} {
       (businessOwner()
         && resource.data.businessId == request.auth.uid
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
-          'status', 'slotIds', 'cancelledBy', 'cancelReason', 'startMs', 'scheduledAt', 'timeZone', 'staffId', 'staffName', 'updatedAt'
+          'status', 'slotIds', 'cancelledBy', 'cancelReason', 'startMs', 'scheduledAt', 'timeZone', 'staffId', 'staffName', 'updatedAt', 'reminderSentAt'
         ])
         && request.resource.data.status in ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
         && bizStaffMatches(request.resource.data))
@@ -867,4 +886,161 @@ match /cmsMessages/{messageId} {
     && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'handledBy', 'handledAt'])
     && request.resource.data.status in ['NEW', 'HANDLED'];
   allow delete: if false;
+}
+
+// ---- Business income tax returns (working papers and filing record) --------------
+// Preparers edit; the business owner can read their own return's status. Status moves
+// follow the workflow, and the filing steps require the evidence that justifies them.
+
+function returnNext(from) {
+  return {
+    'PREPARING': ['PREPARING', 'IN_REVIEW'],
+    'IN_REVIEW': ['IN_REVIEW', 'PREPARING', 'APPROVED'],
+    'APPROVED': ['APPROVED', 'PREPARING', 'AWAITING_SIGNATURE'],
+    'AWAITING_SIGNATURE': ['AWAITING_SIGNATURE', 'PREPARING', 'SIGNED'],
+    'SIGNED': ['SIGNED', 'TRANSMITTED', 'PREPARING'],
+    'TRANSMITTED': ['TRANSMITTED', 'ACCEPTED', 'REJECTED'],
+    'ACCEPTED': ['ACCEPTED'],
+    'REJECTED': ['REJECTED', 'PREPARING']
+  }[from];
+}
+
+function validBusinessReturn(d) {
+  return d.keys().hasOnly([
+      'tenantId', 'caseId', 'clientId', 'taxYear', 'entityType', 'entity', 'owners', 'adjustments', 'extended', 'status',
+      'preparedBy', 'preparedByName', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'signature', 'filing', 'approvedSnapshot',
+      'version', 'createdAt', 'updatedAt', 'updatedBy', 'updatedByName'
+    ])
+    && d.tenantId == 'perry-tax-pro'
+    && d.taxYear is int
+    && (d.entityType == null || d.entityType in ['SOLE_PROP', 'PARTNERSHIP', 'S_CORP', 'C_CORP'])
+    && d.entity is map
+    && (d.entity.get('einLast4', '') == '' || d.entity.einLast4.matches('[0-9]{4}'))
+    && d.owners is list && d.owners.size() <= 25
+    && d.adjustments is list && d.adjustments.size() <= 50
+    && d.status in ['PREPARING', 'IN_REVIEW', 'APPROVED', 'AWAITING_SIGNATURE', 'SIGNED', 'TRANSMITTED', 'ACCEPTED', 'REJECTED']
+    && (!(d.status in ['SIGNED', 'TRANSMITTED', 'ACCEPTED', 'REJECTED']) || (d.signature is map && d.signature.signerName is string && d.signature.signedAt is string))
+    && (!(d.status in ['TRANSMITTED', 'ACCEPTED', 'REJECTED']) || (d.filing is map && d.filing.submissionId.matches('[0-9]{13}[A-Za-z0-9]{7}')))
+    && (!(d.status in ['APPROVED', 'AWAITING_SIGNATURE', 'SIGNED', 'TRANSMITTED', 'ACCEPTED']) || d.reviewedBy is string)
+    && d.updatedBy == request.auth.uid
+    && d.updatedByName == taxUser().name
+    && d.version is int;
+}
+
+match /taxBusinessReturns/{caseId} {
+  allow get: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && (taxPreparer() || resource.data.clientId == request.auth.uid);
+  allow list: if taxPreparer() && resource.data.tenantId == 'perry-tax-pro';
+  allow create: if taxPreparer()
+    && validBusinessReturn(request.resource.data)
+    && request.resource.data.caseId == caseId
+    && exists(/databases/$(database)/documents/taxBusinessYearEnd/$(caseId))
+    && get(/databases/$(database)/documents/taxBusinessYearEnd/$(caseId)).data.clientId == request.resource.data.clientId
+    && get(/databases/$(database)/documents/taxBusinessYearEnd/$(caseId)).data.taxYear == request.resource.data.taxYear
+    && request.resource.data.status == 'PREPARING'
+    && request.resource.data.version == 1;
+  allow update: if taxPreparer()
+    && validBusinessReturn(request.resource.data)
+    && request.resource.data.caseId == resource.data.caseId
+    && request.resource.data.clientId == resource.data.clientId
+    && request.resource.data.taxYear == resource.data.taxYear
+    && request.resource.data.createdAt == resource.data.createdAt
+    && request.resource.data.version == resource.data.version + 1
+    && returnNext(resource.data.status).hasAny([request.resource.data.status]);
+  allow delete: if false;
+}
+
+match /taxBusinessReturnEvents/{eventId} {
+  allow get, list: if taxPreparer() && resource.data.tenantId == 'perry-tax-pro';
+  allow create: if taxPreparer()
+    && request.resource.data.keys().hasOnly(['tenantId', 'caseId', 'clientId', 'action', 'detail', 'actorId', 'actorName', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.actorId == request.auth.uid
+    && request.resource.data.actorName == taxUser().name
+    && request.resource.data.detail is string && request.resource.data.detail.size() <= 500
+    && existsAfter(/databases/$(database)/documents/taxBusinessReturns/$(request.resource.data.caseId));
+  allow update, delete: if false;
+}
+
+// ---- Business growth: CRM notes, feedback, campaigns, opt-outs ---------------------
+
+match /bizCustomerNotes/{noteId} {
+  allow get, list: if businessOwner() && resource.data.businessId == request.auth.uid;
+  allow create: if businessOwner()
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'customerId', 'kind', 'text', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.businessId == request.auth.uid
+    && request.resource.data.kind in ['NOTE', 'CALL', 'EMAIL', 'VISIT', 'MESSAGE']
+    && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+    && get(/databases/$(database)/documents/taxBusinessCustomers/$(request.resource.data.customerId)).data.ownerUid == request.auth.uid;
+  allow update, delete: if false;
+}
+
+// A feedback link for one completed booking. The ID is a random 32-character token, so
+// a single get is allowed to anyone holding the link; listing is for the owner only.
+match /bizFeedbackRequests/{token} {
+  allow get: if true;
+  allow list: if businessOwner() && resource.data.businessId == request.auth.uid;
+  allow create: if businessOwner()
+    && token.size() == 32
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'bookingId', 'serviceName', 'customerFirstName', 'createdAt', 'expiresAtMs'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.businessId == request.auth.uid
+    && get(/databases/$(database)/documents/bizBookings/$(request.resource.data.bookingId)).data.businessId == request.auth.uid
+    && get(/databases/$(database)/documents/bizBookings/$(request.resource.data.bookingId)).data.status == 'COMPLETED'
+    && request.resource.data.expiresAtMs is int;
+  allow update, delete: if false;
+}
+
+// One answer per request (same ID). Public only when featured with the customer's consent.
+match /bizFeedback/{token} {
+  allow get, list: if resource.data.tenantId == 'perry-tax-pro'
+    && ((businessOwner() && resource.data.businessId == request.auth.uid)
+      || (resource.data.featured == true && resource.data.publishConsent == true));
+  allow create: if request.auth != null
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'bookingId', 'requestId', 'serviceName', 'displayName', 'rating', 'comment', 'publishConsent', 'featured', 'seenAt', 'authorUid', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.requestId == token
+    && request.resource.data.authorUid == request.auth.uid
+    && exists(/databases/$(database)/documents/bizFeedbackRequests/$(token))
+    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.businessId == request.resource.data.businessId
+    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.bookingId == request.resource.data.bookingId
+    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.expiresAtMs > request.time.toMillis()
+    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.customerFirstName == request.resource.data.displayName
+    && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+    && request.resource.data.comment is string && request.resource.data.comment.size() <= 1000
+    && request.resource.data.publishConsent is bool
+    && request.resource.data.featured == false
+    && request.resource.data.seenAt == null;
+  allow update: if businessOwner()
+    && resource.data.businessId == request.auth.uid
+    && request.resource.data.diff(resource.data).changedKeys().hasOnly(['featured', 'seenAt'])
+    && request.resource.data.featured is bool
+    && (request.resource.data.featured == false || resource.data.publishConsent == true);
+  allow delete: if false;
+}
+
+match /bizCampaigns/{campaignId} {
+  allow get, list: if businessOwner() && resource.data.businessId == request.auth.uid;
+  allow create, update: if businessOwner()
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'name', 'subject', 'body', 'stages', 'tags', 'status', 'sentAt', 'sentCount', 'sentVia', 'createdAt', 'updatedAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.businessId == request.auth.uid
+    && request.resource.data.status in ['DRAFT', 'SENT']
+    && request.resource.data.body is string && request.resource.data.body.size() <= 5000
+    && (resource == null || (resource.data.businessId == request.auth.uid && resource.data.status == 'DRAFT'));
+  allow delete: if false;
+}
+
+// Unsubscribes. Anyone may opt an address out (it only removes marketing); owners can
+// read their own list so campaigns skip those addresses. Stores a hash, not the email.
+match /bizOptOuts/{optOutId} {
+  allow get, list: if businessOwner() && resource.data.businessId == request.auth.uid;
+  allow create: if request.auth != null
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'emailHash', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.emailHash is string && request.resource.data.emailHash.matches('[0-9a-f]{64}')
+    && optOutId == request.resource.data.businessId + '_' + request.resource.data.emailHash;
+  allow update, delete: if false;
 }

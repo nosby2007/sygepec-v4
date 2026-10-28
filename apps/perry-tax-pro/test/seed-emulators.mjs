@@ -50,3 +50,14 @@ if (!staff.length) {
   await biz.saveStaff(session, { name: "Morgan Lee", title: "Colourist", serviceIds: ["svc-colour"], weekly: { 2: [{ start: "09:00", end: "13:00" }], 4: [{ start: "09:00", end: "13:00" }] } });
 }
 console.log("Seeded: owner, client and preparer accounts; business /business/maple-street-studio");
+
+// Demo bookkeeping and a year-end handoff for the business, so the preparer's business
+// return workspace has something to prepare.
+const ledger = [["income", "Sales", 8_400_000], ["income", "Services", 2_600_000], ["expense", "Rent", 1_440_000], ["expense", "Supplies", 380_000], ["expense", "Meals", 120_000], ["expense", "Advertising", 250_000], ["expense", "Insurance", 310_000]];
+for (const [i, [kind, category, amountCents]] of ledger.entries())
+  await fb.setDocument(`taxBusinessEntries/demo-${year}-${i}`, { tenantId: T, clientId: owner.uid, taxYear: year, kind, category, amountCents, date: `${year}-0${(i % 9) + 1}-10`, description: `Demo ${category.toLowerCase()}`, createdAt: now }, "owner");
+await fb.setDocument(`taxBusinessYearEnd/demo-case-${year}`, { tenantId: T, clientId: owner.uid, taxYear: year, status: "SUBMITTED_FOR_REVIEW", report: { entryCount: ledger.length, matchedCount: 0, correctionCount: 0, disclaimer: "Demo data" }, createdAt: now }, "owner");
+const growth = await import("@/lib/business-growth");
+for (const [name, email, consent, stage] of [["Ann Lee", "ann@example.test", true, "VIP"], ["Bo Park", "bo@example.test", false, "ACTIVE"], ["Cy Diaz", "cy@example.test", true, "LAPSED"], ["Eve Stone", "", false, "LEAD"]])
+  await growth.saveCustomer(session, null, { name, email, stage, marketingConsent: consent, tags: stage === "VIP" ? "color" : "" });
+console.log(`Seeded: demo books and year-end case demo-case-${year}`);
