@@ -155,7 +155,7 @@ export async function sendReminder(session, rawBookingId, channel) {
     if (!mailerConfigured()) throw new BusinessError("Email sending is not set up yet. Copy the message and send it yourself.", 409);
     if (!booking.customerEmail) throw new BusinessError("This booking has no email address.");
     const dto = { name: booking.customerName, service: booking.serviceName, start_ms: booking.startMs, time_zone: booking.timeZone };
-    await sendEmail({ to: booking.customerEmail, subject: `Reminder: ${booking.serviceName} with ${profile?.name || "us"}`, text: reminderText(dto, profile, bookingSettingsOf(profile)), replyTo: profile?.email || undefined });
+    await sendEmail({ to: booking.customerEmail, subject: `Reminder: ${booking.serviceName} with ${profile?.name || "us"}`, text: reminderText(dto, profile, bookingSettingsOf(profile)), replyTo: profile?.email || undefined, fromName: profile?.name });
   }
   const next = { ...strip(booking), reminderSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await commitWrites([replaceWrite(`bizBookings/${id}`, next, booking.updateTime)], session.idToken);
@@ -287,7 +287,7 @@ export async function sendCampaign(session, rawId, mode) {
     for (const c of recipients.slice(0, 500)) {
       const text = renderTemplate(campaign.body, { name: c.name, business: data.profile.name, booking_link: data.profile.slug ? `${SITE}/business/${data.profile.slug}/book` : "" });
       const links = await unsubscribeLinks(session.uid, data.profile.slug, c.email);
-      await sendEmail({ to: c.email, subject: renderTemplate(campaign.subject, { name: c.name, business: data.profile.name }), text, unsubscribeUrl: links.page, oneClickUrl: links.oneClick, replyTo: data.profile.email || undefined }).then(() => { sent++; }, () => {});
+      await sendEmail({ to: c.email, subject: renderTemplate(campaign.subject, { name: c.name, business: data.profile.name }), text, unsubscribeUrl: links.page, oneClickUrl: links.oneClick, replyTo: data.profile.email || undefined, fromName: data.profile.name }).then(() => { sent++; }, () => {});
     }
     if (!sent) throw new BusinessError("The email provider did not accept any message.", 502);
   } else {
