@@ -63,7 +63,7 @@ function Group({ icon, title, items, hot, empty, children }) {
 const bookingAction = (id, action) => fetch(`/api/business/appointments/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) })
   .then(async (r) => { if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not update the booking."); });
 
-function Today({ todo, mailer, run, copy, busy }) {
+function Today({ todo, mailer, sms, run, copy, busy }) {
   const [open, setOpen] = useState(null);
   return (
     <div className="grid-2 mt fade-in">
@@ -82,7 +82,8 @@ function Today({ todo, mailer, run, copy, busy }) {
             {open === b.id && <p className="small" style={{ margin: 0, padding: 10, background: "var(--surface-2)", borderRadius: 10 }}>{b.text}</p>}
             <div className="row">
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => copy(b.text, "Reminder copied. Send it by text or email, then mark it sent.")}><Icon name="clipboard" size={14} /> Copy</button>
-              {b.phone && <a className="btn btn-ghost btn-sm" href={`sms:${b.phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(b.text)}`}><Icon name="chat" size={14} /> Text</a>}
+              {sms && b.phone && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => run(() => post({ action: "sendReminder", bookingId: b.id, channel: "SMS" }), "Reminder texted.")}><Icon name="chat" size={14} /> Text it</button>}
+              {!sms && b.phone && <a className="btn btn-ghost btn-sm" href={`sms:${b.phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(b.text)}`}><Icon name="chat" size={14} /> Text</a>}
               {mailer && b.email && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => run(() => post({ action: "sendReminder", bookingId: b.id, channel: "EMAIL" }), "Reminder emailed.")}><Icon name="mail" size={14} /> Email it</button>}
               <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => run(() => post({ action: "sendReminder", bookingId: b.id, channel: "MANUAL" }), "Marked as reminded.")}>Mark sent</button>
             </div>

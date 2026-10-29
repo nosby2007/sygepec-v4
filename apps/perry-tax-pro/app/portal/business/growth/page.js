@@ -36,6 +36,7 @@ export default async function Page({ searchParams }) {
   const props = {
     tab,
     mailer: d.mailer,
+    sms: d.sms,
     businessName: d.profile?.name || "",
     bookingLink: d.profile?.status === "PUBLISHED" && d.profile.publicBooking ? `/business/${d.profile.slug}/book` : null,
     todo: {

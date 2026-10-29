@@ -4,6 +4,7 @@ import { listAppointments } from "@/lib/data";
 import { getBookingSettings, listClientAppointmentEvents } from "@/lib/appointments";
 import { clientCanChange } from "@/lib/booking";
 import { formatInZone, zoneLabel } from "@/lib/timezone";
+import { twilioVideoConfigured } from "@/lib/twilio";
 import Icon from "@/components/Icon";
 import { Empty, PageHead } from "@/components/ui";
 import ClientAppointmentActions from "./ClientAppointmentActions";
@@ -20,6 +21,7 @@ export default async function Page() {
     listAppointments(s.id), getBookingSettings(session.idToken), listClientAppointmentEvents(session),
   ]);
   const nowMs = new Date().getTime();
+  const inAppVideo = twilioVideoConfigured();
   const upcoming = appts.filter((a) => a.start_ms >= nowMs && a.status !== "CANCELLED");
   const past = appts.filter((a) => !upcoming.includes(a)).reverse();
 
@@ -44,7 +46,14 @@ export default async function Page() {
         {!isPast && a.type === "VIRTUAL" && a.status === "CONFIRMED" && (
           <div className="alert alert-info" style={{ width: "100%" }}>
             <Icon name="video" size={16} />
-            {a.meeting_url ? (
+            {inAppVideo ? (
+              <div className="stack-sm">
+                {/* A full page load, so the call page's camera and microphone permissions apply. */}
+                <a className="btn btn-primary btn-sm" href={`/portal/appointments/${a.id}/call`} id={`join-${a.id}`}><Icon name="video" size={14} /> Join video call</a>
+                <span className="small">The call opens 15 minutes before your appointment. Use a phone or computer with a camera.</span>
+                {a.meeting_instructions && <span className="small" style={{ whiteSpace: "pre-line" }}>{a.meeting_instructions}</span>}
+              </div>
+            ) : a.meeting_url ? (
               <div className="stack-sm">
                 <a className="btn btn-primary btn-sm" href={a.meeting_url} target="_blank" rel="noopener noreferrer" id={`join-${a.id}`}><Icon name="video" size={14} /> Join video call</a>
                 {a.meeting_instructions && <span className="small" style={{ whiteSpace: "pre-line" }}>{a.meeting_instructions}</span>}

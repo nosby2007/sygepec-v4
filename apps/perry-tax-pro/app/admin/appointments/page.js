@@ -5,6 +5,8 @@ import { getBookingSettings } from "@/lib/appointments";
 import { upcomingDaily, countBy } from "@/lib/analytics";
 import { zonedParts } from "@/lib/timezone";
 import { zoomConfigured } from "@/lib/zoom";
+import { mailerConfigured } from "@/lib/mailer";
+import { twilioSmsConfigured, twilioVideoConfigured } from "@/lib/twilio";
 import AppointmentWorkspace from "./AppointmentWorkspace";
 import Icon from "@/components/Icon";
 import { NumberCount } from "@/components/Motion";
@@ -48,7 +50,7 @@ export default async function Page() {
           </div>
         </div>
       </div>
-      <AppointmentWorkspace appointments={appointments} settings={settings} preparers={preparers} zoomEnabled={zoomConfigured()} today={today} />
+      <AppointmentWorkspace appointments={appointments} settings={settings} preparers={preparers} zoomEnabled={zoomConfigured()} channels={{ video: twilioVideoConfigured(), sms: twilioSmsConfigured(), email: mailerConfigured() }} today={today} />
     </>
   );
 }

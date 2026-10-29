@@ -8,13 +8,15 @@ import { formatInZone, zonedParts, zonedTimeToUtc, zoneLabel } from "@/lib/timez
 
 const ACTION_LABELS = {
   BOOKED: "Requested by client", CONFIRMED: "Confirmed", COMPLETED: "Completed", CANCELLED: "Cancelled",
-  RESCHEDULED: "Rescheduled", ASSIGNED: "Assignment", MEETING_UPDATED: "Meeting link", MEETING_SHARED: "Link shared (recorded by staff)", NOTE: "Internal note",
+  RESCHEDULED: "Rescheduled", ASSIGNED: "Assignment", MEETING_UPDATED: "Meeting link", MEETING_SHARED: "Link shared (recorded by staff)", SENT: "Message sent", NOTE: "Internal note",
 };
 const CHANNELS = [
   ["EMAIL_MANUAL", "Email I sent"], ["SMS_MANUAL", "Text message I sent"], ["PHONE", "Phone call"], ["IN_PERSON", "In person"],
 ];
+// Messages the app sent itself are stored as MEETING_SHARED with one of these channels.
+const APP_SENT = new Set(["SMS_TWILIO", "EMAIL_APP"]);
 
-export default function AppointmentDetail({ appointment: a, timeZone, preparers, zoomEnabled, onClose }) {
+export default function AppointmentDetail({ appointment: a, timeZone, preparers, zoomEnabled, channels = {}, onClose }) {
   const router = useRouter();
   const zone = a.time_zone || timeZone;
   // The reschedule form is entered and saved in the office zone.
@@ -147,9 +149,29 @@ export default function AppointmentDetail({ appointment: a, timeZone, preparers,
         </div>
       </div>
 
+      {a.status === "CONFIRMED" && ((channels.video && a.type === "VIRTUAL") || channels.sms || channels.email) && (
+        <>
+          <div className="divider" />
+          <div className="stack-sm">
+            <div className="kicker"><Icon name="send" size={14} /> {a.type === "VIRTUAL" && channels.video ? "Video call and messages" : "Message the client"}</div>
+            <div className="row">
+              {/* A full page load, so the call page's camera and microphone permissions apply. */}
+              {channels.video && a.type === "VIRTUAL" && <a id="start-video" href={`/admin/appointments/${a.id}/call`} className="btn btn-primary btn-sm"><Icon name="video" size={14} /> Start video call</a>}
+              {channels.sms && a.phone && <button type="button" className="btn btn-ghost btn-sm" disabled={!!state.busy} onClick={() => send("send", { channel: "SMS" }, () => setState({ ok: "Text sent." }))}><Icon name="chat" size={14} /> Text the client</button>}
+              {channels.email && a.email && <button type="button" className="btn btn-ghost btn-sm" disabled={!!state.busy} onClick={() => send("send", { channel: "EMAIL" }, () => setState({ ok: "Email sent." }))}><Icon name="mail" size={14} /> Email the client</button>}
+            </div>
+            <span className="hint">
+              {a.type === "VIRTUAL" && channels.video ? "The call opens an hour before the start for you and 15 minutes before for the client. It is not recorded. " : ""}
+              {channels.sms || channels.email ? "Messages confirm the time and point the client to their portal." : ""}
+              {channels.sms && !a.phone ? " No phone number on this booking, so texting is off." : ""}
+            </span>
+          </div>
+        </>
+      )}
+
       <div className="divider" />
       <div className="stack-sm">
-        <div className="kicker"><Icon name="video" size={14} /> Meeting link <span className="hint">Private: only this client and staff can see it</span></div>
+        <div className="kicker"><Icon name="video" size={14} /> {channels.video ? "Zoom link (optional)" : "Meeting link"} <span className="hint">Private: only this client and staff can see it</span></div>
         <div className="field"><label htmlFor="meeting-url">Zoom link</label><input id="meeting-url" className="input" placeholder="https://us02web.zoom.us/j/…" value={form.url} onChange={set("url")} /></div>
         <div className="field"><label htmlFor="meeting-instructions">Instructions for the client</label><textarea id="meeting-instructions" className="textarea" maxLength={1000} placeholder="Passcode, what to have ready…" value={form.instructions} onChange={set("instructions")} /></div>
         <div className="row">
@@ -168,7 +190,7 @@ export default function AppointmentDetail({ appointment: a, timeZone, preparers,
               <input className="input" placeholder="Note (optional)" maxLength={300} value={form.shareNote} onChange={set("shareNote")} />
               <button type="button" className="btn btn-ghost btn-sm" disabled={!!state.busy} onClick={() => send("shared", { channel: form.channel, note: form.shareNote }, () => setForm((f) => ({ ...f, shareNote: "" })))}>Record</button>
             </div>
-            <span className="hint">The app does not send email or text messages yet. This only logs what you did.</span>
+            <span className="hint">This only logs a message you sent yourself.</span>
           </div>
         )}
       </div>
@@ -185,7 +207,7 @@ export default function AppointmentDetail({ appointment: a, timeZone, preparers,
           <ul className="timeline-list">
             {events.map((e) => (
               <li key={e.id} className={e.visibility === "internal" ? "internal" : ""}>
-                <b>{ACTION_LABELS[e.action] || e.action}</b>{e.detail ? `: ${e.detail}` : ""}
+                <b>{ACTION_LABELS[APP_SENT.has(e.channel) ? "SENT" : e.action] || e.action}</b>{e.detail ? `: ${e.detail}` : ""}
                 <span className="hint">{e.actor_name} · {formatInZone(e.created_at, timeZone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{e.visibility === "internal" ? " · staff only" : ""}</span>
               </li>
             ))}

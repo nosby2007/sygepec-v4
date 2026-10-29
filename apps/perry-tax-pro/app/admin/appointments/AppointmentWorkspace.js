@@ -4,7 +4,7 @@ import AppointmentBoard from "./AppointmentBoard";
 import AppointmentCalendar from "./AppointmentCalendar";
 import AppointmentDetail from "./AppointmentDetail";
 
-export default function AppointmentWorkspace({ appointments, settings, preparers, zoomEnabled, today }) {
+export default function AppointmentWorkspace({ appointments, settings, preparers, zoomEnabled, channels, today }) {
   const [selectedId, setSelectedId] = useState(null);
   const selected = appointments.find((a) => a.id === selectedId);
   const select = (id) => {
@@ -17,7 +17,7 @@ export default function AppointmentWorkspace({ appointments, settings, preparers
       <div className={selected ? "grid-main mt" : "mt"}>
         <AppointmentCalendar appointments={appointments} timeZone={settings.timeZone} weekly={settings.weekly} today={today} selectedId={selectedId} onSelect={select} />
         {selected && (
-          <AppointmentDetail key={selected.id} appointment={selected} timeZone={settings.timeZone} preparers={preparers} zoomEnabled={zoomEnabled} onClose={() => setSelectedId(null)} />
+          <AppointmentDetail key={selected.id} appointment={selected} timeZone={settings.timeZone} preparers={preparers} zoomEnabled={zoomEnabled} channels={channels} onClose={() => setSelectedId(null)} />
         )}
       </div>
       <AppointmentBoard appointments={appointments} timeZone={settings.timeZone} onManage={select} />

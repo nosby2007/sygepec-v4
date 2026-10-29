@@ -11,18 +11,25 @@ import { SERVICES } from "@/lib/constants";
 import { cleanText, safeId } from "@/lib/security";
 import { formatInZone, isTimeZone, zoneLabel } from "@/lib/timezone";
 import { createZoomMeeting, zoomConfigured } from "@/lib/zoom";
+import { mailerConfigured, sendEmail } from "@/lib/mailer";
+import { ensureVideoRoom, maskPhone, sendSms, toE164, twilioSmsConfigured, twilioVideoConfigured, videoAccessToken } from "@/lib/twilio";
 
 export const SETTINGS_PATH = "taxSettings/booking";
 const DAY = 86_400_000;
+const MINUTE = 60_000;
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
 
 // How a preparer says they passed the meeting link on. These are records of something
-// a person did; the app itself sends nothing.
+// a person did outside the app.
 export const SHARE_CHANNELS = {
   EMAIL_MANUAL: "Email sent by staff",
   SMS_MANUAL: "Text message sent by staff",
   PHONE: "Read out on a phone call",
   IN_PERSON: "Given in person",
 };
+
+// Messages the app sent itself, recorded with the same event type and these channels.
+export const SENT_CHANNELS = { SMS_TWILIO: "Text sent by the app", EMAIL_APP: "Email sent by the app" };
 
 export class BookingError extends Error {
   constructor(message, status = 400) {
@@ -130,10 +137,22 @@ export async function bookAppointment(session, input) {
   throw new BookingError("That time was just taken. Please pick another slot.", 409);
 }
 
-const PREPARER_ACTIONS = new Set(["confirm", "complete", "cancel", "reschedule", "assign", "meeting", "zoom", "shared", "note"]);
+const PREPARER_ACTIONS = new Set(["confirm", "complete", "cancel", "reschedule", "assign", "meeting", "zoom", "shared", "note", "send"]);
 const CLIENT_ACTIONS = new Set(["cancel", "reschedule"]);
 // Actions that only add a history entry and leave the appointment itself untouched.
-const LOG_ONLY = new Set(["shared", "note"]);
+const LOG_ONLY = new Set(["shared", "note", "send"]);
+
+// The appointment message staff send from the app. It points to the portal rather than
+// carrying a meeting link, so a forwarded text does not let anyone else join.
+export function appointmentMessage(appointment, timeZone) {
+  const startMs = Number.isFinite(appointment.startMs) ? appointment.startMs : Date.parse(appointment.scheduledAt);
+  const when = `${formatInZone(startMs, timeZone, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })} ${zoneLabel(timeZone, new Date(startMs))}`;
+  const first = String(appointment.name || "").split(/\s+/)[0];
+  const how = appointment.type === "VIRTUAL"
+    ? `Join the video call from your portal: ${SITE}/portal/appointments`
+    : "We look forward to seeing you at the office.";
+  return `Hi ${first}, this is InnovaCare Tax confirming your ${appointment.service} appointment on ${when}. ${how}`;
+}
 
 export async function changeAppointment(session, rawId, action, input = {}) {
   const id = safeId(rawId);
@@ -263,6 +282,27 @@ export async function changeAppointment(session, rawId, action, input = {}) {
       events.push(["MEETING_SHARED", [label, cleanText(input.note, 300)].filter(Boolean).join(": "), "internal", input.channel]);
       break;
     }
+    case "send": {
+      if (current.status !== "CONFIRMED") throw new BookingError("Confirm the appointment before messaging the client.");
+      const text = appointmentMessage(current, timeZone);
+      if (input.channel === "SMS") {
+        if (!twilioSmsConfigured()) throw new BookingError("Text messaging is not set up yet.", 409);
+        const to = toE164(current.phone);
+        if (!to) throw new BookingError("This appointment has no valid mobile number.");
+        await sendSms({ to, body: `${text} Reply STOP to opt out.` }).catch(() => {
+          throw new BookingError("The text provider did not accept this message. Copy it and send it yourself.", 502);
+        });
+        events.push(["MEETING_SHARED", `${SENT_CHANNELS.SMS_TWILIO}: ${maskPhone(to)}`, "internal", "SMS_TWILIO"]);
+      } else if (input.channel === "EMAIL") {
+        if (!mailerConfigured()) throw new BookingError("Email sending is not set up yet.", 409);
+        if (!current.email) throw new BookingError("This appointment has no email address.");
+        await sendEmail({ to: current.email, subject: `Your InnovaCare Tax appointment: ${current.service}`, text, fromName: "InnovaCare Tax" }).catch(() => {
+          throw new BookingError("The email provider did not accept this message. Copy it and send it yourself.", 502);
+        });
+        events.push(["MEETING_SHARED", `${SENT_CHANNELS.EMAIL_APP}: ${current.email}`, "internal", "EMAIL_APP"]);
+      } else throw new BookingError("Choose text or email.");
+      break;
+    }
     case "note": {
       const note = cleanText(input.note, 500);
       if (!note) throw new BookingError("Write a note first.");
@@ -282,6 +322,40 @@ export async function changeAppointment(session, rawId, action, input = {}) {
     throw error;
   }
   return { id, ...next };
+}
+
+// ---- Video ---------------------------------------------------------------------------
+
+export const videoRoomName = (appointmentId) => `tax-${appointmentId}`;
+
+// Clients can join from 15 minutes before the start, staff from an hour before; the room
+// stays open until an hour after the scheduled end.
+export function videoWindow(appointment, role) {
+  const startMs = Number.isFinite(appointment.startMs) ? appointment.startMs : Date.parse(appointment.scheduledAt);
+  const minutes = appointment.durationMinutes || 45;
+  return { opensMs: startMs - (role === "PREPARER" ? 60 : 15) * MINUTE, closesMs: startMs + (minutes + 60) * MINUTE };
+}
+
+export async function joinVideo(session, rawId) {
+  if (!twilioVideoConfigured()) throw new BookingError("Video calls are not set up yet.", 409);
+  const id = safeId(rawId);
+  const current = id ? await getDocument(`taxAppointments/${id}`, session.idToken).catch(() => null) : null;
+  const isPreparer = session.role === "PREPARER";
+  if (!current || current.tenantId !== TAX_TENANT || (!isPreparer && current.clientId !== session.uid))
+    throw new BookingError("Appointment not found.", 404);
+  if (current.type !== "VIRTUAL") throw new BookingError("This is an in-person appointment.");
+  if (current.status !== "CONFIRMED") throw new BookingError("The video call opens once the appointment is confirmed.", 409);
+  const { opensMs, closesMs } = videoWindow(current, session.role);
+  const nowMs = Date.now();
+  if (nowMs < opensMs) throw new BookingError(`The video call opens ${isPreparer ? "an hour" : "15 minutes"} before the appointment.`, 409);
+  if (nowMs > closesMs) throw new BookingError("This video call has ended.", 409);
+  const room = videoRoomName(id);
+  await ensureVideoRoom(room).catch(() => { throw new BookingError("The video service is unavailable. Please try again.", 502); });
+  // The text before "|" is the name the other side sees; the uid keeps identities unique.
+  const label = cleanText(session.name, 60).replace(/\|/g, " ") || (isPreparer ? "Preparer" : "Client");
+  const identity = `${isPreparer ? `${label} (InnovaCare)` : label}|${session.uid}`;
+  const token = await videoAccessToken({ identity, room, ttlSeconds: Math.ceil((closesMs - nowMs) / 1000) });
+  return { token, room };
 }
 
 function eventDto(row) {

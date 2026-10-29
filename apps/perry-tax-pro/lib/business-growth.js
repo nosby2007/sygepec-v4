@@ -6,6 +6,7 @@ import {
 import { BusinessError, bookingSettingsOf, getOwnProfile, listOwnerBookings, listStaff, resolveBusiness, whenLabel } from "@/lib/business-booking";
 import { NOTE_KINDS, REMINDER_TEMPLATE, STAGE_KEYS, audience, customerInsights, normEmail, renderTemplate } from "@/lib/growth-shared";
 import { mailerConfigured, sendEmail } from "@/lib/mailer";
+import { sendSms, toE164, twilioSmsConfigured } from "@/lib/twilio";
 import { cleanEmail, cleanText, safeId } from "@/lib/security";
 import { seal, unseal } from "@/lib/sealed";
 import { formatInZone, zonedParts } from "@/lib/timezone";
@@ -43,6 +44,7 @@ export async function loadGrowth(session) {
     campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     optedOut: new Set(optOuts.map((o) => o.emailHash)),
     mailer: mailerConfigured(),
+    sms: twilioSmsConfigured(),
     nowMs,
     timeZoneDate: (ms) => zonedParts(new Date(ms), settings.timeZone).date,
   };
@@ -144,7 +146,7 @@ export function reminderText(booking, profile, settings) {
   });
 }
 
-// channel "EMAIL" sends through the provider; "MANUAL" records that the owner sent it.
+// channel "EMAIL" or "SMS" sends through the provider; "MANUAL" records that the owner sent it.
 export async function sendReminder(session, rawBookingId, channel) {
   const id = safeId(rawBookingId);
   const booking = id ? await getDocument(`bizBookings/${id}`, session.idToken).catch(() => null) : null;
@@ -160,9 +162,18 @@ export async function sendReminder(session, rawBookingId, channel) {
       throw new BusinessError("The email provider did not accept this message. Copy the reminder and send it yourself.", 502);
     });
   }
+  if (channel === "SMS") {
+    if (!twilioSmsConfigured()) throw new BusinessError("Text messaging is not set up yet. Copy the message and send it yourself.", 409);
+    const to = toE164(booking.customerPhone);
+    if (!to) throw new BusinessError("This booking has no valid mobile number.");
+    const dto = { name: booking.customerName, service: booking.serviceName, start_ms: booking.startMs, time_zone: booking.timeZone };
+    await sendSms({ to, body: `${reminderText(dto, profile, bookingSettingsOf(profile))} Reply STOP to opt out.` }).catch(() => {
+      throw new BusinessError("The text provider did not accept this message. Copy the reminder and send it yourself.", 502);
+    });
+  }
   const next = { ...strip(booking), reminderSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await commitWrites([replaceWrite(`bizBookings/${id}`, next, booking.updateTime)], session.idToken);
-  return { sentVia: channel === "EMAIL" ? "email" : "you" };
+  return { sentVia: { EMAIL: "email", SMS: "text" }[channel] || "you" };
 }
 
 // ---- Feedback ---------------------------------------------------------------------------

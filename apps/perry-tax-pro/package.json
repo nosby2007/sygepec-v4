@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --no-warnings --import ./test/node-hooks.mjs lib/booking.test.mjs lib/zoom.test.mjs lib/business-return.test.mjs lib/growth-shared.test.mjs lib/mailer.test.mjs",
+    "test": "node --test --no-warnings --import ./test/node-hooks.mjs lib/booking.test.mjs lib/zoom.test.mjs lib/business-return.test.mjs lib/growth-shared.test.mjs lib/mailer.test.mjs lib/twilio.test.mjs lib/appointments-video.test.mjs",
     "test:rules": "node firebase/test/build-rules.mjs && firebase emulators:exec --config firebase/test/firebase.json --project demo-perry-tax --only firestore,storage \"node --test firebase/test/rules.test.mjs\"",
     "test:integration": "node firebase/test/build-rules.mjs && firebase emulators:exec --config firebase/test/firebase.json --project demo-perry-tax --only firestore,auth,storage \"node --test --no-warnings --import ./test/node-hooks.mjs test/business.integration.test.mjs test/cms.integration.test.mjs test/growth.integration.test.mjs\""
   },
@@ -15,7 +15,8 @@
     "jose": "^6.2.13",
     "next": "^16.4.2",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "twilio-video": "2.36.0"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
