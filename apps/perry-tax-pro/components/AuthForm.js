@@ -34,6 +34,8 @@ export default function AuthForm({ mode, accountType = "TAX", next = null }) {
     const home = data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : isReg ? "/portal/intake" : "/portal";
     // Back to the page the user was on before signing out, if it belongs to their area.
     const back = next && next.startsWith(data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : "/portal") ? next : null;
+    // Password accepted; the authenticator code (or its first setup) comes next.
+    if (data.mfa && data.mfa !== "ok") return router.push(`/login/verify?next=${encodeURIComponent(back || home)}`);
     router.push(back || home);
     router.refresh();
   };

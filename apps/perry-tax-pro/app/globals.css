@@ -967,3 +967,13 @@ tr.muted td { color: var(--faint); }
 .idle-card h2 { margin: 0; font-size: 1.3rem; }
 .idle-card p { margin: 0; color: var(--muted); }
 .idle-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: rgba(245, 184, 65, 0.15); color: var(--gold-ink); }
+
+/* Two-step sign-in */
+.mfa-code { font-size: 1.4rem; letter-spacing: .25em; text-align: center; font-variant-numeric: tabular-nums; }
+.mfa-steps { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.mfa-qr-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.mfa-qr { width: 168px; height: 168px; padding: 8px; background: #fff; border-radius: 12px; border: 1px solid var(--border, #e5e7eb); flex: none; }
+.mfa-qr svg { width: 100%; height: 100%; display: block; }
+.mfa-key { display: block; margin-top: 6px; font-size: .95rem; letter-spacing: .08em; word-break: break-all; }
+.mfa-recovery { margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--surface-2, #f4f6fa); border: 1px solid var(--border, #e5e7eb); font-size: 1rem; line-height: 1.7; columns: 2; }
+.alert-inline { color: var(--danger, #c0392b); }

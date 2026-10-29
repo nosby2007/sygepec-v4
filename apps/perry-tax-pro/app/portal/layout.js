@@ -10,6 +10,7 @@ const taxLinks = [
   { href: "/portal/documents", label: "Documents", icon: "folder" },
   { href: "/portal/appointments", label: "Appointments", icon: "calendar" },
   { href: "/portal/messages", label: "Messages", icon: "chat" },
+  { href: "/portal/security", label: "Security", icon: "shield" },
 ];
 
 const businessLinks = [
@@ -22,6 +23,7 @@ const businessLinks = [
   { href: "/portal/business/profile", label: "Public page", icon: "megaphone" },
   { href: "/portal/business/accounting", label: "Accounting", icon: "book" },
   { href: "/portal/business/plan", label: "Plan & payments", icon: "wallet" },
+  { href: "/portal/security", label: "Security", icon: "shield" },
 ];
 
 export default async function PortalLayout({ children }) {

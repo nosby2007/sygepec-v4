@@ -44,5 +44,9 @@ export const cookieOptions = () => ({
   secure: process.env.NODE_ENV === "production",
 });
 
+// A password sign-in that still owes its second step ("verify" or "setup"). Preparer
+// sessions from before two-step sign-in existed carry no flag and must pass it too.
+export const mfaPending = (session) => (session?.mfa ? session.mfa !== "ok" : session?.role === "PREPARER");
+
 export const idleExpired = (session, nowMs = Date.now()) =>
   Number.isFinite(session?.lastSeen) && nowMs - session.lastSeen > SERVER_IDLE_MS;

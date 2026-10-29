@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COOKIE, cookieOptions, idleExpired, openSession, sealSession } from "@/lib/session-token";
+import { COOKIE, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
 import { allows, featureForPath, upgradeMessage } from "@/lib/plans";
 import { getEntitlement } from "@/lib/entitlements";
 
@@ -56,6 +56,15 @@ export async function proxy(request) {
     return response;
   }
 
+  // Password accepted but the second sign-in step is still owed: only the two-step
+  // screens (and the sign-in API they use) are open.
+  if (mfaPending(session)) {
+    if (request.nextUrl.pathname.startsWith("/api/auth/")) return NextResponse.next();
+    return isApi
+      ? NextResponse.json({ error: "Finish two-step sign-in first.", mfa: true }, { status: 401 })
+      : NextResponse.redirect(publicUrl(request, `/login/verify?next=${encodeURIComponent(request.nextUrl.pathname)}`));
+  }
+
   // Business plans: the feature this path needs, checked against the cached plan. The
   // plan page always reads it fresh, so an upgrade shows at once.
   const path = request.nextUrl.pathname;
@@ -91,5 +100,5 @@ export async function proxy(request) {
 
 // Background requests the browser makes on its own must not count as activity.
 export const config = {
-  matcher: ["/portal/:path*", "/admin/:path*", "/api/((?!auth/logout|cron|public|payments/confirm).*)"],
+  matcher: ["/portal/:path*", "/admin/:path*", "/api/((?!auth/logout|cron|public|payments/confirm|stripe/webhook).*)"],
 };

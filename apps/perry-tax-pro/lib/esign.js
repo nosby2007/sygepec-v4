@@ -5,6 +5,8 @@ import { getReturnForSession } from "@/lib/data";
 import { paymentGate } from "@/lib/payments";
 import { notifyStatusChange, emailClient } from "@/lib/notifications";
 import { serviceToken } from "@/lib/service-identity";
+import { audit } from "@/lib/audit";
+import { scanFile, scanMessage } from "@/lib/file-scan";
 import { cleanEmail, cleanText, safeId } from "@/lib/security";
 
 // Online signing of Form 8879 through DocuSeal, with third-party knowledge-based
@@ -91,6 +93,8 @@ export async function sendForSignature(session, rawReturnId, input) {
 
   const pdf = Buffer.from(String(input.pdf || ""), "base64");
   if (!pdf.length || pdf.length > MAX_PDF_BYTES || pdf.subarray(0, 5).toString() !== "%PDF-") throw new SignError("Upload the Form 8879 PDF from your tax software (8 MB at most).");
+  const scan = scanFile(pdf, { allowed: ["application/pdf"] });
+  if (!scan.ok) throw new SignError(scanMessage(scan) || "Upload the Form 8879 PDF from your tax software (8 MB at most).");
   const spouseEmail = cleanEmail(input.spouseEmail);
   const spouseName = cleanText(input.spouseName, 100);
   if ((spouseEmail && !spouseName) || (!spouseEmail && spouseName)) throw new SignError("Enter both the spouse's name and email, or neither.");
@@ -157,15 +161,19 @@ async function download(url) {
 
 // Saves a file into the return's documents with the signed-in user's own access, the
 // same way an upload does (the server identity has no Storage permission).
+// The file goes up with the user's token (the server identity has no Storage access);
+// the record is written by the server identity, the only writer the rules allow for
+// these types. "signed-" files cannot be deleted under the Storage rules.
 async function storeDocument(session, sig, type, filename, bytes) {
   const id = crypto.randomUUID();
-  const storagePath = `tax/${TAX_TENANT}/${sig.clientId}/${sig.returnId}/${id}/document.pdf`;
+  const storagePath = `tax/${TAX_TENANT}/${sig.clientId}/${sig.returnId}/${id}/signed-${type === "SIGNED_8879" ? "8879" : "audit"}.pdf`;
   await uploadObject(storagePath, bytes, "application/pdf", session.idToken);
+  const token = await serviceToken();
   await setDocument(`taxDocuments/${id}`, {
     tenantId: TAX_TENANT, returnId: sig.returnId, clientId: sig.clientId, type, filename, storagePath,
     mime: "application/pdf", size: bytes.length, uploadedBy: session.uid, createdAt: new Date().toISOString(),
-  }, session.idToken, { createOnly: true });
-  await incrementDocument(`taxReturns/${sig.returnId}`, "docCount", 1, session.idToken).catch(() => null);
+  }, token, { createOnly: true });
+  await incrementDocument(`taxReturns/${sig.returnId}`, "docCount", 1, token).catch(() => null);
   return id;
 }
 
@@ -204,5 +212,6 @@ export async function syncSignature(session, rawReturnId) {
   const signedAt = signers.map((s) => s.completedAt).filter(Boolean).sort().at(-1) || now;
   await setDocument(`taxSignatures/${id}`, { ...strip(sig), signers, status: "COMPLETED", completedAt: signedAt, ...evidence, updatedAt: now }, token);
   await patchFields(`taxReturns/${id}`, { signatureStatus: "SIGNED", signatureMethod: "REMOTE", signedAt, updatedAt: now }, token);
+  await audit(null, "SIGNATURE_COMPLETED", { target: `taxReturns/${id}`, details: { submissionId: sig.submissionId, signedDocumentId: evidence.signedDocumentId || "", auditDocumentId: evidence.auditDocumentId || "" } });
   return { ...sig, signers, status: "COMPLETED", completedAt: signedAt, ...evidence };
 }

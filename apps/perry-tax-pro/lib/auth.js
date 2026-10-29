@@ -2,9 +2,10 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
-import { COOKIE, cookieOptions, idleExpired, openSession, sealSession } from "@/lib/session-token";
+import { COOKIE, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
 
-export async function createSession(firebaseAuth, profile) {
+// mfa: "ok", or "verify" / "setup" while the second sign-in step is still owed.
+export async function createSession(firebaseAuth, profile, mfa = "ok") {
   const expiresAt = Date.now() + Number(firebaseAuth.expiresIn || 3600) * 1000;
   const token = await sealSession({
     uid: firebaseAuth.localId || firebaseAuth.user_id,
@@ -16,6 +17,7 @@ export async function createSession(firebaseAuth, profile) {
     refreshToken: firebaseAuth.refreshToken || firebaseAuth.refresh_token,
     expiresAt,
     lastSeen: Date.now(),
+    mfa,
   });
   (await cookies()).set(COOKIE, token, cookieOptions());
 }
@@ -30,9 +32,23 @@ async function decryptSession() {
   return session && !idleExpired(session) ? session : null;
 }
 
+// The signed-in session as sealed, even while the second sign-in step is owed. Only the
+// two-step pages and API may use it; everything else goes through getFirebaseSession.
+export async function getPendingSession() {
+  const session = await decryptSession();
+  return session?.uid ? session : null;
+}
+
+export async function setMfaState(mfa) {
+  const session = await decryptSession();
+  if (!session) return;
+  const { exp: _e, iat: _i, ...rest } = session;
+  (await cookies()).set(COOKIE, await sealSession({ ...rest, mfa, lastSeen: Date.now() }), cookieOptions());
+}
+
 export async function getFirebaseSession() {
   const session = await decryptSession();
-  if (!session?.uid || !session?.refreshToken) return null;
+  if (!session?.uid || !session?.refreshToken || mfaPending(session)) return null;
   try {
     let idToken = session.idToken;
     if (!idToken || Number(session.expiresAt || 0) < Date.now() + 60_000) {

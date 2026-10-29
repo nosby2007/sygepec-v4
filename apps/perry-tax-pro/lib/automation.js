@@ -1,5 +1,6 @@
 import "server-only";
-import { getDocument, patchFields, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
+import { deleteDocument, getDocument, patchFields, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
+import { AUDIT_RETENTION_YEARS, audit } from "@/lib/audit";
 import { reserveSummary } from "@/lib/connect";
 import { getEntitlement } from "@/lib/entitlements";
 import { allows } from "@/lib/plans";
@@ -23,7 +24,16 @@ const DAY = 24 * HOUR;
 const older = (iso, ms, nowMs) => !iso || Date.parse(iso) < nowMs - ms;
 const mine = (rows) => rows.filter((row) => row.tenantId === TAX_TENANT);
 
-export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve"];
+export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve", "retention"];
+
+// How long records are kept. Tax files follow IRS guidance: a preparer keeps a copy of
+// each return and Form 8879 for 3 years, and records that support a return are kept
+// up to 7 years; nothing about a return is deleted automatically, only listed for review.
+export const RETENTION = {
+  auditYears: AUDIT_RETENTION_YEARS,
+  returnYears: 7,
+  unpaidLinkDays: 30,
+};
 
 export async function runDaily({ dryRun = false, nowMs = Date.now(), only = TASKS } = {}) {
   const token = await serviceToken();
@@ -180,6 +190,34 @@ const RUNNERS = {
       results.push(sent);
     }
     return summary(due, results);
+  },
+
+  // Data retention: removes security-log entries past their 7 years, closes online
+  // invoice payment links nobody used, and counts tax returns old enough to review for
+  // removal (a person decides; nothing about a return is deleted here).
+  async retention(ctx) {
+    const auditCutoff = new Date(ctx.nowMs - RETENTION.auditYears * 365.25 * DAY).toISOString();
+    const linkCutoff = new Date(ctx.nowMs - RETENTION.unpaidLinkDays * DAY).toISOString();
+    const oldestYear = new Date(ctx.nowMs).getUTCFullYear() - RETENTION.returnYears - 1;
+    const [oldAudit, openLinks, oldReturns] = await Promise.all([
+      queryCollection("taxAudit", ctx.token, { filters: [["at", "LESS_THAN", auditCutoff]], limit: 500 }),
+      queryCollection("taxBizPayments", ctx.token, { filters: [["status", "EQUAL", "OPEN"]], limit: 2000 }),
+      queryCollection("taxReturns", ctx.token, { filters: [["taxYear", "LESS_THAN_OR_EQUAL", oldestYear]], limit: 2000 }),
+    ]);
+    const auditDue = mine(oldAudit);
+    const linksDue = mine(openLinks).filter((p) => older(p.createdAt, RETENTION.unpaidLinkDays * DAY, ctx.nowMs));
+    const reviewDue = mine(oldReturns).length;
+    if (ctx.dryRun) return { auditRemoved: auditDue.length, linksClosed: linksDue.length, returnsToReview: reviewDue, dryRun: true };
+    let auditRemoved = 0;
+    for (const entry of auditDue) {
+      if (await deleteDocument(`taxAudit/${entry.id}`, ctx.token).then(() => true, () => false)) auditRemoved++;
+    }
+    let linksClosed = 0;
+    for (const link of linksDue) {
+      if (await patchFields(`taxBizPayments/${link.id}`, { status: "EXPIRED", expiredAt: new Date(ctx.nowMs).toISOString() }, ctx.token).then(() => true, () => false)) linksClosed++;
+    }
+    if (auditRemoved || linksClosed) await audit(null, "RETENTION_RUN", { details: { auditRemoved, linksClosed, auditOlderThan: auditCutoff.slice(0, 10), linksOlderThan: linkCutoff.slice(0, 10) } });
+    return { auditRemoved, linksClosed, returnsToReview: reviewDue };
   },
 
   // Keeps business plan status in step with Stripe (renewals, failed cards, cancellations).

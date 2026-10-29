@@ -32,7 +32,9 @@ match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
     && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png|image/webp|image/heic)');
   allow update: if false;
   // Matches the Firestore taxDocuments rule: clients cannot remove files from a filed return.
+  // Signed Form 8879 files (signed-*.pdf) are kept for the IRS retention period.
   allow delete: if request.auth != null
+    && !fileName.matches('signed-.*')
     && validTaxReturn(clientUid, returnId)
     && (
       taxPreparer()

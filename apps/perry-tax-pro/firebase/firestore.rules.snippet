@@ -132,13 +132,17 @@ match /taxDocuments/{docId} {
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == taxReturn(request.resource.data.returnId).clientId
     && request.resource.data.uploadedBy == request.auth.uid
+    // Signed Form 8879 and its audit trail are written only by the server identity.
+    && !(request.resource.data.type in ['SIGNED_8879', 'SIGNATURE_AUDIT'])
     // The record may only point at this return's own Storage folder.
     && request.resource.data.storagePath is string
     && request.resource.data.storagePath.matches(
       'tax/perry-tax-pro/' + request.resource.data.clientId + '/' + request.resource.data.returnId + '/' + docId + '/[^/]+'
     );
   allow update: if false;
+  // Signed Form 8879 and its audit trail must be kept (3 years); nobody deletes them here.
   allow delete: if canAccessTaxReturn(resource.data.returnId)
+    && !(resource.data.type in ['SIGNED_8879', 'SIGNATURE_AUDIT'])
     && (
       taxPreparer()
       || (

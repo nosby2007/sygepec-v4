@@ -11,6 +11,7 @@ const links = [
   { href: "/admin/business", label: "Business Tax", icon: "building" },
   { href: "/admin/payments", label: "Payments & growth", icon: "dollar" },
   { href: "/admin/content", label: "Website", icon: "megaphone" },
+  { href: "/admin/security", label: "Security", icon: "shield" },
 ];
 
 export default async function AdminLayout({ children }) {

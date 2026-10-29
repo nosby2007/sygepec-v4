@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit";
 import { getFirebaseSession } from "@/lib/auth";
 import { getReturnForSession } from "@/lib/data";
 import { getDocument, mergeDocument } from "@/lib/firebase";
@@ -127,6 +128,8 @@ export async function PUT(req, { params }) {
   } catch {
     return Response.json({ error: "The return could not be updated. Please try again." }, { status: 503, headers: privateHeaders });
   }
+  const { updatedAt: _u, ...logged } = changes;
+  await audit(session, "RETURN_UPDATED", { target: `taxReturns/${r.id}`, details: logged });
   if (changes.status && changes.status !== r.status) await notifyStatusChange(r, changes.status).catch(() => {});
   return Response.json({ ok: true, status: changes.status || r.status }, { headers: privateHeaders });
 }

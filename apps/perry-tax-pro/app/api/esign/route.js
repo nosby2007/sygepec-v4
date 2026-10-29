@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit";
 import { getFirebaseSession } from "@/lib/auth";
 import { SignError, cancelSignature, sendForSignature, signatureView, syncSignature } from "@/lib/esign";
 import { ServiceIdentityError } from "@/lib/service-identity";
@@ -11,8 +12,16 @@ export async function POST(req) {
   if (!session || session.accountType === "BUSINESS") return Response.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
   const body = await req.json().catch(() => ({}));
   try {
-    if (body.action === "send") return Response.json({ ok: true, signature: await sendForSignature(session, body.returnId, body) }, { headers: privateHeaders });
-    if (body.action === "cancel") return Response.json(await cancelSignature(session, body.returnId), { headers: privateHeaders });
+    if (body.action === "send") {
+      const signature = await sendForSignature(session, body.returnId, body);
+      await audit(session, "SIGNATURE_SENT", { target: `taxReturns/${body.returnId}`, details: { joint: Boolean(body.spouseEmail) } });
+      return Response.json({ ok: true, signature }, { headers: privateHeaders });
+    }
+    if (body.action === "cancel") {
+      const result = await cancelSignature(session, body.returnId);
+      await audit(session, "SIGNATURE_CANCELLED", { target: `taxReturns/${body.returnId}` });
+      return Response.json(result, { headers: privateHeaders });
+    }
     if (body.action === "sync") return Response.json({ ok: true, signature: signatureView(await syncSignature(session, body.returnId), session.uid) }, { headers: privateHeaders });
     return Response.json({ error: "Unsupported action." }, { status: 400, headers: privateHeaders });
   } catch (error) {

@@ -101,7 +101,7 @@ export default function DocumentCenter({ returnId, docs, checklist, canDelete = 
                   <div className="hint">{DOC_TYPES[d.type] || SYSTEM_DOC_TYPES[d.type] || "Document"} · {kb(d.size)} · {fmtDate(d.created_at)}</div>
                 </div>
               </div>
-              {canDelete && <button className="btn btn-ghost btn-icon" onClick={() => remove(d.id)} aria-label={`Remove ${d.filename}`}><Icon name="x" size={16} /></button>}
+              {canDelete && !SYSTEM_DOC_TYPES[d.type] && <button className="btn btn-ghost btn-icon" onClick={() => remove(d.id)} aria-label={`Remove ${d.filename}`}><Icon name="x" size={16} /></button>}
             </div>
           ))}
         </div>

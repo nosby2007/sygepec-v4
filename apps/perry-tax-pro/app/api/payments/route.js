@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit";
 import { getFirebaseSession } from "@/lib/auth";
 import {
   PaymentError, chooseRefundTransfer, setFee, setSubscriptionCancel, startCheckout, startSubscription,
@@ -37,6 +38,7 @@ export async function POST(req) {
   if (!run) return Response.json({ error: "Unsupported action." }, { status: 400, headers: privateHeaders });
   try {
     const result = await run(session, body);
+    if (["fee", "paid", "waive", "reopen"].includes(body.action)) await audit(session, "FEE_CHANGED", { target: `${body.kind}/${body.refId}`, details: { action: body.action, amount: body.amount ?? "", timing: body.timing ?? "", method: body.method ?? "", note: body.note ?? "" } });
     return Response.json({ ok: true, url: result?.url || null, changed: Boolean(result?.changed), expiresAt: result?.expiresAt || null }, { headers: privateHeaders });
   } catch (error) {
     if (error instanceof PaymentError || error instanceof ConnectError) return Response.json({ error: error.message }, { status: error.status, headers: privateHeaders });

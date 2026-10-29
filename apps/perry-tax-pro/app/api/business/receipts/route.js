@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import {getFirebaseSession} from '@/lib/business-auth';
 import {getDocument,setDocument,uploadObject,deleteObject,TAX_TENANT} from '@/lib/firebase';
 import {mutationGuard,privateHeaders} from '@/lib/security';
+import {audit} from '@/lib/audit';
+import {scanFile,scanMessage} from '@/lib/file-scan';
 export async function POST(req){
  const blocked=mutationGuard(req);if(blocked)return blocked;
  const s=await getFirebaseSession();if(!s||s.role!=='CLIENT')return Response.json({error:'Unauthorized'},{status:401,headers:privateHeaders});
@@ -13,11 +15,9 @@ export async function POST(req){
  const entry=await getDocument('taxBusinessEntries/'+entryId,s.idToken);
  if(!entry||entry.clientId!==s.uid||entry.kind!=='expense')return Response.json({error:'Expense not found'},{status:404,headers:privateHeaders});
  const bytes=new Uint8Array(await file.arrayBuffer());
- const pdf=String.fromCharCode(...bytes.slice(0,5))==='%PDF-';
- const jpg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
- const png=bytes[0]===137&&String.fromCharCode(...bytes.slice(1,4))==='PNG';
- if(!pdf&&!jpg&&!png)return Response.json({error:'PDF, JPG or PNG only'},{status:400,headers:privateHeaders});
- const mime=pdf?'application/pdf':jpg?'image/jpeg':'image/png',ext=pdf?'pdf':jpg?'jpg':'png';
+ const scan=scanFile(bytes,{allowed:['application/pdf','image/jpeg','image/png']});
+ if(!scan.ok){const unsafe=scanMessage(scan);if(unsafe)await audit(s,'UPLOAD_BLOCKED',{target:'taxBusinessEntries/'+entryId,details:{filename:file.name,reason:scan.reason}});return Response.json({error:unsafe||'PDF, JPG or PNG only'},{status:400,headers:privateHeaders});}
+ const {mime,ext}=scan;
  const id=crypto.randomUUID(),path='tax/perry-tax-pro/business/'+s.uid+'/'+entryId+'/'+id+'.'+ext;
  await uploadObject(path,bytes,mime,s.idToken);
  try{await setDocument('taxBusinessReceipts/'+id,{tenantId:TAX_TENANT,clientId:s.uid,entryId,taxYear:entry.taxYear,storagePath:path,mime,size:file.size,createdAt:new Date().toISOString()},s.idToken,{createOnly:true});}
