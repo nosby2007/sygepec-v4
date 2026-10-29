@@ -5,6 +5,7 @@ import { intakeToEstimate, buildChecklist } from "@/lib/tax";
 import { money, fmtDate, STATUSES, statusIndex, DOC_TYPES } from "@/lib/constants";
 import { Timeline, StatusBadge, statusProgress } from "@/components/Status";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
+import { twilioVideoConfigured } from "@/lib/twilio";
 import Icon from "@/components/Icon";
 import { MoneyCount } from "@/components/Motion";
 import { Donut, ProgressRing, PALETTE } from "@/components/charts";
@@ -22,6 +23,7 @@ export default async function Dashboard() {
   const est = r.intake.submitted ? intakeToEstimate(r.intake) : null;
   const lastNote = notes.filter((n) => n.author_id !== s.id).at(-1);
   const upcoming = appointments.filter((a) => new Date(a.scheduled_at) > new Date() && a.status !== "CANCELLED")[0];
+  const inAppVideo = twilioVideoConfigured();
   const progress = statusProgress(r.status);
 
   const next =
@@ -88,7 +90,13 @@ export default async function Dashboard() {
           <div className="val" style={{ fontSize: "1.15rem" }}>
             {upcoming ? fmtDate(upcoming.scheduled_at, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "None scheduled"}
           </div>
-          <div className="kpi-foot"><Link href={upcoming ? "/portal/appointments" : "/book"} className="small grad-text" style={{ fontWeight: 600 }}>{upcoming ? "View details" : "Book now →"}</Link></div>
+          <div className="kpi-foot">
+            {/* A full page load, so the call page's camera and microphone permissions apply. */}
+            {upcoming && inAppVideo && upcoming.type === "VIRTUAL" && upcoming.status === "CONFIRMED" && (
+              <a href={`/portal/appointments/${upcoming.id}/call`} className="btn btn-primary btn-sm" style={{ marginRight: 10 }}><Icon name="video" size={14} /> Join video call</a>
+            )}
+            <Link href={upcoming ? "/portal/appointments" : "/book"} className="small grad-text" style={{ fontWeight: 600 }}>{upcoming ? "View details" : "Book now →"}</Link>
+          </div>
         </div>
         <div className="card kpi card-hover">
           <div className="kpi-head"><div className="lbl">Your preparer</div><span className="kpi-icon violet"><Icon name="user" size={18} /></span></div>

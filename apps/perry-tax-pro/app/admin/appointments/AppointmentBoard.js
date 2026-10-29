@@ -10,13 +10,14 @@ const FILTERS = ["ACTION_NEEDED", "UPCOMING", "COMPLETED", "CANCELLED", "ALL"];
 
 const ACTIONS = { CONFIRMED: "confirm", COMPLETED: "complete", CANCELLED: "cancel" };
 
-export default function AppointmentBoard({ appointments, timeZone, onManage }) {
+export default function AppointmentBoard({ appointments, timeZone, onManage, videoEnabled }) {
   const router = useRouter();
   // Optimistic status overrides until the refreshed server data arrives.
   const [pending, setPending] = useState({});
   const rows = useMemo(() => appointments.map((item) => (pending[item.id] ? { ...item, status: pending[item.id] } : item)), [appointments, pending]);
   const fmtDate = (value, options) => formatInZone(value, timeZone, options);
-  const [filter, setFilter] = useState("ACTION_NEEDED");
+  // Open on the confirmation queue only when something is waiting in it.
+  const [filter, setFilter] = useState(() => (appointments.some((item) => item.status === "REQUESTED") ? "ACTION_NEEDED" : "UPCOMING"));
   const [error, setError] = useState("");
   const [now] = useState(() => Date.now());
   const filtered = useMemo(() => rows.filter((item) => {
@@ -79,11 +80,15 @@ export default function AppointmentBoard({ appointments, timeZone, onManage }) {
             </div>
             <div className="small"><b>{item.service}</b>{item.notes && <p className="small" style={{ marginTop: 6 }}>{item.notes}</p>}</div>
             <div className="row appointment-actions">
+              {/* A full page load, so the call page's camera and microphone permissions apply. */}
+              {videoEnabled && item.type === "VIRTUAL" && item.status === "CONFIRMED" && new Date(item.scheduled_at).getTime() >= now - 3 * 3_600_000 && (
+                <a className="btn btn-primary btn-sm" href={`/admin/appointments/${item.id}/call`}><Icon name="video" size={14} /> Start video call</a>
+              )}
               {item.status === "REQUESTED" && <button className="btn btn-primary btn-sm" onClick={() => change(item.id, "CONFIRMED")}><Icon name="check" size={14} /> Confirm</button>}
               {item.status === "CONFIRMED" && <button className="btn btn-primary btn-sm" onClick={() => change(item.id, "COMPLETED")}><Icon name="check" size={14} /> Complete</button>}
               {!["COMPLETED", "CANCELLED"].includes(item.status) && <button className="btn btn-danger btn-sm" onClick={() => change(item.id, "CANCELLED")}>Cancel</button>}
               <button className="btn btn-ghost btn-sm" onClick={() => onManage(item.id)}>Manage</button>
-              {item.type === "VIRTUAL" && item.status === "CONFIRMED" && !item.meeting_url && <span className="pill warn">No video link</span>}
+              {!videoEnabled && item.type === "VIRTUAL" && item.status === "CONFIRMED" && !item.meeting_url && <span className="pill warn">No video link</span>}
             </div>
           </article>
         ))}

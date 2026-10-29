@@ -20,7 +20,7 @@ export default function AppointmentWorkspace({ appointments, settings, preparers
           <AppointmentDetail key={selected.id} appointment={selected} timeZone={settings.timeZone} preparers={preparers} zoomEnabled={zoomEnabled} channels={channels} onClose={() => setSelectedId(null)} />
         )}
       </div>
-      <AppointmentBoard appointments={appointments} timeZone={settings.timeZone} onManage={select} />
+      <AppointmentBoard appointments={appointments} timeZone={settings.timeZone} onManage={select} videoEnabled={Boolean(channels?.video)} />
     </>
   );
 }
