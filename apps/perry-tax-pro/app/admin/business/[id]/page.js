@@ -11,6 +11,9 @@ import Icon from "@/components/Icon";
 import BusinessTaxCaseEditor from "./BusinessTaxCaseEditor";
 import BusinessReturnPanel from "./BusinessReturnPanel";
 import { loadReturn } from "@/lib/business-return-server";
+import FeeControls from "@/components/FeeControls";
+import { chargeView, getCharge, paymentsReady } from "@/lib/payments";
+import { BUSINESS_RETURN_BASE_CENTS } from "@/lib/billing";
 
 const moneyCents = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format((value || 0) / 100);
 const date = (value) => value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
@@ -23,7 +26,11 @@ export default async function BusinessTaxCasePage({ params }) {
   if (!loaded) notFound();
   const { record } = loaded;
   const { updateTime: _u, createTime: _c, ...returnData } = loaded.ret;
-  const users = await queryCollection("taxUsers", session.idToken, { filters: [["tenantId", "EQUAL", TAX_TENANT]], limit: 1000 });
+  const [users, charge, payments] = await Promise.all([
+    queryCollection("taxUsers", session.idToken, { filters: [["tenantId", "EQUAL", TAX_TENANT]], limit: 1000 }),
+    getCharge("BUSINESS_RETURN", record.report.id).catch(() => null),
+    paymentsReady(),
+  ]);
   const preparers = users.filter((user) => user.role === "PREPARER").map((user) => ({ id: user.uid || user.id, name: user.name }));
   const months = monthlyLedger(record.entries, record.report.taxYear).map((month) => ({ label: month.label, values: [month.income, month.expense] }));
   const categories = Object.entries(record.summary.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label, value], index) => ({ label, value, color: [PALETTE.blue, PALETTE.teal, PALETTE.gold, PALETTE.violet, PALETTE.orange][index % 5] }));
@@ -45,6 +52,7 @@ export default async function BusinessTaxCasePage({ params }) {
 
       <BusinessTaxCaseEditor report={record.report} preparers={preparers} statuses={BUSINESS_TAX_STATUSES} priorities={BUSINESS_TAX_PRIORITIES} />
 
+      <div className="mt"><FeeControls kind="BUSINESS_RETURN" refId={record.report.id} charge={chargeView(charge, loaded.ret.status)} available={payments} defaultAmount={(BUSINESS_RETURN_BASE_CENTS / 100).toFixed(2)} /></div>
       <BusinessReturnPanel key={returnData.version} caseId={record.report.id} initial={returnData} books={loaded.books} events={loaded.events.map(({ id: eventId, action, detail, actorName, createdAt }) => ({ id: eventId, action, detail, actorName, createdAt }))} />
 
       <Reveal className="grid-main mt">

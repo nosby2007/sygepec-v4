@@ -21,6 +21,7 @@ const businessLinks = [
   { href: "/portal/business/team", label: "Team", icon: "user" },
   { href: "/portal/business/profile", label: "Public page", icon: "megaphone" },
   { href: "/portal/business/accounting", label: "Accounting", icon: "book" },
+  { href: "/portal/business/plan", label: "Plan & payments", icon: "wallet" },
 ];
 
 export default async function PortalLayout({ children }) {

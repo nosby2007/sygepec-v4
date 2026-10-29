@@ -224,6 +224,16 @@ export async function incrementDocument(path, fieldPath, amount, idToken) {
   });
 }
 
+// Sets only the named fields of an existing document, leaving every other field as it is.
+export async function patchFields(path, fields, idToken) {
+  const mask = Object.keys(fields).map((field) => `updateMask.fieldPaths=${encodeURIComponent(field)}`).join("&");
+  return decodeDocument(await jsonRequest(`${docBase()}/${path}?${mask}&currentDocument.exists=true`, {
+    method: "PATCH",
+    headers: authHeaders(idToken),
+    body: JSON.stringify({ fields: encodeFields(fields) }),
+  }));
+}
+
 export async function mergeDocument(path, changes, idToken) {
   const current = await getDocument(path, idToken);
   if (!current) return null;

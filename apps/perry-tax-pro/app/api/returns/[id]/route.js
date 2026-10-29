@@ -3,6 +3,8 @@ import { getReturnForSession } from "@/lib/data";
 import { getDocument, mergeDocument } from "@/lib/firebase";
 import { SIGNATURE_METHODS, SIGNATURE_STATUSES, STATUSES, SUBMISSION_STATUSES } from "@/lib/constants";
 import { cleanText, mutationGuard, privateHeaders, sanitizeIntake } from "@/lib/security";
+import { paymentGate } from "@/lib/payments";
+import { notifyStatusChange } from "@/lib/notifications";
 
 export async function GET(_req, { params }) {
   const r = await getReturnForSession((await params).id, await getFirebaseSession());
@@ -59,6 +61,10 @@ export async function PUT(req, { params }) {
     return Response.json({ error: "Assign a preparer before starting the signature workflow." }, { status: 400 });
   if (["READY", "SUBMITTED", "ACCEPTED"].includes(effectiveSubmissionStatus) && effectiveSignatureStatus !== "SIGNED")
     return Response.json({ error: "A verified Form 8879 signature is required before e-file submission." }, { status: 400 });
+  // Payment gate: only steps that move forward are checked, so a return can always go back.
+  const gate = (body.signatureStatus === "SIGNED" && r.signature_status !== "SIGNED" && await paymentGate("TAX_RETURN", r.id, "SIGN"))
+    || (["READY", "SUBMITTED"].includes(body.submissionStatus) && body.submissionStatus !== r.submission_status && await paymentGate("TAX_RETURN", r.id, "FILE"));
+  if (gate) return Response.json({ error: gate }, { status: 402, headers: privateHeaders });
 
   const now = new Date().toISOString();
   const changes = { updatedAt: new Date().toISOString() };
@@ -121,5 +127,6 @@ export async function PUT(req, { params }) {
   } catch {
     return Response.json({ error: "The return could not be updated. Please try again." }, { status: 503, headers: privateHeaders });
   }
+  if (changes.status && changes.status !== r.status) await notifyStatusChange(r, changes.status).catch(() => {});
   return Response.json({ ok: true, status: changes.status || r.status }, { headers: privateHeaders });
 }

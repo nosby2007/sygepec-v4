@@ -6,12 +6,14 @@ import { money, fmtDate, STATUSES, statusIndex, DOC_TYPES } from "@/lib/constant
 import { Timeline, StatusBadge, statusProgress } from "@/components/Status";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 import { twilioVideoConfigured } from "@/lib/twilio";
+import { chargeView, getCharge } from "@/lib/payments";
+import PayCard from "@/components/PayCard";
 import Icon from "@/components/Icon";
 import { MoneyCount } from "@/components/Motion";
 import { Donut, ProgressRing, PALETTE } from "@/components/charts";
 import { Avatar, ChartEmpty } from "@/components/ui";
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }) {
   const s = await requireTaxClient();
   const r = await getClientReturn(s.id);
   if (!r) return <p>No return found. Please contact support.</p>;
@@ -24,6 +26,8 @@ export default async function Dashboard() {
   const lastNote = notes.filter((n) => n.author_id !== s.id).at(-1);
   const upcoming = appointments.filter((a) => new Date(a.scheduled_at) > new Date() && a.status !== "CANCELLED")[0];
   const inAppVideo = twilioVideoConfigured();
+  const fee = chargeView(await getCharge("TAX_RETURN", r.id).catch(() => null), r.status);
+  const paymentNotice = (await searchParams)?.payment;
   const progress = statusProgress(r.status);
 
   const next =
@@ -48,6 +52,8 @@ export default async function Dashboard() {
 
   return (
     <>
+      {paymentNotice === "paid" && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="check" size={16} />Payment received. Thank you.</div>}
+      {fee?.due && <div style={{ marginBottom: 16 }}><PayCard charge={fee} notice={paymentNotice} refundOption={Boolean(est && est.refund * 100 >= fee.amountCents)} /></div>}
       <section className="page-banner">
         <div>
           <div className="kicker"><Icon name="sparkle" size={14} /> Tax Year {r.tax_year}</div>

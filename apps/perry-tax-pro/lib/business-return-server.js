@@ -6,6 +6,8 @@ import {
 } from "@/lib/business-return";
 import { commitWrites, createWrite, getDocument, isConflict, queryCollection, replaceWrite, TAX_TENANT } from "@/lib/firebase";
 import { cleanText, safeId } from "@/lib/security";
+import { paymentGate } from "@/lib/payments";
+import { notifyBusinessReturn } from "@/lib/notifications";
 
 //   taxBusinessReturns/{caseId}       the return working papers and filing record
 //   taxBusinessReturnEvents/{id}      append-only audit trail
@@ -153,6 +155,8 @@ export async function updateReturn(session, rawCaseId, action, input = {}) {
     events.push(["STATUS", `${RETURN_FLOW[ret.status].label} → ${RETURN_FLOW[to].label}${input.note ? `: ${cleanText(input.note, 300)}` : ""}`]);
   } else if (action === "sign") {
     if (ret.status !== "AWAITING_SIGNATURE") throw new ReturnError("Request the signature first.", 409);
+    const gate = await paymentGate("BUSINESS_RETURN", ret.caseId, "SIGN");
+    if (gate) throw new ReturnError(gate, 402);
     const signedAt = cleanText(input.signedAt, 10);
     const signature = {
       form: ENTITY_TYPES[ret.entityType].signatureForm,
@@ -170,6 +174,8 @@ export async function updateReturn(session, rawCaseId, action, input = {}) {
     events.push(["SIGNED", `${signature.form} signed by ${signature.signerName}${signature.signerTitle ? `, ${signature.signerTitle}` : ""} on ${signedAt}`]);
   } else if (action === "transmit") {
     if (ret.status !== "SIGNED" || !ret.signature) throw new ReturnError("The signature authorization must be recorded before transmission.", 409);
+    const gate = await paymentGate("BUSINESS_RETURN", ret.caseId, "FILE");
+    if (gate) throw new ReturnError(gate, 402);
     const submissionId = cleanText(input.submissionId, 20);
     if (!validSubmissionId(submissionId)) throw new ReturnError("Enter the 20-character MeF submission ID from your e-file software.");
     const software = cleanText(input.software, 80);
@@ -201,6 +207,7 @@ export async function updateReturn(session, rawCaseId, action, input = {}) {
     if (isConflict(error)) throw new ReturnError("Someone else changed this return. Reload and try again.", 409);
     throw error;
   }
+  if (next.status !== ret.status) await notifyBusinessReturn(loaded.record, next.status).catch(() => {});
   return next;
 }
 

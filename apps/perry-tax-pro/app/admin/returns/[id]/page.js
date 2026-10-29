@@ -8,6 +8,8 @@ import { Timeline, StatusBadge, statusProgress } from "@/components/Status";
 import Messages from "@/components/Messages";
 import DocumentCenter from "@/components/DocumentCenter";
 import ReturnControls from "./ReturnControls";
+import FeeControls from "@/components/FeeControls";
+import { chargeView, getCharge, paymentsReady } from "@/lib/payments";
 import WorkflowEditor from "@/components/WorkflowEditor";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 import Icon from "@/components/Icon";
@@ -19,7 +21,9 @@ export default async function Page({ params }) {
   const s = await requireRole("PREPARER");
   const r = await getReturn((await params).id);
   if (!r) notFound();
-  const [preparers, documents, notes] = await Promise.all([listPreparers(), listDocuments(r.id), listNotes(r.id)]);
+  const [preparers, documents, notes, charge, payments] = await Promise.all([
+    listPreparers(), listDocuments(r.id), listNotes(r.id), getCharge("TAX_RETURN", r.id).catch(() => null), paymentsReady(),
+  ]);
   const i = r.intake;
   const p = i.personal || {};
   const est = intakeToEstimate(i);
@@ -66,6 +70,7 @@ export default async function Page({ params }) {
 
       <div className="card"><Timeline status={r.status} /></div>
       <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} />
+      <div className="mt"><FeeControls kind="TAX_RETURN" refId={r.id} charge={chargeView(charge, r.status)} available={payments} defaultAmount="149" /></div>
       <div className="card mt">
         <div className="card-title">
           <div className="row nowrap"><span className="kpi-icon violet"><Icon name="shield" size={18} /></span><div><h3>Signature & e-file workflow</h3><p className="small">Verify Form 8879 before recording a submission or IRS acknowledgement.</p></div></div>
