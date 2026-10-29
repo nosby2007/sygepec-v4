@@ -23,16 +23,30 @@ export function formEncode(data, prefix = "", out = new URLSearchParams()) {
   return out;
 }
 
-async function call(method, path, data, fetcher) {
+export class StripeError extends Error {
+  constructor(status, body) {
+    super(`Stripe refused the request (${status}${body.error?.code ? ` ${body.error.code}` : ""})`);
+    this.status = status;
+    this.stripeMessage = body.error?.message || "";
+  }
+}
+
+// `account` makes the call on behalf of a business's own connected account (Stripe
+// Connect), so the payment belongs to that business and pays out to its bank.
+export async function call(method, path, data, fetcher = fetch, account = null) {
   if (!stripeConfigured()) throw new Error("Stripe is not configured");
   const response = await fetcher(`${API}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${secretKey()}`, ...(data ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      ...(data ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+      ...(account ? { "Stripe-Account": account } : {}),
+    },
     body: data ? formEncode(data) : undefined,
     cache: "no-store",
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Stripe refused the request (${response.status}${body.error?.code ? ` ${body.error.code}` : ""})`);
+  if (!response.ok) throw new StripeError(response.status, body);
   return body;
 }
 

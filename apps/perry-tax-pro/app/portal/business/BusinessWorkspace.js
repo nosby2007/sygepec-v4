@@ -29,7 +29,8 @@ export default function BusinessWorkspace() {
   const [services, setServices] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [service, setService] = useState({ name: "", price: "", durationMinutes: 60, description: "", public: false });
+  const [service, setService] = useState({ name: "", price: "", durationMinutes: 60, description: "", public: false, taxPercent: "25" });
+  const [payLinks, setPayLinks] = useState({});
   const [editingService, setEditingService] = useState(null);
   const [invoice, setInvoice] = useState({ customerId: "", description: "", amount: "", dueDate: "" });
   const [error, setError] = useState("");
@@ -51,6 +52,17 @@ export default function BusinessWorkspace() {
     return () => { cancelled = true; };
   }, []);
 
+  // A Stripe payment page on the business's own account. The tax set-aside uses the rate
+  // of the service the description starts with, or the business default.
+  async function payLink(item) {
+    setError("");
+    const match = services.find((s) => item.description.toLowerCase().startsWith(String(s.name).toLowerCase()));
+    const response = await fetch("/api/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invoiceLink", invoiceId: item.id, serviceId: match?.id || null }) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return setError(body.error || "The payment link could not be created.");
+    setPayLinks((links) => ({ ...links, [item.id]: { url: body.url } }));
+  }
+
   async function create(type, data, reset) {
     setBusy(true);
     setError("");
@@ -58,7 +70,7 @@ export default function BusinessWorkspace() {
       const response = await fetch(`/api/business/${type}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Unable to save");
-      reset();
+      await reset(body);
       applyWorkspace(await fetchWorkspace());
     } catch (reason) {
       setError(reason.message || "Unable to save");
@@ -80,7 +92,7 @@ export default function BusinessWorkspace() {
 
   return <>
     <div className="page-head">
-      <div><div className="kicker"><Icon name="receipt" size={15} /> Small Business</div><h1>Services, calendar & invoices</h1><p className="desc small">Services, what customers can book online, and draft billing. No automatic reminders, customer notifications, or payment processing yet.</p></div>
+      <div><div className="kicker"><Icon name="receipt" size={15} /> Small Business</div><h1>Services, calendar & invoices</h1><p className="desc small">Services, what customers can book online, and billing. Send customers a pay link to collect online into your own bank account.</p></div>
       <Link href="/portal/business" className="btn btn-ghost"><Icon name="back" size={16} /> Bookkeeping</Link>
     </div>
     {error && <div className="alert alert-error" role="alert" style={{ marginBottom: 16 }}><Icon name="alert" size={16} />{error}</div>}
@@ -101,10 +113,15 @@ export default function BusinessWorkspace() {
         </div>
 
         {tab === "services" && <div className="fade-in">
-          <form className="form-grid" onSubmit={(event) => { event.preventDefault(); create("services", service, () => setService({ name: "", price: "", durationMinutes: 60, description: "", public: false })); }}>
+          <form className="form-grid" onSubmit={(event) => { event.preventDefault(); create("services", service, async (saved) => {
+            // The tax set-aside is kept server-side, next to the payment account.
+            if (saved?.id && service.taxPercent !== "") await fetch("/api/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "serviceRate", serviceId: saved.id, percent: service.taxPercent }) }).catch(() => {});
+            setService({ name: "", price: "", durationMinutes: 60, description: "", public: false, taxPercent: service.taxPercent });
+          }); }}>
             <div className="field full"><label htmlFor="sv-name">Service</label><input id="sv-name" className="input" required maxLength={100} value={service.name} onChange={(event) => setService({ ...service, name: event.target.value })} /></div>
             <div className="field"><label htmlFor="sv-price">Price (USD)</label><div className="input-icon"><Icon name="dollar" size={15} /><input id="sv-price" className="input num" required inputMode="decimal" value={service.price} onChange={(event) => setService({ ...service, price: event.target.value })} /></div></div>
             <div className="field"><label htmlFor="sv-duration">Duration (minutes)</label><div className="input-icon"><Icon name="clock" size={15} /><input id="sv-duration" className="input num" type="number" min={15} max={480} required value={service.durationMinutes} onChange={(event) => setService({ ...service, durationMinutes: Number(event.target.value) })} /></div></div>
+            <div className="field"><label htmlFor="sv-tax">Tax set-aside (%)</label><div className="input-icon"><Icon name="shield" size={15} /><input id="sv-tax" className="input num" type="number" min={0} max={60} step="0.5" value={service.taxPercent} onChange={(event) => setService({ ...service, taxPercent: event.target.value })} /></div><span className="hint">Share of each payment to keep for income tax. Not added to the price.</span></div>
             <div className="field full"><label htmlFor="sv-desc">Description (shown to customers)</label><textarea id="sv-desc" className="textarea" maxLength={1000} value={service.description} onChange={(event) => setService({ ...service, description: event.target.value })} /></div>
             <label className="full row nowrap small"><input type="checkbox" checked={service.public} onChange={(event) => setService({ ...service, public: event.target.checked })} /> Show on my public page so customers can book it</label>
             <div className="full form-actions" style={{ marginTop: 0 }}><button className="btn btn-primary" disabled={busy}><Icon name="plus" size={16} /> Add service</button></div>
@@ -132,10 +149,12 @@ export default function BusinessWorkspace() {
           </form>
           <div className="table-wrap mt">
             <table>
-              <thead><tr><th>Customer</th><th>Description</th><th>Due</th><th>Status</th><th className="num">Amount</th></tr></thead>
+              <thead><tr><th>Customer</th><th>Description</th><th>Due</th><th>Status</th><th className="num">Amount</th><th>Online</th></tr></thead>
               <tbody>
-                {invoices.map((item) => <tr key={item.id}><td><div className="person"><Avatar name={item.customerName} size="sm" /><b>{item.customerName}</b></div></td><td className="small">{item.description}</td><td className="small">{item.dueDate}</td><td><span className={`badge s-${item.status}`}>{String(item.status).toLowerCase()}</span></td><td className="num"><b>{money(item.amountCents)}</b></td></tr>)}
-                {invoices.length === 0 && <tr><td colSpan={5}><Empty icon="receipt" title="No invoices yet">Drafts you create appear here.</Empty></td></tr>}
+                {invoices.map((item) => <tr key={item.id}><td><div className="person"><Avatar name={item.customerName} size="sm" /><b>{item.customerName}</b></div></td><td className="small">{item.description}</td><td className="small">{item.dueDate}</td><td><span className={`badge s-${item.status}`}>{String(item.status).toLowerCase()}</span></td><td className="num"><b>{money(item.amountCents)}</b></td><td>{payLinks[item.id]?.url
+                  ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(payLinks[item.id].url).then(() => setPayLinks({ ...payLinks, [item.id]: { ...payLinks[item.id], copied: true } }), () => {})}><Icon name="clipboard" size={14} /> {payLinks[item.id].copied ? "Copied" : "Copy link"}</button>
+                  : <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => payLink(item)}><Icon name="link" size={14} /> Pay link</button>}</td></tr>)}
+                {invoices.length === 0 && <tr><td colSpan={6}><Empty icon="receipt" title="No invoices yet">Drafts you create appear here.</Empty></td></tr>}
               </tbody>
             </table>
           </div>

@@ -9,6 +9,7 @@ const links = [
   { href: "/admin/signatures", label: "Signatures", icon: "pen" },
   { href: "/admin/submissions", label: "Submissions", icon: "send" },
   { href: "/admin/business", label: "Business Tax", icon: "building" },
+  { href: "/admin/payments", label: "Payments & growth", icon: "dollar" },
   { href: "/admin/content", label: "Website", icon: "megaphone" },
 ];
 

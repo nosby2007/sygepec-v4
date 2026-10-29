@@ -1,5 +1,7 @@
 import "server-only";
-import { getDocument, patchFields, queryCollection, TAX_TENANT } from "@/lib/firebase";
+import { getDocument, patchFields, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
+import { reserveSummary } from "@/lib/connect";
+import { periodOf } from "@/lib/tax-reserve";
 import { appointmentMessage } from "@/lib/appointments";
 import { buildChecklist } from "@/lib/tax";
 import { DOC_TYPES } from "@/lib/constants";
@@ -19,7 +21,7 @@ const DAY = 24 * HOUR;
 const older = (iso, ms, nowMs) => !iso || Date.parse(iso) < nowMs - ms;
 const mine = (rows) => rows.filter((row) => row.tenantId === TAX_TENANT);
 
-export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions"];
+export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve"];
 
 export async function runDaily({ dryRun = false, nowMs = Date.now(), only = TASKS } = {}) {
   const token = await serviceToken();
@@ -137,6 +139,39 @@ const RUNNERS = {
         email: { to: c.clientEmail, name: c.clientName, subject: `Payment due: ${c.description}`, text: `Your ${money(c.amountCents)} fee for ${c.description.toLowerCase()} is ready to pay. You can pay securely by card from your portal.`, link },
         mark: { path: `taxCharges/${c.kind}_${c.refId}`, fields: { lastReminderAt: new Date(ctx.nowMs).toISOString() } },
       }));
+    }
+    return summary(due, results);
+  },
+
+  // Ten days before each IRS estimated-tax due date, tells each business owner how much
+  // to pay for the period that just ended, based on the income in their books.
+  async taxReserve(ctx) {
+    const candidates = [ctx.nowMs, ctx.nowMs - 45 * DAY].map((ms) => periodOf(ms));
+    const period = candidates.find((p) => {
+      const due = Date.parse(`${p.due}T12:00:00Z`);
+      return due >= ctx.nowMs && due - ctx.nowMs <= 10 * DAY;
+    });
+    if (!period) return { due: 0, sent: 0, channels: [], note: "no estimated-tax due date in the next 10 days" };
+    const owners = mine(await queryCollection("taxUsers", ctx.token, { filters: [["accountType", "EQUAL", "BUSINESS"]], limit: 2000 }));
+    const results = [];
+    let due = 0;
+    for (const user of owners) {
+      const uid = user.uid || user.id;
+      const payout = await getDocument(`taxPayouts/${uid}`, ctx.token).catch(() => null);
+      if (payout?.lastReserveReminder === period.key) continue;
+      const totals = await reserveSummary(uid, Date.parse(`${period.start}T12:00:00Z`)).catch(() => null);
+      if (!totals || totals.setAsideCents <= 0) continue;
+      due++;
+      const amount = money(totals.setAsideCents);
+      const when = new Date(`${period.due}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+      const sent = await deliver(ctx, {
+        email: { to: user.email, name: user.name, subject: `Estimated tax due ${when}: about ${amount}`, link: "/portal/business/plan",
+          text: `Your books show ${money(totals.incomeCents)} of income for ${period.label}. Based on your set-aside rate, plan to pay about ${amount} in federal estimated tax by ${when} (Form 1040-ES), at irs.gov/payments/direct-pay or through EFTPS. Your preparer can confirm the exact amount.` },
+      });
+      if (sent.sent.length && !ctx.dryRun) {
+        await setDocument(`taxPayouts/${uid}`, { ...(payout ? Object.fromEntries(Object.entries(payout).filter(([k]) => !["id", "createTime", "updateTime"].includes(k))) : { tenantId: TAX_TENANT, clientId: uid }), lastReserveReminder: period.key }, ctx.token);
+      }
+      results.push(sent);
     }
     return summary(due, results);
   },

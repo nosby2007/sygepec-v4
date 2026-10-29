@@ -8,6 +8,8 @@ import { PageHead } from "@/components/ui";
 import Icon from "@/components/Icon";
 import PayCard from "@/components/PayCard";
 import PlanPicker from "./PlanPicker";
+import { PayoutCard, ReserveCard } from "./PayoutPanels";
+import { getPayout, reserveSummary, syncConnect } from "@/lib/connect";
 
 export const metadata = { title: "Plan & payments" };
 
@@ -21,18 +23,26 @@ export default async function Page({ searchParams }) {
     const ret = await getDocument(`taxBusinessReturns/${c.refId}`, token).catch(() => null);
     fees.push(chargeView(c, ret?.status || "PREPARING"));
   }
-  const notice = (await searchParams)?.payment;
+  const params = await searchParams;
+  const notice = params?.payment;
+  // Coming back from Stripe onboarding: read the account's new status from Stripe.
+  const payout = ready ? await (params?.connect ? syncConnect(s.uid) : getPayout(s.uid)).catch(() => null) : null;
+  const reserve = ready ? await reserveSummary(s.uid).catch(() => null) : null;
   const active = billing && ACTIVE_SUBSCRIPTION.has(billing.status) ? billing : null;
 
   return (
     <>
-      <PageHead kicker="Business workspace" icon="receipt" title="Plan & payments" desc="Your monthly workspace plan and any business tax return fees." />
+      <PageHead kicker="Business workspace" icon="receipt" title="Plan & payments" desc="Get paid online, keep money aside for taxes, and manage your workspace plan." />
       {notice === "paid" && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="check" size={16} />Payment received. Thank you.</div>}
       {notice === "cancelled" && <div className="alert alert-info" style={{ marginBottom: 16 }}><Icon name="info" size={16} />Payment cancelled. Nothing was charged.</div>}
       {!ready || !stripeConfigured() ? (
         <div className="card"><p className="small muted" style={{ margin: 0 }}>Online payments are being set up. Your preparer will contact you about your plan.</p></div>
       ) : (
         <>
+          <div className="grid-2" style={{ marginBottom: 16, alignItems: "start" }}>
+            <PayoutCard payout={payout ? { stripeAccountId: payout.stripeAccountId, chargesEnabled: payout.chargesEnabled, payoutsEnabled: payout.payoutsEnabled, detailsSubmitted: payout.detailsSubmitted, requirementsDue: payout.requirementsDue || 0 } : null} />
+            {reserve && <ReserveCard reserve={{ ...reserve, serviceRates: payout?.serviceRates || {} }} />}
+          </div>
           {fees.filter((f) => f.due).map((f) => <div key={f.refId} style={{ marginBottom: 16 }}><PayCard charge={f} notice={notice} /></div>)}
           <PlanPicker
             plans={Object.entries(BUSINESS_PLANS).map(([key, p]) => ({ key, name: p.name, price: money(p.cents) }))}
