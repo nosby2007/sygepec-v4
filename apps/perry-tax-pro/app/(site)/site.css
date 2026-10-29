@@ -201,3 +201,5 @@
 .pub .signed-out-tips { list-style: none; padding: 16px 0 0; margin: 4px 0 0; border-top: 1px solid var(--pub-line); display: grid; gap: 8px; width: 100%; color: #5b6573; font-size: .9rem; }
 .pub .signed-out-tips li { display: flex; gap: 8px; align-items: center; justify-content: center; }
 @media (max-width: 680px) { .pub .signed-out-card { padding: 32px 20px; } .pub .signed-out-card .btn { width: 100%; } }
+.pub-prices.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 980px) { .pub-prices.three { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; } }

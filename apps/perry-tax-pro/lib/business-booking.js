@@ -1,4 +1,6 @@
 import "server-only";
+import { getEntitlement } from "@/lib/entitlements";
+import { allows } from "@/lib/plans";
 import crypto from "node:crypto";
 import {
   commitWrites, createWrite, deleteWrite, getDocument, isConflict, queryCollection, refreshIdToken, replaceWrite,
@@ -259,6 +261,8 @@ export async function resolveBusiness(slugInput) {
   if (!businessId) return null;
   const profile = await getDocument(`bizProfiles/${businessId}`, null).catch(() => null);
   if (!profile || profile.status !== "PUBLISHED" || profile.tenantId !== TAX_TENANT || profile.slug !== slug) return null;
+  // The public page and online booking are part of the Advanced plan and above.
+  if (!allows(await getEntitlement(businessId), "PUBLIC_PAGE")) return null;
   return { ...profile, businessId };
 }
 

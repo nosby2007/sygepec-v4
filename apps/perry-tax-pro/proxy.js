@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { COOKIE, cookieOptions, idleExpired, openSession, sealSession } from "@/lib/session-token";
+import { allows, featureForPath, upgradeMessage } from "@/lib/plans";
+import { getEntitlement } from "@/lib/entitlements";
 
 // Runs before every signed-in page and API request:
 // - a session idle for longer than the limit is cleared and the user is sent to a page
@@ -8,6 +10,8 @@ import { COOKIE, cookieOptions, idleExpired, openSession, sealSession } from "@/
 //   refreshed once here and saved, instead of on every later request.
 const REFRESH_URL = "https://securetoken.googleapis.com/v1/token";
 const RESEAL_EVERY_MS = 60_000;
+// How long a business's plan is trusted from the session before it is read again.
+const PLAN_CACHE_MS = 5 * 60_000;
 
 async function refresh(session) {
   const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -52,13 +56,34 @@ export async function proxy(request) {
     return response;
   }
 
+  // Business plans: the feature this path needs, checked against the cached plan. The
+  // plan page always reads it fresh, so an upgrade shows at once.
+  const path = request.nextUrl.pathname;
+  const business = session.accountType === "BUSINESS" && session.role === "CLIENT";
+  let feature = business ? featureForPath(path) : null;
+  // Without a plan, reading stays allowed (data is always the owner's); changes are not.
+  if (feature === "WORKSPACE" && isApi && request.method === "GET") feature = null;
+  const onPlanPage = path.startsWith("/portal/business/plan");
+  let ent = session.ent && session.ent.at > nowMs - PLAN_CACHE_MS && !onPlanPage ? session.ent : null;
+  const planChanged = (feature || onPlanPage) && !ent;
+  if (planChanged) {
+    const fresh = await getEntitlement(session.uid);
+    ent = { plan: fresh.plan, at: nowMs };
+  }
+  if (feature && !allows(ent, feature)) {
+    const message = upgradeMessage(ent?.plan ? feature : "WORKSPACE");
+    return isApi
+      ? NextResponse.json({ error: message, upgrade: true }, { status: 402 })
+      : NextResponse.redirect(publicUrl(request, `/portal/business/plan?upgrade=${ent?.plan ? feature : "WORKSPACE"}`));
+  }
+
   const needsToken = Number(session.expiresAt || 0) < nowMs + 5 * 60_000;
   const stale = !Number.isFinite(session.lastSeen) || nowMs - session.lastSeen > RESEAL_EVERY_MS;
-  if (!needsToken && !stale) return NextResponse.next();
+  if (!needsToken && !stale && !planChanged) return NextResponse.next();
 
   const fresh = needsToken ? await refresh(session) : null;
   const { exp: _e, iat: _i, ...rest } = session;
-  const value = await sealSession({ ...rest, ...(fresh || {}), lastSeen: nowMs });
+  const value = await sealSession({ ...rest, ...(fresh || {}), ...(ent ? { ent } : {}), lastSeen: nowMs });
   const response = NextResponse.next({ request: { headers: withCookie(request, value) } });
   response.cookies.set(COOKIE, value, cookieOptions());
   return response;

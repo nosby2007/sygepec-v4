@@ -1,6 +1,8 @@
 import "server-only";
 import { getDocument, patchFields, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { reserveSummary } from "@/lib/connect";
+import { getEntitlement } from "@/lib/entitlements";
+import { allows } from "@/lib/plans";
 import { periodOf } from "@/lib/tax-reserve";
 import { appointmentMessage } from "@/lib/appointments";
 import { buildChecklist } from "@/lib/tax";
@@ -66,7 +68,11 @@ const RUNNERS = {
   // Confirmed bookings with business customers, starting in roughly a day.
   async bookings(ctx) {
     const rows = mine(await queryCollection("bizBookings", ctx.token, { filters: [["status", "EQUAL", "CONFIRMED"]], limit: 2000 }));
-    const due = rows.filter((b) => tomorrowWindow(b.startMs, ctx.nowMs) && !b.reminderSentAt);
+    const window = rows.filter((b) => tomorrowWindow(b.startMs, ctx.nowMs) && !b.reminderSentAt);
+    // Automatic reminders are part of the Advanced plan and above.
+    const plans = {};
+    for (const id of new Set(window.map((b) => b.businessId))) plans[id] = allows(await getEntitlement(id), "AUTO_REMINDERS");
+    const due = window.filter((b) => plans[b.businessId]);
     const profiles = {};
     const results = [];
     for (const b of due) {

@@ -8,6 +8,8 @@ import { PageHead } from "@/components/ui";
 import Icon from "@/components/Icon";
 import PayCard from "@/components/PayCard";
 import PlanPicker from "./PlanPicker";
+import { getEntitlement } from "@/lib/entitlements";
+import { FEATURES, PLAN_HIGHLIGHTS, planName } from "@/lib/plans";
 import { PayoutCard, ReserveCard } from "./PayoutPanels";
 import { getPayout, reserveSummary, syncConnect } from "@/lib/connect";
 
@@ -28,11 +30,17 @@ export default async function Page({ searchParams }) {
   // Coming back from Stripe onboarding: read the account's new status from Stripe.
   const payout = ready ? await (params?.connect ? syncConnect(s.uid) : getPayout(s.uid)).catch(() => null) : null;
   const reserve = ready ? await reserveSummary(s.uid).catch(() => null) : null;
+  const ent = await getEntitlement(s.uid);
+  const locked = FEATURES[params?.upgrade];
+  const trialEnds = ent.trialEndsAt ? new Date(ent.trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
   const active = billing && ACTIVE_SUBSCRIPTION.has(billing.status) ? billing : null;
 
   return (
     <>
       <PageHead kicker="Business workspace" icon="receipt" title="Plan & payments" desc="Get paid online, keep money aside for taxes, and manage your workspace plan." />
+      {locked && <div className="alert alert-info" style={{ marginBottom: 16 }}><Icon name="lock" size={16} /><span><b>{locked.label}</b> {params.upgrade === "WORKSPACE" ? "needs an active plan. Your data is safe: you can still view and export your books under Accounting." : `is part of the ${planName(locked.plan)} plan. Choose it below to unlock it right away.`}</span></div>}
+      {ent.trial && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="sparkle" size={16} /><span>You are on a free trial with every Premium feature until <b>{trialEnds}</b>. Choose a plan any time; you will not lose anything you set up.</span></div>}
+      {!ent.active && !locked && <div className="alert alert-error" style={{ marginBottom: 16 }}><Icon name="alert" size={16} /><span>Your free trial ended on {trialEnds}. Choose a plan to keep using your workspace. Your books stay available to view and export.</span></div>}
       {notice === "paid" && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="check" size={16} />Payment received. Thank you.</div>}
       {notice === "cancelled" && <div className="alert alert-info" style={{ marginBottom: 16 }}><Icon name="info" size={16} />Payment cancelled. Nothing was charged.</div>}
       {!ready || !stripeConfigured() ? (
@@ -45,7 +53,7 @@ export default async function Page({ searchParams }) {
           </div>
           {fees.filter((f) => f.due).map((f) => <div key={f.refId} style={{ marginBottom: 16 }}><PayCard charge={f} notice={notice} /></div>)}
           <PlanPicker
-            plans={Object.entries(BUSINESS_PLANS).map(([key, p]) => ({ key, name: p.name, price: money(p.cents) }))}
+            plans={Object.entries(BUSINESS_PLANS).map(([key, p]) => ({ key, name: p.name, price: money(p.cents), highlights: PLAN_HIGHLIGHTS[key], suggested: locked?.plan === key }))}
             current={active ? { plan: active.plan, status: active.status, cancelAtPeriodEnd: active.cancelAtPeriodEnd, periodEnd: active.currentPeriodEnd } : null}
           />
           {fees.filter((f) => !f.due && f.status !== "UNPAID").map((f) => (

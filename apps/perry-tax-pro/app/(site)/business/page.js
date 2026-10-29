@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import Icon from "@/components/Icon";
+import { BUSINESS_PLANS, money } from "@/lib/billing";
+import { PLAN_HIGHLIGHTS, TRIAL_DAYS } from "@/lib/plans";
 
 export const metadata = {
   title: "InnovaCare Business",
@@ -76,6 +78,26 @@ export default function BusinessPage() {
             <li><Icon name="check" size={18} />Partnerships and S corporations, with K-1s</li>
             <li><Icon name="check" size={18} />C corporations</li>
           </ul>
+        </div>
+      </section>
+
+      <section className="pub-section" id="plans">
+        <div className="container">
+          <div className="pub-head">
+            <span className="eyebrow">Plans</span>
+            <h2>Simple monthly pricing. Try every feature free for {TRIAL_DAYS} days.</h2>
+          </div>
+          <div className="pub-prices three">
+            {Object.entries(BUSINESS_PLANS).map(([key, plan]) => (
+              <div key={key} className={`pub-price${key === "ADVANCED" ? " featured" : ""}`}>
+                <h3>{plan.name}</h3>
+                <div className="amount">{money(plan.cents)}<small>/month</small></div>
+                <ul>{PLAN_HIGHLIGHTS[key].map((item) => <li key={item}><Icon name="check" size={16} />{item}</li>)}</ul>
+                <Link href="/business/register" className={`btn ${key === "ADVANCED" ? "btn-primary" : "btn-ghost"}`}>Start free trial</Link>
+              </div>
+            ))}
+          </div>
+          <p className="small" style={{ marginTop: 16 }}>Cancel any time. Card fees for customer payments are Stripe&apos;s standard rate; we add nothing. Business tax returns start at $250 depending on complexity.</p>
         </div>
       </section>
 

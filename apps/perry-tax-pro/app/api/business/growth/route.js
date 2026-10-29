@@ -3,6 +3,11 @@ import {
   addCustomerNote, customerFromBooking, listCustomerNotes, requestFeedback, saveCampaign, saveCustomer, sendCampaign, sendReminder, updateFeedback,
 } from "@/lib/business-growth";
 import { BusinessError } from "@/lib/business-booking";
+import { getEntitlement } from "@/lib/entitlements";
+import { allows, upgradeMessage } from "@/lib/plans";
+
+// Actions that belong to a higher plan than the growth hub itself.
+const ACTION_FEATURES = { requestFeedback: "FEEDBACK", updateFeedback: "FEEDBACK", saveCampaign: "CAMPAIGNS", sendCampaign: "CAMPAIGNS" };
 
 const ACTIONS = {
   saveCustomer: (s, b) => saveCustomer(s, b.id || null, b.customer || {}),
@@ -23,5 +28,7 @@ export const POST = (req) => ownerRoute(req, async (session) => {
   const body = await readJson(req);
   const run = ACTIONS[body.action];
   if (!run) throw new BusinessError("Unsupported action.");
+  const feature = ACTION_FEATURES[body.action];
+  if (feature && !allows(await getEntitlement(session.uid), feature)) throw new BusinessError(upgradeMessage(feature), 402);
   return { ok: true, result: (await run(session, body)) ?? null };
 });
