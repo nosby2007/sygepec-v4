@@ -61,3 +61,10 @@ test("sends a text through the messaging service when one is set", async () => {
   assert.equal(sent.init.headers.Authorization, `Basic ${Buffer.from("SKtest:keysecret").toString("base64")}`);
   await assert.rejects(sendSms({ to: "555-010-2000", body: "x" }, async () => json(400, {})), /refused/);
 });
+
+test("a trailing newline on a secret is ignored", async () => {
+  Object.assign(process.env, ENV, { TWILIO_API_KEY_SECRET: "keysecret\n" });
+  let auth;
+  await ensureVideoRoom("tax-abc", async (_url, init) => { auth = init.headers.Authorization; return json(201, {}); });
+  assert.equal(auth, `Basic ${Buffer.from("SKtest:keysecret").toString("base64")}`);
+});

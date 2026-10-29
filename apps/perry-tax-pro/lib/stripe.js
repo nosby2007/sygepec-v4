@@ -5,8 +5,11 @@ import "server-only";
 // only after the server reads the session back from Stripe and finds it paid.
 const API = "https://api.stripe.com/v1";
 
+// Secret Manager values often end with a newline that would break the Authorization header.
+const secretKey = () => (process.env.STRIPE_SECRET_KEY || "").trim();
+
 export function stripeConfigured() {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return Boolean(secretKey());
 }
 
 // Stripe's nested form syntax: { a: { b: 1 }, c: [x] } → a[b]=1&c[0]=x
@@ -24,7 +27,7 @@ async function call(method, path, data, fetcher) {
   if (!stripeConfigured()) throw new Error("Stripe is not configured");
   const response = await fetcher(`${API}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, ...(data ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    headers: { Authorization: `Bearer ${secretKey()}`, ...(data ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
     body: data ? formEncode(data) : undefined,
     cache: "no-store",
   });

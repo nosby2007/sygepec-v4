@@ -15,16 +15,19 @@ const VIDEO_API = "https://video.twilio.com/v1";
 const API = "https://api.twilio.com/2010-04-01";
 const ROOM_EXISTS = 53113;
 
+// Secret Manager values often end with a newline that would become part of the password.
+const env = (name) => (process.env[name] || "").trim();
+
 function credentials() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const keySid = process.env.TWILIO_API_KEY_SID;
-  const keySecret = process.env.TWILIO_API_KEY_SECRET;
+  const accountSid = env("TWILIO_ACCOUNT_SID");
+  const keySid = env("TWILIO_API_KEY_SID");
+  const keySecret = env("TWILIO_API_KEY_SECRET");
   return accountSid && keySid && keySecret ? { accountSid, keySid, keySecret } : null;
 }
 
 function sender() {
-  const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const from = process.env.TWILIO_FROM_NUMBER;
+  const service = env("TWILIO_MESSAGING_SERVICE_SID");
+  const from = env("TWILIO_FROM_NUMBER");
   return service ? { MessagingServiceSid: service } : from ? { From: from } : null;
 }
 
