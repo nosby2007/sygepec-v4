@@ -15,6 +15,11 @@ const MESSAGES = {
     title: "You are signed out",
     text: "Thanks for stopping by. If you are on a shared or public computer, close this browser window as well.",
   },
+  signed: {
+    icon: "check",
+    title: "Thank you, your signature was received",
+    text: "Your preparer has been notified. Once every signer has signed, your return can be e-filed. You can close this window.",
+  },
   expired: {
     icon: "lock",
     title: "Your session has ended",

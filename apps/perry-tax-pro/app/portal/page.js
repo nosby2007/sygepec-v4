@@ -8,6 +8,8 @@ import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 import { twilioVideoConfigured } from "@/lib/twilio";
 import { chargeView, getCharge } from "@/lib/payments";
 import PayCard from "@/components/PayCard";
+import { getFirebaseSession } from "@/lib/auth";
+import { esignConfigured, signatureView, syncSignature } from "@/lib/esign";
 import Icon from "@/components/Icon";
 import { MoneyCount } from "@/components/Motion";
 import { Donut, ProgressRing, PALETTE } from "@/components/charts";
@@ -27,12 +29,17 @@ export default async function Dashboard({ searchParams }) {
   const upcoming = appointments.filter((a) => new Date(a.scheduled_at) > new Date() && a.status !== "CANCELLED")[0];
   const inAppVideo = twilioVideoConfigured();
   const fee = chargeView(await getCharge("TAX_RETURN", r.id).catch(() => null), r.status);
-  const paymentNotice = (await searchParams)?.payment;
+  const params = await searchParams;
+  const paymentNotice = params?.payment;
+  // Coming back from signing, or any visit while a request is open: read the progress.
+  const sig = esignConfigured() ? signatureView(await syncSignature(await getFirebaseSession(), r.id).catch(() => null), s.id) : null;
   const progress = statusProgress(r.status);
 
   const next =
     r.submission_status === "REJECTED"
       ? { text: "Your submission needs attention. Contact your preparer for the correction required.", href: "/portal/messages", cta: "Contact Preparer" }
+      : r.signature_status === "REQUESTED" && sig?.myLink
+      ? { text: "Your return is ready. Sign Form 8879 online so we can e-file it.", href: "#sign-card", cta: "Sign now" }
       : r.signature_status === "REQUESTED"
       ? { text: "Your Form 8879 signature is requested. Contact your preparer to complete the verified signing process.", href: "/portal/messages", cta: "Contact Preparer" }
       : r.status === "INTAKE"
@@ -53,6 +60,15 @@ export default async function Dashboard({ searchParams }) {
   return (
     <>
       {paymentNotice === "paid" && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="check" size={16} />Payment received. Thank you.</div>}
+      {params?.signed && sig?.status === "COMPLETED" && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="check" size={16} />Thank you, your Form 8879 is signed. We will e-file your return next.</div>}
+      {params?.signed && sig && sig.status !== "COMPLETED" && <div className="alert alert-info" style={{ marginBottom: 16 }}><Icon name="info" size={16} />Your signature was received.{sig.signers.some((x) => x.status !== "completed") ? " We are waiting for the other signer." : ""}</div>}
+      {sig?.myLink && !(fee?.due && fee.timing === "BEFORE_SIGNATURE") && (
+        <div className="card stack-sm" id="sign-card" style={{ marginBottom: 16, borderColor: "var(--teal)" }}>
+          <div className="kicker"><Icon name="pen" size={14} /> Your signature is needed</div>
+          <p className="small" style={{ margin: 0 }}>Your return is ready. Review Form 8879 and sign it online so we can e-file. You will first answer a few identity questions; the IRS requires this for online signatures.</p>
+          <div className="row"><a id="sign-8879" href={sig.myLink} className="btn btn-primary"><Icon name="pen" size={15} /> Review and sign Form 8879</a></div>
+        </div>
+      )}
       {fee?.due && <div style={{ marginBottom: 16 }}><PayCard charge={fee} notice={paymentNotice} refundOption={Boolean(est && est.refund * 100 >= fee.amountCents)} /></div>}
       <section className="page-banner">
         <div>

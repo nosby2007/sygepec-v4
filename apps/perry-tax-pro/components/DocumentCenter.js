@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DOC_TYPES, fmtDate } from "@/lib/constants";
+import { DOC_TYPES, SYSTEM_DOC_TYPES, fmtDate } from "@/lib/constants";
 import Icon from "@/components/Icon";
 import { ProgressRing } from "@/components/charts";
 
@@ -98,7 +98,7 @@ export default function DocumentCenter({ returnId, docs, checklist, canDelete = 
                 <span className={`file-ico ${/^image\//.test(d.mime || "") ? "img" : ""}`}>{ext(d.filename)}</span>
                 <div style={{ minWidth: 0 }}>
                   <a href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer" style={{ fontWeight: 600, fontSize: "0.92rem", wordBreak: "break-all" }}>{d.filename}</a>
-                  <div className="hint">{DOC_TYPES[d.type]} · {kb(d.size)} · {fmtDate(d.created_at)}</div>
+                  <div className="hint">{DOC_TYPES[d.type] || SYSTEM_DOC_TYPES[d.type] || "Document"} · {kb(d.size)} · {fmtDate(d.created_at)}</div>
                 </div>
               </div>
               {canDelete && <button className="btn btn-ghost btn-icon" onClick={() => remove(d.id)} aria-label={`Remove ${d.filename}`}><Icon name="x" size={16} /></button>}

@@ -59,6 +59,12 @@ export const DOC_TYPES = {
   OTHER: "Other Document",
 };
 
+// Documents the app files itself (online signing). Not offered for upload.
+export const SYSTEM_DOC_TYPES = {
+  SIGNED_8879: "Signed Form 8879",
+  SIGNATURE_AUDIT: "Form 8879 signature audit trail",
+};
+
 export const SERVICES = [
   "Individual Return",
   "Self-Employed / Gig Worker",

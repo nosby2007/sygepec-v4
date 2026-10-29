@@ -9,6 +9,9 @@ import Messages from "@/components/Messages";
 import DocumentCenter from "@/components/DocumentCenter";
 import ReturnControls from "./ReturnControls";
 import FeeControls from "@/components/FeeControls";
+import ESignPanel from "@/components/ESignPanel";
+import { esignConfigured, signatureView, syncSignature } from "@/lib/esign";
+import { getFirebaseSession } from "@/lib/auth";
 import { chargeView, getCharge, paymentsReady } from "@/lib/payments";
 import WorkflowEditor from "@/components/WorkflowEditor";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
@@ -24,6 +27,8 @@ export default async function Page({ params }) {
   const [preparers, documents, notes, charge, payments] = await Promise.all([
     listPreparers(), listDocuments(r.id), listNotes(r.id), getCharge("TAX_RETURN", r.id).catch(() => null), paymentsReady(),
   ]);
+  // Opening the return also picks up any signing progress (and files the signed form).
+  const signature = esignConfigured() ? await syncSignature(await getFirebaseSession(), r.id).catch(() => null) : null;
   const i = r.intake;
   const p = i.personal || {};
   const est = intakeToEstimate(i);
@@ -70,6 +75,7 @@ export default async function Page({ params }) {
 
       <div className="card"><Timeline status={r.status} /></div>
       <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} />
+      <div className="mt"><ESignPanel returnId={r.id} signature={signatureView(signature)} available={esignConfigured() && payments} jointReturn={r.filing_status === "MFJ" || r.intake?.personal?.filingStatus === "MFJ"} /></div>
       <div className="mt"><FeeControls kind="TAX_RETURN" refId={r.id} charge={chargeView(charge, r.status)} available={payments} defaultAmount="149" /></div>
       <div className="card mt">
         <div className="card-title">
