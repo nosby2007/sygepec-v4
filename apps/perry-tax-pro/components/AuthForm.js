@@ -15,7 +15,7 @@ const score = (pw) => {
 };
 const STRENGTH = ["", "Weak", "Fair", "Good", "Strong"];
 
-export default function AuthForm({ mode, accountType = "TAX" }) {
+export default function AuthForm({ mode, accountType = "TAX", next = null }) {
   const isReg = mode === "register";
   const isBusiness = accountType === "BUSINESS";
   const [f, setF] = useState({ name: "", email: "", phone: "", password: "", accountType });
@@ -31,7 +31,10 @@ export default function AuthForm({ mode, accountType = "TAX" }) {
     const res = await fetch(`/api/auth/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
     const data = await res.json();
     if (!res.ok) return setState({ error: data.error });
-    router.push(data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : isReg ? "/portal/intake" : "/portal");
+    const home = data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : isReg ? "/portal/intake" : "/portal";
+    // Back to the page the user was on before signing out, if it belongs to their area.
+    const back = next && next.startsWith(data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : "/portal") ? next : null;
+    router.push(back || home);
     router.refresh();
   };
 

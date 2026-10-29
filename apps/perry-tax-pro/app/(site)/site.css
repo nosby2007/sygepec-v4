@@ -191,3 +191,13 @@
   .pub-bring ul { columns: 1; }
   .pub-band, .pub-section { padding: 64px 0; }
 }
+
+/* Signed-out page */
+.pub .signed-out { min-height: 70vh; display: grid; place-items: center; padding: 56px 16px; background: var(--pub-paper); }
+.pub .signed-out-card { width: min(560px, 100%); background: #fff; border: 1px solid var(--pub-line); border-top: 4px solid var(--pub-amber); padding: 40px 32px; text-align: center; display: grid; gap: 16px; justify-items: center; }
+.pub .signed-out-card h1 { margin: 0; font-size: clamp(1.4rem, 3.5vw, 1.9rem); color: var(--pub-ink); }
+.pub .signed-out-card p { margin: 0; color: #4a5565; max-width: 46ch; }
+.pub .signed-out-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--pub-navy); color: #fff; }
+.pub .signed-out-tips { list-style: none; padding: 16px 0 0; margin: 4px 0 0; border-top: 1px solid var(--pub-line); display: grid; gap: 8px; width: 100%; color: #5b6573; font-size: .9rem; }
+.pub .signed-out-tips li { display: flex; gap: 8px; align-items: center; justify-content: center; }
+@media (max-width: 680px) { .pub .signed-out-card { padding: 32px 20px; } .pub .signed-out-card .btn { width: 100%; } }

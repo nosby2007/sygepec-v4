@@ -1,21 +1,12 @@
 import "server-only";
-import { EncryptJWT, jwtDecrypt } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
-
-// Firebase Hosting forwards only the reserved __session cookie to rewrites.
-const COOKIE = "__session";
-
-function sessionKey() {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("SESSION_SECRET must contain at least 32 characters.");
-  return new TextEncoder().encode(secret.slice(0, 32));
-}
+import { COOKIE, cookieOptions, idleExpired, openSession, sealSession } from "@/lib/session-token";
 
 export async function createSession(firebaseAuth, profile) {
   const expiresAt = Date.now() + Number(firebaseAuth.expiresIn || 3600) * 1000;
-  const token = await new EncryptJWT({
+  const token = await sealSession({
     uid: firebaseAuth.localId || firebaseAuth.user_id,
     email: firebaseAuth.email || profile.email,
     name: profile.name,
@@ -24,18 +15,9 @@ export async function createSession(firebaseAuth, profile) {
     idToken: firebaseAuth.idToken || firebaseAuth.id_token,
     refreshToken: firebaseAuth.refreshToken || firebaseAuth.refresh_token,
     expiresAt,
-  })
-    .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .encrypt(sessionKey());
-  (await cookies()).set(COOKIE, token, {
-    httpOnly: true,
-    sameSite: "strict",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-    secure: process.env.NODE_ENV === "production",
+    lastSeen: Date.now(),
   });
+  (await cookies()).set(COOKIE, token, cookieOptions());
 }
 
 export async function destroySession() {
@@ -43,13 +25,9 @@ export async function destroySession() {
 }
 
 async function decryptSession() {
-  const token = (await cookies()).get(COOKIE)?.value;
-  if (!token) return null;
-  try {
-    return (await jwtDecrypt(token, sessionKey())).payload;
-  } catch {
-    return null;
-  }
+  const session = await openSession((await cookies()).get(COOKIE)?.value);
+  // proxy.js normally clears an idle session first; this covers requests it does not see.
+  return session && !idleExpired(session) ? session : null;
 }
 
 export async function getFirebaseSession() {
@@ -61,7 +39,9 @@ export async function getFirebaseSession() {
       const refreshed = await refreshIdToken(session.refreshToken);
       idToken = refreshed.id_token;
     }
-    const profile = await getDocument(`taxUsers/${session.uid}`, idToken);
+    // One retry, so a brief network or Firestore hiccup does not look like a sign-out.
+    const profile = await getDocument(`taxUsers/${session.uid}`, idToken)
+      .catch(() => getDocument(`taxUsers/${session.uid}`, idToken));
     if (!profile || profile.tenantId !== "perry-tax-pro" || !["CLIENT", "PREPARER"].includes(profile.role)) return null;
     return {
       id: session.uid,

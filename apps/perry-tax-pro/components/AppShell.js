@@ -1,16 +1,17 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Icon from "@/components/Icon";
+import IdleGuard from "@/components/IdleGuard";
 
 export default function AppShell({ links, user, children }) {
   const path = usePathname();
-  const router = useRouter();
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    // Full page load on purpose: drops every cached page of private data after sign-out.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign("/signed-out?reason=manual");
   };
   const isActive = (href) => (href === links[0].href ? path === href : path.startsWith(href));
   const current = [...links].reverse().find((l) => isActive(l.href)) || links[0];
@@ -42,6 +43,7 @@ export default function AppShell({ links, user, children }) {
 
   return (
     <div className="shell">
+      <IdleGuard />
       <div className="mobile-bar">
         {brand}
         <button type="button" id="drawer-toggle" className="drawer-btn" aria-expanded={open} aria-controls="app-sidebar" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>

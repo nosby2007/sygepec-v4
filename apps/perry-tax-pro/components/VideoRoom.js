@@ -41,6 +41,13 @@ export default function VideoRoom({ appointmentId, title, backHref, otherLabel }
     room.disconnect();
   };
 
+  // A call involves no clicks or typing, so it reports activity to the idle sign-out.
+  useEffect(() => {
+    if (phase !== "connected") return;
+    const beat = setInterval(() => window.dispatchEvent(new Event("app-activity")), 30_000);
+    return () => clearInterval(beat);
+  }, [phase]);
+
   useEffect(() => {
     window.addEventListener("pagehide", leave);
     return () => { window.removeEventListener("pagehide", leave); leave(); };
