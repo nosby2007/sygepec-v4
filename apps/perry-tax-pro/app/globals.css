@@ -423,6 +423,12 @@ p { color: var(--muted); }
 .range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--blue); cursor: pointer; }
 
 /* App shell ---------------------------------------------------------------- */
+.mobile-bar { display: none; position: sticky; top: 0; z-index: 60; height: 60px; padding: 0 16px; align-items: center; justify-content: space-between; color: #fff; background: linear-gradient(90deg, #07101f, #0b1f3a); box-shadow: 0 6px 20px rgba(4,10,22,.18); }
+.mobile-bar .logo { font-size: 1.05rem; }
+.drawer-btn { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; }
+.drawer-btn:hover, .drawer-btn[aria-expanded="true"] { background: rgba(255,255,255,.16); }
+.drawer-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(4,10,22,.5); }
+body.drawer-open { overflow: hidden; }
 .shell { display: grid; grid-template-columns: 268px 1fr; min-height: 100vh; }
 .sidebar {
   border-right: 1px solid rgba(255,255,255,.06); padding: 22px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
@@ -782,11 +788,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .steps::before { display: none; }
   .nav { display: none; }
   .shell { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 14px; }
-  .side-label, .side-promo { display: none; }
-  .side-nav { flex-direction: row; flex-wrap: wrap; }
+  /* The sidebar becomes a drawer opened from the mobile bar. */
+  .mobile-bar { display: flex; }
+  .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 70; width: min(300px, 86vw); height: 100dvh; transform: translateX(-102%); visibility: hidden; transition: transform 0.25s var(--ease), visibility 0s 0.25s; }
+  .sidebar.open { transform: none; visibility: visible; transition: transform 0.25s var(--ease); box-shadow: 24px 0 60px rgba(4,10,22,.45); }
+  .side-promo { display: none; }
   .side-nav a.active::before { display: none; }
-  .side-user { margin-top: 0; }
+  .topbar { top: 60px; }
   .main { padding: 0 18px 40px; }
   .timeline { grid-template-columns: repeat(3, 1fr); row-gap: 20px; }
   .tl-step:nth-child(4)::before, .tl-step:nth-child(4)::after { display: none; }

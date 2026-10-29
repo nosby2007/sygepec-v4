@@ -61,12 +61,15 @@
 .pub .nav a::after { background: var(--pub-amber); bottom: -8px; border-radius: 0; height: 3px; }
 .pub .site-header .btn-ghost { color: var(--pub-navy); background: #fff; border-color: var(--pub-navy); }
 .pub-login { font-weight: 700; color: var(--pub-navy); font-size: .92rem; }
-.pub-menu { display: none; position: relative; }
-.pub-menu summary { list-style: none; cursor: pointer; padding: 8px 10px; border: 2px solid var(--pub-navy); border-radius: 4px; color: var(--pub-navy); font-weight: 700; font-size: .9rem; }
-.pub-menu summary::-webkit-details-marker { display: none; }
-.pub-menu nav { position: absolute; right: 0; top: calc(100% + 10px); background: #fff; border: 1px solid var(--pub-line); min-width: 220px; padding: 8px 0; box-shadow: 0 18px 40px rgba(0,0,0,.12); display: grid; }
-.pub-menu nav a { padding: 10px 18px; font-weight: 600; }
-.pub-menu nav a:hover { background: var(--pub-paper); }
+.pub-menu { display: none; }
+.pub-menu-btn { display: grid; place-items: center; width: 44px; height: 44px; border: 2px solid var(--pub-navy); border-radius: 4px; background: #fff; color: var(--pub-navy); cursor: pointer; }
+.pub-menu-btn:hover, .pub-menu-btn[aria-expanded="true"] { background: var(--pub-navy); color: #fff; }
+/* Full-width panel under the header, dark text on white. */
+.pub-menu-panel { position: absolute; left: 0; right: 0; top: 100%; background: #fff; border-top: 1px solid var(--pub-line); border-bottom: 3px solid var(--pub-amber); box-shadow: 0 24px 40px rgba(10,24,42,.18); display: grid; padding: 6px 0; max-height: calc(100vh - 76px); overflow-y: auto; }
+.pub-menu-panel a { color: var(--pub-ink); font-weight: 600; font-size: 1.02rem; padding: 14px 22px; border-left: 4px solid transparent; }
+.pub-menu-panel a + a { border-top: 1px solid var(--pub-line); }
+.pub-menu-panel a:hover, .pub-menu-panel a:focus-visible { background: var(--pub-paper); border-left-color: var(--pub-amber); color: var(--pub-navy); outline: none; }
+.pub-menu-panel a.current { border-left-color: var(--pub-navy); color: var(--pub-navy); }
 
 /* Hero: one full-width photograph with text on a dark wash. */
 .pub-hero { position: relative; min-height: min(78vh, 680px); display: flex; align-items: center; color: #fff; overflow: hidden; background: var(--pub-navy); }

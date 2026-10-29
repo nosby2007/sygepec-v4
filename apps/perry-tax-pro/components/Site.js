@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/cms";
 import Icon from "@/components/Icon";
+import MobileMenu from "@/components/MobileMenu";
 
 export function Logo() {
   return (
@@ -55,14 +56,7 @@ export async function SiteHeader() {
               <Link id="nav-login" href="/login" className="pub-login">Log in</Link>
             )}
             <Link id="nav-register" href={s ? "/book" : "/register"} className="btn btn-primary btn-sm hide-sm">{s ? "Book a visit" : "Start my return"}</Link>
-            <details className="pub-menu">
-              <summary>Menu</summary>
-              <nav aria-label="Mobile">
-                {NAV.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
-                <Link href="/book">Book a visit</Link>
-                {!s && <Link href="/register">Start my return</Link>}
-              </nav>
-            </details>
+            <MobileMenu links={[...NAV, ["/book", "Book a visit"], ...(s ? [] : [["/login", "Log in"], ["/register", "Start my return"]])]} />
           </div>
         </div>
       </header>

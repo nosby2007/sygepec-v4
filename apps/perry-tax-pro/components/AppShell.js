@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 
@@ -17,10 +18,38 @@ export default function AppShell({ links, user, children }) {
   const isBusiness = user.accountType === "BUSINESS";
   const area = isPreparer ? "Preparer workspace" : isBusiness ? "Business workspace" : "Client portal";
   const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  // On phones the sidebar is a drawer behind a menu button. It closes when a page is
+  // chosen, on Escape and on a tap on the dimmed page.
+  const [open, setOpen] = useState(false);
+  const [seenPath, setSeenPath] = useState(path);
+  if (seenPath !== path) {
+    setSeenPath(path);
+    setOpen(false);
+  }
+  useEffect(() => {
+    if (!open) return;
+    const key = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", key);
+    document.body.classList.add("drawer-open");
+    return () => { document.removeEventListener("keydown", key); document.body.classList.remove("drawer-open"); };
+  }, [open]);
+  const brand = (
+    <Link href="/" className="logo">
+      <span className="logo-mark">IC</span>
+      <span>InnovaCare<small>{isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
+    </Link>
+  );
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <div className="mobile-bar">
+        {brand}
+        <button type="button" id="drawer-toggle" className="drawer-btn" aria-expanded={open} aria-controls="app-sidebar" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>
+          <Icon name={open ? "x" : "menu"} size={22} />
+        </button>
+      </div>
+      {open && <div className="drawer-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />}
+      <aside id="app-sidebar" className={`sidebar${open ? " open" : ""}`}>
         <Link href="/" className="logo">
           <span className="logo-mark">IC</span>
           <span>InnovaCare<small>{isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
@@ -29,7 +58,7 @@ export default function AppShell({ links, user, children }) {
           <div className="side-label">{isPreparer ? "Operations" : "Workspace"}</div>
           <nav className="side-nav">
             {links.map((l) => (
-              <Link key={l.href} id={`side-${l.label.toLowerCase().replace(/\W+/g, "-")}`} href={l.href} className={isActive(l.href) ? "active" : ""}>
+              <Link key={l.href} id={`side-${l.label.toLowerCase().replace(/\W+/g, "-")}`} href={l.href} className={isActive(l.href) ? "active" : ""} onClick={() => setOpen(false)}>
                 <span className="ico"><Icon name={l.icon} size={18} /></span>
                 {l.label}
               </Link>
