@@ -47,6 +47,11 @@
   `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`, `account.updated`.
 - Two endpoints in Stripe point here (your account, and connected accounts). Put both
   signing secrets in the one secret, separated by a comma.
+- Secret Manager name: `PERRY_TAX_STRIPE_WEBHOOK_SECRET`, mounted on Cloud Run as
+  `STRIPE_WEBHOOK_SECRET`. Do **not** use the secret named `STRIPE_WEBHOOK_SECRET`: it
+  belongs to the main SYGEPEC Cloud Functions (`firebase-managed=functions`).
+- Hosting pins the Cloud Run revision (`pinTag`), so redeploy Hosting after any Cloud
+  Run change, including a new secret version.
 
 ## Data retention (daily job, task `retention`)
 - Deletes audit entries older than 7 years.
