@@ -6,8 +6,8 @@ store release is only needed for native changes (icon, permissions, plugins).
 
 - Business owners: Appointments, Clients, Checkout, Marketing, Profile (+ Settings, Help,
   Growth levels). Opens at `/m/business/appointments`.
-- Tax clients: "Book local", the businesses & services directory (`/m/discover`). The full
-  customer app comes later.
+- Tax clients and customers use the separate InnovaCare client app (`../innovacare-client`,
+  `/m/client`); a client who signs in here is sent there.
 - Native: share sheet (`@capacitor/share`), haptics, status bar, splash, camera for photos.
   The site calls them through `window.Capacitor` (see `components/mobile/native.js`).
 - No connection: `www/offline.html` with a retry button.
