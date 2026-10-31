@@ -36,6 +36,15 @@ store release is only needed for native changes (icon, permissions, plugins).
 A debug APK can also be built from the command line: `npm run build:debug` (output in
 `android/app/build/outputs/apk/debug/`).
 
+On this PC the SDK is in `%USERPROFILE%\AppData\Local\sdk` (set in the untracked
+`android/local.properties`). Gradle fails with "Unable to establish loopback connection"
+because the Windows user folder has spaces; give Java a short temp folder first:
+
+```
+set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
+set JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\Temp\jtmp
+```
+
 ## Google Play release
 
 1. Create an upload key once (keep the file and passwords safe, never commit them):
