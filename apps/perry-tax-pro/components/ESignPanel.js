@@ -20,12 +20,14 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
 });
 
 // Preparer panel: send Form 8879 for online signing with an identity check, follow
-// each signer, and cancel to send a corrected form.
-export default function ESignPanel({ returnId, signature, available, jointReturn }) {
+// each signer, and cancel to send a corrected form. "compact" is the Signature Center
+// row: the upload form stays folded until the preparer asks for it.
+export default function ESignPanel({ returnId, signature, available, jointReturn, compact = false }) {
   const router = useRouter();
   const [file, setFile] = useState(null);
   const [spouse, setSpouse] = useState({ name: "", email: "" });
   const [state, setState] = useState({});
+  const [expanded, setExpanded] = useState(!compact);
   const open = signature && ["SENT", "PARTIAL"].includes(signature.status);
 
   const post = async (body, ok) => {
@@ -50,10 +52,11 @@ export default function ESignPanel({ returnId, signature, available, jointReturn
 
   if (!available) return null;
   const [label, tone] = STATUS[signature?.status] || ["Not sent", ""];
+  const ids = compact ? `-${returnId}` : "";
   return (
-    <div className="card stack-sm" id="esign-panel">
+    <div className={compact ? "esign-compact stack-sm" : "card stack-sm"} id={compact ? undefined : "esign-panel"}>
       <div className="card-title">
-        <div className="kicker"><Icon name="pen" size={14} /> Online signature · Form 8879</div>
+        <div className="kicker"><Icon name="pen" size={14} /> Online signature{compact ? " · DocuSeal" : " · Form 8879"}</div>
         <span className={`badge ${tone}`}>{label}</span>
       </div>
       {signature && signature.status !== "CANCELLED" && (
@@ -67,20 +70,27 @@ export default function ESignPanel({ returnId, signature, available, jointReturn
           <button type="button" className="btn btn-ghost btn-sm" disabled={!!state.busy} onClick={() => post({ action: "sync" }, "Status updated.")}><Icon name="refresh" size={14} /> Check status</button>
           <button type="button" className="btn btn-danger btn-sm" disabled={!!state.busy} onClick={() => post({ action: "cancel" }, "Request cancelled. You can send a corrected form.")}>Cancel request</button>
         </div>
+      ) : signature?.status !== "COMPLETED" && !expanded ? (
+        <div className="row">
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setExpanded(true)}><Icon name="send" size={14} /> {signature ? "Send a new request" : "Send for online signature"}</button>
+        </div>
       ) : signature?.status !== "COMPLETED" && (
         <div className="stack-sm">
           <div className="field">
-            <label htmlFor="esign-pdf">Form 8879 PDF from your tax software</label>
-            <input id="esign-pdf" type="file" accept="application/pdf" className="input" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <label htmlFor={`esign-pdf${ids}`}>Form 8879 PDF from your tax software</label>
+            <input id={`esign-pdf${ids}`} type="file" accept="application/pdf" className="input" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             <span className="hint">Use the official IRS layout. Signature, date and identity-check fields are placed automatically.</span>
           </div>
           {jointReturn && (
             <div className="form-grid">
-              <div className="field"><label htmlFor="esign-spouse-name">Spouse&apos;s name</label><input id="esign-spouse-name" className="input" maxLength={100} value={spouse.name} onChange={(e) => setSpouse({ ...spouse, name: e.target.value })} /></div>
-              <div className="field"><label htmlFor="esign-spouse-email">Spouse&apos;s email</label><input id="esign-spouse-email" type="email" className="input" value={spouse.email} onChange={(e) => setSpouse({ ...spouse, email: e.target.value })} /></div>
+              <div className="field"><label htmlFor={`esign-spouse-name${ids}`}>Spouse&apos;s name</label><input id={`esign-spouse-name${ids}`} className="input" maxLength={100} value={spouse.name} onChange={(e) => setSpouse({ ...spouse, name: e.target.value })} /></div>
+              <div className="field"><label htmlFor={`esign-spouse-email${ids}`}>Spouse&apos;s email</label><input id={`esign-spouse-email${ids}`} type="email" className="input" value={spouse.email} onChange={(e) => setSpouse({ ...spouse, email: e.target.value })} /></div>
             </div>
           )}
-          <button type="button" id="esign-send" className="btn btn-primary btn-sm" disabled={!!state.busy} onClick={send}><Icon name="send" size={14} /> {state.busy === "send" ? "Sending…" : "Send for signature"}</button>
+          <div className="row">
+          <button type="button" id={compact ? undefined : "esign-send"} className="btn btn-primary btn-sm" disabled={!!state.busy} onClick={send}><Icon name="send" size={14} /> {state.busy === "send" ? "Sending…" : "Send for signature"}</button>
+          {compact && <button type="button" className="btn btn-ghost btn-sm" disabled={!!state.busy} onClick={() => { setExpanded(false); setFile(null); setState({}); }}>Not now</button>}
+          </div>
           <span className="hint">Each signer answers identity questions before signing (IRS Pub. 1345). After 3 failed attempts they must sign on paper.</span>
         </div>
       )}

@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
-import { getDocument, incrementDocument, mergeDocument, patchFields, setDocument, TAX_TENANT, uploadObject } from "@/lib/firebase";
+import { getDocument, incrementDocument, mergeDocument, patchFields, queryCollection, setDocument, TAX_TENANT, uploadObject } from "@/lib/firebase";
 import { getReturnForSession } from "@/lib/data";
 import { paymentGate } from "@/lib/payments";
 import { notifyStatusChange, emailClient } from "@/lib/notifications";
@@ -64,6 +64,18 @@ const strip = ({ id: _i, createTime: _c, updateTime: _u, ...data }) => data;
 export async function getSignature(returnId) {
   const id = safeId(returnId);
   return id ? getDocument(`taxSignatures/${id}`, await serviceToken()).catch(() => null) : null;
+}
+
+// Every signing request, by return ID, for the Signature Center. Open requests are read
+// back from DocuSeal first (at most 25 at a time), so the queue shows who has signed.
+export async function listSignatures(session) {
+  if (session?.role !== "PREPARER") return {};
+  const rows = await queryCollection("taxSignatures", await serviceToken(), { filters: [["tenantId", "EQUAL", TAX_TENANT]], limit: 1000 }).catch(() => []);
+  const open = rows.filter((sig) => ["SENT", "PARTIAL"].includes(sig.status)).slice(0, 25);
+  const synced = await Promise.all(open.map((sig) => syncSignature(session, sig.returnId).catch(() => sig)));
+  const byReturn = Object.fromEntries(rows.map((sig) => [sig.returnId, sig]));
+  for (const sig of synced) if (sig) byReturn[sig.returnId] = sig;
+  return byReturn;
 }
 
 // Signer view for screens: never includes another signer's link.

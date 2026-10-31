@@ -977,3 +977,9 @@ tr.muted td { color: var(--faint); }
 .mfa-key { display: block; margin-top: 6px; font-size: .95rem; letter-spacing: .08em; word-break: break-all; }
 .mfa-recovery { margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--surface-2, #f4f6fa); border: 1px solid var(--border, #e5e7eb); font-size: 1rem; line-height: 1.7; columns: 2; }
 .alert-inline { color: var(--danger, #c0392b); }
+
+/* Signature Center: online signing inside a queue row */
+.esign-compact { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2, transparent); }
+.esign-compact .card-title { margin-bottom: 0; }
+.esign-manual summary { cursor: pointer; color: var(--muted); }
+.esign-manual[open] summary { margin-bottom: 8px; }
