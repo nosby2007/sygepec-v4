@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- InnovaCare client app icon foreground: a map pin (book local). 108dp canvas, the
+     visible area is the middle 72dp. The business app uses a calendar on navy. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28c-11.6,0 -21,9.4 -21,21c0,15.5 21,35 21,35s21,-19.5 21,-35c0,-11.6 -9.4,-21 -21,-21z" />
+    <path
+        android:fillColor="#0B1F3A"
+        android:pathData="M54,40a9,9 0,1 1,0 18a9,9 0,1 1,0 -18z" />
+</vector>

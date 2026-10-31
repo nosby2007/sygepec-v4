@@ -249,7 +249,7 @@ export async function publishedBusinesses() {
     filters: [["status", "EQUAL", "PUBLISHED"], ["tenantId", "EQUAL", TAX_TENANT]], limit: 500,
   }).catch(() => []);
   return rows
-    .map(({ id, name, slug, tagline, city, state, logoPath, publicBooking }) => ({ businessId: id, name, slug, tagline: tagline || "", city: city || "", state: state || "", logoPath: logoPath || null, publicBooking: publicBooking === true }))
+    .map(({ id, name, slug, tagline, city, state, logoPath, coverPath, publicBooking }) => ({ businessId: id, name, slug, tagline: tagline || "", city: city || "", state: state || "", logoPath: logoPath || null, coverPath: coverPath || null, publicBooking: publicBooking === true }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -461,6 +461,10 @@ export async function createPublicBooking(slug, input, { ip = "unknown" } = {}) 
     status,
     when: whenLabel(startMs, settings.timeZone),
     manageUrl: `/business/${profile.slug}/booking/${token}`,
+    token,
+    startMs,
+    serviceName: service.name,
+    business: { id: profile.businessId, name: profile.name, slug: profile.slug },
   };
 }
 

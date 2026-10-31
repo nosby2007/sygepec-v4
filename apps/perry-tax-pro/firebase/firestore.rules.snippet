@@ -636,6 +636,29 @@ match /bizPortfolio/{photoId} {
   allow delete: if businessOwner() && resource.data.businessId == request.auth.uid;
 }
 
+// "My bookings" in the client app: one private index row per booking a signed-in client
+// made. link is the sealed guest link (the same one a guest keeps), opened on the server.
+match /clientBookings/{bookingId} {
+  allow get, list: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && resource.data.ownerUid == request.auth.uid;
+  allow create: if taxSignedIn()
+    && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+    && request.resource.data.keys().hasOnly(['tenantId', 'ownerUid', 'bookingId', 'businessId', 'slug', 'businessName', 'serviceName', 'startMs', 'link', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.bookingId == bookingId
+    && request.resource.data.businessId is string
+    && request.resource.data.slug is string && request.resource.data.slug.size() <= 80
+    && request.resource.data.businessName is string && request.resource.data.businessName.size() <= 120
+    && request.resource.data.serviceName is string && request.resource.data.serviceName.size() <= 120
+    && request.resource.data.startMs is int
+    && request.resource.data.link is string && request.resource.data.link.size() <= 4000
+    && request.resource.data.createdAt is string;
+  allow update: if false;
+  allow delete: if taxSignedIn() && resource.data.ownerUid == request.auth.uid;
+}
+
 // One document per public link, created with the profile, so two businesses can never
 // claim the same link.
 match /bizSlugs/{slug} {

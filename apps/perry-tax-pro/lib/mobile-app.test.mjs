@@ -5,6 +5,7 @@ import { parseCheckout } from "./mobile-checkout.js";
 import { growthFacts, growthLevels, LEVELS } from "./growth-levels.js";
 import { safeNext } from "./idle.js";
 import { featureForPath } from "./plans.js";
+import { averageRating, clientBookingRecord, searchBusinesses, splitBookings } from "./client-app.js";
 
 // ---- Checkout ------------------------------------------------------------------------------
 
@@ -78,4 +79,52 @@ test("mobile tabs and APIs need the right plan", () => {
   assert.equal(featureForPath("/api/business/checkout"), "INVOICES");
   assert.equal(featureForPath("/api/business/portfolio"), "PUBLIC_PAGE");
   assert.equal(featureForPath("/m/discover"), null, "the directory is open to tax clients");
+});
+
+// ---- Client app ------------------------------------------------------------------------------
+
+test("client bookings split into upcoming (soonest first) and past (newest first)", () => {
+  const now = Date.UTC(2026, 9, 31, 15);
+  const hour = 3_600_000;
+  const rows = [
+    { id: "a", status: "CONFIRMED", startMs: now + 48 * hour, minutes: 60 },
+    { id: "b", status: "REQUESTED", startMs: now + 2 * hour, minutes: 30 },
+    { id: "c", status: "CONFIRMED", startMs: now - 20 * 60_000, minutes: 60 },
+    { id: "d", status: "CANCELLED", startMs: now + 24 * hour, minutes: 60 },
+    { id: "e", status: "COMPLETED", startMs: now - 72 * hour, minutes: 60 },
+    { id: "f", status: "CONFIRMED", startMs: now - 3 * hour, minutes: 60 },
+  ];
+  const { upcoming, past } = splitBookings(rows, now);
+  assert.deepEqual(upcoming.map((b) => b.id), ["c", "b", "a"], "an appointment in progress is still upcoming");
+  assert.deepEqual(past.map((b) => b.id), ["d", "f", "e"], "cancelled and finished bookings are past");
+});
+
+test("client booking index row holds only what the rules allow", () => {
+  const record = clientBookingRecord("uid_1", {
+    id: "bk_1", token: "sealed", startMs: 1793450000000.7, serviceName: "Knotless braids",
+    business: { id: "biz_1", slug: "amas-braiding", name: "Ama's Braiding Studio" },
+  }, "2026-10-31T12:00:00.000Z");
+  assert.deepEqual(Object.keys(record).sort(), ["bookingId", "businessId", "businessName", "createdAt", "link", "ownerUid", "serviceName", "slug", "startMs", "tenantId"]);
+  assert.equal(record.startMs, 1793450000000, "startMs is an integer for the rules");
+  assert.equal(record.tenantId, "perry-tax-pro");
+  assert.equal(record.ownerUid, "uid_1");
+});
+
+test("explore search matches every word across name, services and city", () => {
+  const list = [
+    { name: "Ama's Braiding Studio", tagline: "Knotless braids", city: "Atlanta", state: "GA", services: ["Cornrows", "Loc retwist"] },
+    { name: "Fresh Fade", tagline: "", city: "Decatur", state: "GA", services: ["Haircut"] },
+  ];
+  assert.equal(searchBusinesses(list, "").length, 2);
+  assert.deepEqual(searchBusinesses(list, "loc atlanta").map((b) => b.name), ["Ama's Braiding Studio"]);
+  assert.deepEqual(searchBusinesses(list, "HAIRCUT").map((b) => b.name), ["Fresh Fade"]);
+  assert.equal(searchBusinesses(list, "nails").length, 0);
+  assert.equal(averageRating([{ rating: 5 }, { rating: 4 }, { rating: 4 }]), 4.3);
+  assert.equal(averageRating([]), null);
+});
+
+test("sign-in can return to the client app, the app's paths need no business plan", () => {
+  assert.equal(safeNext("/m/client/book/amas-braiding?service=svc_1"), "/m/client/book/amas-braiding?service=svc_1");
+  assert.equal(featureForPath("/m/client"), null);
+  assert.equal(featureForPath("/api/client/bookings"), null);
 });

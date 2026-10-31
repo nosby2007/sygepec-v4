@@ -300,6 +300,29 @@ describe("business isolation", () => {
   });
 });
 
+describe("client app bookings", () => {
+  const row = (owner, id, extra = {}) => ({
+    tenantId: T, ownerUid: owner, bookingId: id, businessId: "bizA", slug: "biz-a", businessName: "Biz A",
+    serviceName: "Cut", startMs: 1793450000000, link: "sealed-token", createdAt: now, ...extra,
+  });
+  test("a client files a booking under their own account only", async () => {
+    ok(await write("alice", "clientBookings/cb1", row("alice", "cb1"), true));
+    denied(await write("alice", "clientBookings/cb2", row("bob", "cb2"), true));
+    denied(await write("alice", "clientBookings/cb3", row("alice", "other"), true));
+    denied(await write("alice", "clientBookings/cb4", row("alice", "cb4", { status: "CONFIRMED" }), true));
+    denied(await write(null, "clientBookings/cb5", row("alice", "cb5"), true));
+    denied(await write("stranger", "clientBookings/cb6", row("stranger", "cb6"), true));
+  });
+  test("only the owner reads or removes the row, and it never changes", async () => {
+    ok(await read("alice", "clientBookings/cb1"));
+    denied(await read("bob", "clientBookings/cb1"));
+    denied(await read("bizA", "clientBookings/cb1"));
+    denied(await write("alice", "clientBookings/cb1", row("alice", "cb1", { startMs: 1 })));
+    denied(await status(fetch(`${DOCS}/clientBookings/cb1`, { method: "DELETE", headers: headers("bob") })));
+    ok(await status(fetch(`${DOCS}/clientBookings/cb1`, { method: "DELETE", headers: headers("alice") })));
+  });
+});
+
 describe("Storage", () => {
   const docsFile = "tax/perry-tax-pro/alice/alice_docs/d1/document.pdf";
   const filedFile = "tax/perry-tax-pro/alice/alice_filed/f1/document.pdf";

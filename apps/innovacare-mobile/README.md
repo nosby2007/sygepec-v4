@@ -1,4 +1,4 @@
-# InnovaCare mobile app (Android, iOS later)
+# InnovaCare Business app (Android, iOS later)
 
 A Capacitor shell around the mobile screens of the Perry Tax Pro site (`/m`). The screens,
 data and sign-in all live on the site, so a website deploy updates the app at once; a new
@@ -15,7 +15,7 @@ store release is only needed for native changes (icon, permissions, plugins).
 | Setting | Value |
 |---|---|
 | App ID | `com.innovacaretax.business` |
-| Name | InnovaCare |
+| Name | InnovaCare Business |
 | Start URL | `https://perry-tax-pro-sygepec-v4.web.app/m` (`capacitor.config.json`) |
 | Capacitor | 8.5.3 |
 

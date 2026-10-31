@@ -221,3 +221,45 @@ textarea.m-input { height: auto; min-height: 90px; padding: 12px 14px; }
 .m-gap { margin-top: 16px; }
 .m-gap-b { margin-bottom: 14px; }
 .m-avatar.sm { width: 36px; height: 36px; font-size: 13px; }
+
+/* Client app (/m/client) */
+.m-tabbar.four nav { grid-template-columns: repeat(4, 1fr); }
+.m-hello { font-size: 15px; color: var(--muted); margin: 0 0 2px; }
+.m-shop { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; text-decoration: none; color: inherit; margin-bottom: 14px; box-shadow: 0 2px 10px rgba(10, 22, 40, 0.05); }
+.m-shop-cover { height: 150px; background: linear-gradient(135deg, var(--navy), var(--teal-2)) center / cover no-repeat; position: relative; }
+.m-shop-cover .m-rating { top: auto; bottom: 10px; left: auto; right: 10px; transform: none; font-size: 15px; }
+.m-shop-body { display: flex; gap: 12px; align-items: center; padding: 12px 14px 14px; }
+.m-shop-body .m-avatar { flex: none; width: 52px; height: 52px; border-radius: 14px; margin-top: -34px; border: 3px solid #fff; }
+.m-shop-text b { display: block; font-size: 17px; }
+.m-shop-text span { display: block; color: var(--muted); font-size: 14px; }
+.m-shop-text { flex: 1; min-width: 0; }
+.m-svc { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; }
+.m-svc + .m-svc { border-top: 1px solid var(--border); }
+.m-svc b { display: block; font-size: 16px; }
+.m-svc span { display: block; color: var(--muted); font-size: 14px; margin-top: 2px; }
+.m-svc .m-right b { font-size: 16px; }
+.m-days { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px var(--m-gutter) 6px; margin: 0 calc(-1 * var(--m-gutter)) 12px; }
+.m-days button { flex: none; width: 62px; border: 1.5px solid var(--border-strong); border-radius: 14px; background: var(--surface); padding: 8px 0; font: inherit; color: var(--text); display: grid; gap: 2px; justify-items: center; }
+.m-days button span { font-size: 12px; color: var(--muted); }
+.m-days button b { font-size: 20px; }
+.m-days button[aria-pressed="true"] { background: var(--m-ink); border-color: var(--m-ink); color: #fff; }
+.m-days button[aria-pressed="true"] span { color: rgba(255, 255, 255, 0.75); }
+.m-days button:disabled { opacity: 0.4; }
+.m-times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.m-times .m-chip { min-width: 0; }
+.m-pill { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 600; background: var(--surface-3); color: var(--muted); }
+.m-pill.CONFIRMED { background: #e3f7ef; color: #0d6b44; }
+.m-pill.REQUESTED { background: #fff6e0; color: #8a5a00; }
+.m-pill.CANCELLED, .m-pill.NO_SHOW { background: #fdecec; color: #8f1d1d; }
+.m-booking { display: flex; gap: 14px; align-items: center; width: 100%; padding: 14px 16px; background: none; border: 0; font: inherit; color: inherit; text-align: left; }
+.m-booking + .m-booking { border-top: 1px solid var(--border); }
+.m-booking .m-date { flex: none; width: 54px; border-radius: 14px; background: var(--surface-3); text-align: center; padding: 6px 0; }
+.m-booking .m-date span { display: block; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+.m-booking .m-date b { display: block; font-size: 22px; line-height: 1.1; }
+.m-booking > div:nth-child(2) { flex: 1; min-width: 0; }
+.m-booking b.t { display: block; font-size: 16px; }
+.m-booking small { display: block; color: var(--muted); font-size: 14px; margin: 2px 0 6px; }
+.m-me { display: flex; gap: 14px; align-items: center; margin: 8px 0 18px; }
+.m-me .m-avatar { width: 64px; height: 64px; font-size: 22px; }
+.m-me b { display: block; font-size: 22px; font-family: var(--font-outfit), sans-serif; }
+.m-me span { color: var(--muted); font-size: 15px; }

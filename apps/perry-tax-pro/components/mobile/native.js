@@ -36,7 +36,8 @@ export async function api(url, { method = "POST", body } = {}) {
   const res = await fetch(url, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && (data.signedOut || data.mfa)) {
-    window.location.href = data.mfa ? "/login/verify?next=/m" : "/login?next=/m";
+    const back = encodeURIComponent(window.location.pathname);
+    window.location.href = data.mfa ? `/login/verify?next=${back}` : `/login?next=${back}`;
     throw new Error(data.error || "Please sign in again.");
   }
   if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
