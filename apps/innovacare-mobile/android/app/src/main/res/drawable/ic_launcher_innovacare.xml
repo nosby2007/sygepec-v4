@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- InnovaCare app icon foreground: a calendar with a check mark. 108dp canvas, the
+     visible area is the middle 72dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,34h32a6,6 0,0 1,6 6v30a6,6 0,0 1,-6 6H38a6,6 0,0 1,-6 -6V40a6,6 0,0 1,6 -6z" />
+    <path
+        android:fillColor="#14B8A6"
+        android:pathData="M38,34h32a6,6 0,0 1,6 6v6H32v-6a6,6 0,0 1,6 -6z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M43,29v9M65,29v9" />
+    <path
+        android:strokeColor="#0F9688"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M43,60l7,7l15,-15" />
+</vector>

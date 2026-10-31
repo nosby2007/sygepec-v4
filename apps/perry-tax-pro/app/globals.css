@@ -983,3 +983,7 @@ tr.muted td { color: var(--faint); }
 .esign-compact .card-title { margin-bottom: 0; }
 .esign-manual summary { cursor: pointer; color: var(--muted); }
 .esign-manual[open] summary { margin-bottom: 8px; }
+
+/* Public business page: portfolio photos */
+.biz-portfolio { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.biz-portfolio img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }

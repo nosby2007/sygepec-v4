@@ -100,5 +100,5 @@ export async function proxy(request) {
 
 // Background requests the browser makes on its own must not count as activity.
 export const config = {
-  matcher: ["/portal/:path*", "/admin/:path*", "/api/((?!auth/logout|cron|public|payments/confirm|stripe/webhook).*)"],
+  matcher: ["/portal/:path*", "/admin/:path*", "/m", "/m/:path*", "/api/((?!auth/logout|cron|public|payments/confirm|stripe/webhook).*)"],
 };

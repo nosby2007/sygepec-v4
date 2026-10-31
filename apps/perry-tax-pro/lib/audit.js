@@ -12,6 +12,9 @@ export const AUDIT_RETENTION_YEARS = 7;
 
 export const AUDIT_LABELS = {
   LOGIN: "Signed in",
+  CHECKOUT: "Checkout (mobile app)",
+  PORTFOLIO_ADDED: "Added a portfolio photo",
+  PORTFOLIO_REMOVED: "Removed a portfolio photo",
   LOGIN_FAILED: "Failed sign-in",
   LOGOUT: "Signed out",
   MFA_ENABLED: "Turned on two-step sign-in",

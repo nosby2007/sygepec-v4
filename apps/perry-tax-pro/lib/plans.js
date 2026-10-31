@@ -28,6 +28,11 @@ const PATH_FEATURES = [
   // Always open, so an owner without a plan can still see and export their books.
   ["/portal/business/accounting", null],
   ["/portal/business/bookings", "BOOKINGS"],
+  // Mobile app tabs: the calendar needs bookings; the rest of the app needs a plan.
+  ["/m/business/appointments", "BOOKINGS"],
+  ["/m/business", "WORKSPACE"],
+  ["/api/business/checkout", "INVOICES"],
+  ["/api/business/portfolio", "PUBLIC_PAGE"],
   ["/api/business/bookings", "BOOKINGS"],
   ["/api/business/appointments", "BOOKINGS"],
   ["/api/business/reminders", "BOOKINGS"],

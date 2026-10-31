@@ -620,6 +620,22 @@ match /bizProfiles/{businessId} {
   allow delete: if false;
 }
 
+// Portfolio photos shown on the public business page and in the mobile app. The image
+// itself lives under biz/{businessId}/public/ (public read, owner upload).
+match /bizPortfolio/{photoId} {
+  allow get, list: if resource.data.tenantId == 'perry-tax-pro';
+  allow create: if businessOwner()
+    && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'path', 'caption', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.businessId == request.auth.uid
+    && request.resource.data.path is string
+    && request.resource.data.path.matches('biz/' + request.auth.uid + '/public/[A-Za-z0-9_-]+[.](jpg|png|webp)')
+    && request.resource.data.caption is string && request.resource.data.caption.size() <= 120
+    && request.resource.data.createdAt is string;
+  allow update: if false;
+  allow delete: if businessOwner() && resource.data.businessId == request.auth.uid;
+}
+
 // One document per public link, created with the profile, so two businesses can never
 // claim the same link.
 match /bizSlugs/{slug} {

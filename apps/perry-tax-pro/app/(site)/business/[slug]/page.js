@@ -5,6 +5,7 @@ import Icon from "@/components/Icon";
 import { Empty } from "@/components/ui";
 import { publicServices, publicStaff, resolveBusiness } from "@/lib/business-booking";
 import { publicFeedback } from "@/lib/business-growth";
+import { listPortfolio } from "@/lib/portfolio";
 import { addressLine, mediaUrl, money, weeklySummary } from "@/lib/business-display";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }) {
 export default async function BusinessProfilePage({ params }) {
   const profile = await resolveBusiness((await params).slug);
   if (!profile) notFound();
-  const [services, staff, reviews] = await Promise.all([publicServices(profile.businessId), publicStaff(profile.businessId), publicFeedback(profile.businessId)]);
+  const [services, staff, reviews, photos] = await Promise.all([publicServices(profile.businessId), publicStaff(profile.businessId), publicFeedback(profile.businessId), listPortfolio(profile.businessId)]);
   const average = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : null;
   const hours = weeklySummary(profile.booking?.weekly);
   const address = addressLine(profile);
@@ -87,6 +88,17 @@ export default async function BusinessProfilePage({ params }) {
                 ))}
               </div>
             </div>
+            {photos.length > 0 && (
+              <div className="card">
+                <div className="card-title"><h2>Our work</h2><span className="pill">{photos.length}</span></div>
+                <div className="biz-portfolio">
+                  {photos.slice(0, 24).map((ph) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={ph.id} src={mediaUrl(ph.path)} alt={ph.caption || `Work by ${profile.name}`} loading="lazy" />
+                  ))}
+                </div>
+              </div>
+            )}
             {reviews.length > 0 && (
               <div className="card">
                 <div className="card-title"><h2>What customers say</h2><span className="pill"><Icon name="star" size={12} /> {average.toFixed(1)} from {reviews.length} featured review{reviews.length === 1 ? "" : "s"}</span></div>
