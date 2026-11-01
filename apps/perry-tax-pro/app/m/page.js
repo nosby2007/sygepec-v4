@@ -5,7 +5,7 @@ import { getFirebaseSession } from "@/lib/auth";
 // clients the client app (Explore, Bookings, Taxes), preparers the web workspace.
 export default async function Page() {
   const s = await getFirebaseSession();
-  if (!s) redirect("/login?next=/m");
+  if (!s) redirect("/m/login?next=/m");
   if (s.role === "PREPARER") redirect("/admin");
   redirect(s.accountType === "BUSINESS" ? "/m/business/appointments" : "/m/client");
 }

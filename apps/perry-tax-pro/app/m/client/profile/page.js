@@ -28,8 +28,8 @@ export default async function Page() {
           <h3>Sign in to InnovaCare</h3>
           <p>Keep your bookings in one place and follow your tax return.</p>
           <div className="m-btns m-gap">
-            <Link className="m-btn" href="/login?next=/m/client/profile">Sign in</Link>
-            <Link className="m-btn ghost" href="/register?next=/m/client/profile">Create a free account</Link>
+            <Link className="m-btn" href="/m/login?next=/m/client/profile">Sign in</Link>
+            <Link className="m-btn ghost" href="/m/register?next=/m/client/profile">Create a free account</Link>
           </div>
         </div>
       )}
@@ -57,7 +57,7 @@ export default async function Page() {
           <Link className="m-btn" href="/business">Learn more</Link>
         </div>
       )}
-      {session && <SignOut next="/m/client" />}
+      {session && <SignOut to="/m/client" />}
     </main>
   );
 }

@@ -41,6 +41,8 @@ function withCookie(request, value) {
   return headers;
 }
 
+const inApp = (request) => /^\/m(\/|$)/.test(request.nextUrl.pathname);
+
 export async function proxy(request) {
   const token = request.cookies.get(COOKIE)?.value;
   const session = await openSession(token);
@@ -51,7 +53,10 @@ export async function proxy(request) {
   if (idleExpired(session, nowMs)) {
     const response = isApi
       ? NextResponse.json({ error: "You were signed out after a period of inactivity.", signedOut: true }, { status: 401 })
-      : NextResponse.redirect(publicUrl(request, `/signed-out?reason=idle&next=${encodeURIComponent(request.nextUrl.pathname)}`));
+      : NextResponse.redirect(publicUrl(request, inApp(request)
+        // The app stays in the app: its own sign-in screen, back to the same screen after.
+        ? `/m/login?next=${encodeURIComponent(request.nextUrl.pathname)}`
+        : `/signed-out?reason=idle&next=${encodeURIComponent(request.nextUrl.pathname)}`));
     response.cookies.delete(COOKIE);
     return response;
   }

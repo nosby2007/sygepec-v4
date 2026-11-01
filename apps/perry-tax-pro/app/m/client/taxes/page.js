@@ -91,7 +91,7 @@ function Pitch({ signedIn, business = false }) {
           : "Answer a short questionnaire, upload documents from your phone and follow your return until the IRS accepts it."}</p>
         {business ? <a className="m-btn" href="/portal/business">Open business taxes</a>
           : signedIn ? <a className="m-btn" href="/portal/intake">Start my tax return</a>
-          : <Link className="m-btn" href="/register?next=/m/client/taxes">Get started</Link>}
+          : <Link className="m-btn" href="/m/register?next=/m/client/taxes">Get started</Link>}
       </div>
       <div className="m-list">
         {[["shield", "Certified preparers", "Every return is prepared and checked by a person."], ["upload", "Upload from your phone", "Snap W-2s, 1099s and receipts; files are encrypted."], ["pen", "Sign online", "Review and sign Form 8879 without printing."]].map(([icon, title, text]) => (
@@ -100,7 +100,7 @@ function Pitch({ signedIn, business = false }) {
       </div>
       <div className="m-btns m-gap">
         <Link className="m-btn ghost" href="/services">See tax services and prices</Link>
-        {!signedIn && <Link className="m-btn ghost" href="/login?next=/m/client/taxes">I already have an account</Link>}
+        {!signedIn && <Link className="m-btn ghost" href="/m/login?next=/m/client/taxes">I already have an account</Link>}
       </div>
     </main>
   );

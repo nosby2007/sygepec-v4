@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const session = await getFirebaseSession();
-  if (!session) redirect("/login?next=/m/client/bookings");
+  if (!session) redirect("/m/login?next=/m/client/bookings");
   const bookings = await listClientBookings(session).catch(() => null);
   return (
     <main className="m-main">

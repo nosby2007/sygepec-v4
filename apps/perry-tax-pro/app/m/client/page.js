@@ -36,7 +36,7 @@ export default async function Page({ searchParams }) {
           <p className="m-hello">{session ? `Hi ${session.name.split(" ")[0]}` : "Welcome to InnovaCare"}</p>
           <h1>Book local</h1>
         </div>
-        {!session && <Link className="m-btn small" href="/login?next=/m/client">Sign in</Link>}
+        {!session && <Link className="m-btn small" href="/m/login?next=/m/client">Sign in</Link>}
       </div>
       <form role="search" className="m-search"><Icon name="search" size={20} /><input type="search" name="q" defaultValue={q} placeholder="Service, business or city" aria-label="Search businesses" /></form>
 

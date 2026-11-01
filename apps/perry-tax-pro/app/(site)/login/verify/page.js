@@ -14,7 +14,8 @@ export default async function Page({ searchParams }) {
   if (!session) redirect("/login");
   const home = homeOf(session);
   const asked = safeNext((await searchParams)?.next);
-  const next = asked && asked.startsWith(home) ? asked : home;
+  // The app (/m) opens the right screens for any account, so its paths are always fine.
+  const next = asked && (asked.startsWith(home) || asked === "/m" || asked.startsWith("/m/")) ? asked : home;
   if (!mfaPending(session)) redirect(next);
   const status = await mfaStatus(session.uid).catch(() => null);
   if (!status) redirect("/signed-out?reason=expired");

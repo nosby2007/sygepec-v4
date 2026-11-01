@@ -29,8 +29,8 @@ export default async function Page({ params, searchParams }) {
           <h3>Sign in to book</h3>
           <p>With an InnovaCare account your bookings are saved in the app, where you can move or cancel them.</p>
           <div className="m-btns m-gap">
-            <Link className="m-btn" href={`/login?next=${encodeURIComponent(here)}`}>Sign in</Link>
-            <Link className="m-btn ghost" href={`/register?next=${encodeURIComponent(here)}`}>Create a free account</Link>
+            <Link className="m-btn" href={`/m/login?next=${encodeURIComponent(here)}`}>Sign in</Link>
+            <Link className="m-btn ghost" href={`/m/register?next=${encodeURIComponent(here)}`}>Create a free account</Link>
             <Link className="m-btn ghost" href={`/business/${profile.slug}/book${preselect ? `?service=${preselect}` : ""}`}>Book as a guest</Link>
           </div>
         </div>

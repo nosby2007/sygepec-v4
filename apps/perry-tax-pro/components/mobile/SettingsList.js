@@ -20,7 +20,7 @@ export default function SettingsList({ items }) {
         ))}
         {rows.length === 0 && <div className="m-empty">No setting matches “{q}”.</div>}
       </div>
-      <SignOut next="/m" />
+      <SignOut to="/m/login?next=/m/business/appointments" />
     </>
   );
 }

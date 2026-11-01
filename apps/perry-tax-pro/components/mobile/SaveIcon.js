@@ -12,7 +12,7 @@ export default function SaveIcon({ slug, initial, signedIn }) {
   const pathname = usePathname();
   const toggle = async () => {
     if (!signedIn) {
-      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+      router.push(`/m/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
     tap();

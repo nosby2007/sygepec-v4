@@ -279,3 +279,14 @@ textarea.m-input { height: auto; min-height: 90px; padding: 12px 14px; }
 .m-check input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--teal-2); }
 textarea.m-input { height: auto; padding: 12px 14px; resize: vertical; }
 .m-rate-hint { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; font-size: 13px; font-weight: 600; color: #b7791f; }
+
+/* Sign-in and sign-up inside the app */
+.m-auth { padding-top: calc(var(--m-safe-top) + 40px); max-width: 480px; margin: 0 auto; }
+.m-auth h1 { font-family: var(--font-outfit), sans-serif; font-size: 28px; margin: 18px 0 6px; }
+.m-auth-mark { width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--blue-2), var(--teal)); }
+.m-pw { position: relative; }
+.m-pw .m-input { padding-right: 72px; }
+.m-pw button { position: absolute; right: 6px; top: 6px; height: 38px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--surface-3); font: inherit; font-size: 14px; font-weight: 600; color: var(--text); }
+.m-field small.m-sub { display: block; margin-top: 6px; font-size: 13px; }
+.m-auth-alt { text-align: center; color: var(--muted); margin: 22px 0 14px; }
+.m-auth-alt a { color: var(--teal-2); font-weight: 700; }
