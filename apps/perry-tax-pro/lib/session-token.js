@@ -1,5 +1,6 @@
 import { EncryptJWT, jwtDecrypt } from "jose";
 import { SERVER_IDLE_MS } from "@/lib/idle";
+import { APP_MODES } from "@/lib/app-mode";
 
 // The encrypted session cookie, shared by lib/auth.js (pages and routes) and proxy.js
 // (which slides the idle timer and refreshes the Firebase token on every request).
@@ -43,6 +44,9 @@ export const cookieOptions = () => ({
   maxAge: MAX_AGE_S,
   secure: process.env.NODE_ENV === "production",
 });
+
+// The native app this browser is (lib/app-mode.js), kept across sign-in and sign-out.
+export const appMarker = (session) => (APP_MODES.includes(session?.app) ? { app: session.app } : null);
 
 // A password sign-in that still owes its second step ("verify" or "setup"). Preparer
 // sessions from before two-step sign-in existed carry no flag and must pass it too.

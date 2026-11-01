@@ -2,13 +2,15 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
-import { APP_COOKIE, APP_MODES, appSignIn } from "@/lib/app-mode";
-import { COOKIE, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
+import { APP_MODES, appSignIn } from "@/lib/app-mode";
+import { COOKIE, appMarker, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
 
 // mfa: "ok", or "verify" / "setup" while the second sign-in step is still owed.
 export async function createSession(firebaseAuth, profile, mfa = "ok") {
   const expiresAt = Date.now() + Number(firebaseAuth.expiresIn || 3600) * 1000;
+  const before = await openSession((await cookies()).get(COOKIE)?.value);
   const token = await sealSession({
+    ...appMarker(before),
     uid: firebaseAuth.localId || firebaseAuth.user_id,
     email: firebaseAuth.email || profile.email,
     name: profile.name,
@@ -23,8 +25,24 @@ export async function createSession(firebaseAuth, profile, mfa = "ok") {
   (await cookies()).set(COOKIE, token, cookieOptions());
 }
 
+// Inside the native apps the cookie keeps only { app }, so the app look survives sign-out.
 export async function destroySession() {
-  (await cookies()).delete(COOKIE);
+  const store = await cookies();
+  const marker = appMarker(await openSession(store.get(COOKIE)?.value));
+  if (marker) store.set(COOKIE, await sealSession(marker), cookieOptions());
+  else store.delete(COOKIE);
+}
+
+// Records which native app this is (components/mobile/AppMark.js). "auto" keeps the
+// current one, or "client" when none is known yet.
+export async function setAppMode(mode) {
+  const store = await cookies();
+  const session = await openSession(store.get(COOKIE)?.value);
+  const app = mode === "auto" ? session?.app || "client" : mode;
+  if (!APP_MODES.includes(app) || session?.app === app) return;
+  const { exp: _e, iat: _i, ...rest } = session || {};
+  const keep = rest.uid && !idleExpired(rest) ? rest : {};
+  store.set(COOKIE, await sealSession({ ...keep, app }), cookieOptions());
 }
 
 async function decryptSession() {
@@ -83,8 +101,7 @@ export async function getSession() {
 
 // "client" or "business" inside the native apps, otherwise null (see lib/app-mode.js).
 export async function appMode() {
-  const value = (await cookies()).get(APP_COOKIE)?.value;
-  return APP_MODES.includes(value) ? value : null;
+  return appMarker(await openSession((await cookies()).get(COOKIE)?.value))?.app || null;
 }
 
 // Inside the apps a missing session goes to the app's own sign-in screen.

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { COOKIE, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
+import { appSignIn } from "@/lib/app-mode";
+import { COOKIE, appMarker, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
 import { allows, featureForPath, upgradeMessage } from "@/lib/plans";
 import { getEntitlement } from "@/lib/entitlements";
 
@@ -46,7 +47,8 @@ const inApp = (request) => /^\/m(\/|$)/.test(request.nextUrl.pathname);
 export async function proxy(request) {
   const token = request.cookies.get(COOKIE)?.value;
   const session = await openSession(token);
-  if (!session) return NextResponse.next();
+  // No session, or only the native app marker of a signed-out app (lib/app-mode.js).
+  if (!session?.uid) return NextResponse.next();
   const nowMs = Date.now();
   const isApi = request.nextUrl.pathname.startsWith("/api/");
 
@@ -56,8 +58,11 @@ export async function proxy(request) {
       : NextResponse.redirect(publicUrl(request, inApp(request)
         // The app stays in the app: its own sign-in screen, back to the same screen after.
         ? `/m/login?next=${encodeURIComponent(request.nextUrl.pathname)}`
+        : session.app ? appSignIn(session.app)
         : `/signed-out?reason=idle&next=${encodeURIComponent(request.nextUrl.pathname)}`));
-    response.cookies.delete(COOKIE);
+    const marker = appMarker(session);
+    if (marker) response.cookies.set(COOKIE, await sealSession(marker), cookieOptions());
+    else response.cookies.delete(COOKIE);
     return response;
   }
 
@@ -105,5 +110,5 @@ export async function proxy(request) {
 
 // Background requests the browser makes on its own must not count as activity.
 export const config = {
-  matcher: ["/portal/:path*", "/admin/:path*", "/m", "/m/:path*", "/api/((?!auth/logout|cron|public|payments/confirm|stripe/webhook).*)"],
+  matcher: ["/portal/:path*", "/admin/:path*", "/m", "/m/:path*", "/api/((?!auth/logout|auth/app|cron|public|payments/confirm|stripe/webhook).*)"],
 };
