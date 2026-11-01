@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
+import SaveIcon from "@/components/mobile/SaveIcon";
 import ShareIcon from "@/components/mobile/ShareIcon";
 import { dollars, initials } from "@/components/mobile/format";
+import { getFirebaseSession } from "@/lib/auth";
 import { publicServices, publicStaff, resolveBusiness } from "@/lib/business-booking";
 import { publicFeedback } from "@/lib/business-growth";
 import { addressLine, mediaUrl, weeklySummary } from "@/lib/business-display";
 import { averageRating } from "@/lib/client-app";
+import { isFavorite } from "@/lib/client-favorites";
 import { listPortfolio } from "@/lib/portfolio";
 
 export async function generateMetadata({ params }) {
@@ -19,8 +22,10 @@ export async function generateMetadata({ params }) {
 export default async function Page({ params }) {
   const profile = await resolveBusiness((await params).slug);
   if (!profile) notFound();
-  const [services, staff, reviews, photos] = await Promise.all([
+  const session = await getFirebaseSession();
+  const [services, staff, reviews, photos, saved] = await Promise.all([
     publicServices(profile.businessId), publicStaff(profile.businessId), publicFeedback(profile.businessId), listPortfolio(profile.businessId),
+    session ? isFavorite(session, profile.businessId) : false,
   ]);
   const rating = averageRating(reviews);
   const address = addressLine(profile);
@@ -33,6 +38,7 @@ export default async function Page({ params }) {
         <div className="m-cover-tools">
           <Link href="/m/client" aria-label="Back"><Icon name="back" size={20} /></Link>
           <ShareIcon title={profile.name} path={`/business/${profile.slug}`} />
+          <SaveIcon slug={profile.slug} initial={saved} signedIn={Boolean(session)} />
         </div>
       </div>
       <div className="m-profile-card">

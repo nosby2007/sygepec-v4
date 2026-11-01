@@ -5,6 +5,7 @@ import { publicFeedback } from "@/lib/business-growth";
 import { mediaUrl } from "@/lib/business-display";
 import { averageRating, searchBusinesses } from "@/lib/client-app";
 import { nextClientBooking } from "@/lib/client-bookings";
+import { listFavorites } from "@/lib/client-favorites";
 import { formatInZone } from "@/lib/timezone";
 import Icon from "@/components/Icon";
 import { initials } from "@/components/mobile/format";
@@ -22,7 +23,11 @@ export default async function Page({ searchParams }) {
     return { ...b, services: services.map((s) => s.name), rating: averageRating(reviews), reviews: reviews.length };
   }));
   const shown = searchBusinesses(listed, q);
-  const next = session ? await nextClientBooking(session).catch(() => null) : null;
+  const [next, favorites] = session
+    ? await Promise.all([nextClientBooking(session).catch(() => null), listFavorites(session).catch(() => [])])
+    : [null, []];
+  // Saved businesses that are still listed, newest saved first.
+  const saved = favorites.map((f) => listed.find((b) => b.businessId === f.businessId)).filter(Boolean);
 
   return (
     <main className="m-main">
@@ -41,6 +46,24 @@ export default async function Page({ searchParams }) {
           <h3 style={{ margin: "6px 0 2px" }}>{next.service}</h3>
           <p style={{ margin: 0 }}>{next.businessName} · {formatInZone(new Date(next.startMs).toISOString(), next.timeZone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
         </Link>
+      )}
+
+      {saved.length > 0 && !q && (
+        <>
+          <div className="m-section"><h2>Saved</h2></div>
+          <div className="m-saved" role="list">
+            {saved.map((b) => (
+              <Link key={b.businessId} role="listitem" href={`/m/client/business/${b.slug}`}>
+                <div className="m-avatar">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {b.logoPath ? <img src={mediaUrl(b.logoPath)} alt="" /> : initials(b.name)}
+                </div>
+                <span>{b.name}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="m-section"><h2>All businesses</h2></div>
+        </>
       )}
 
       {q && <p className="m-sub" style={{ margin: "0 0 12px" }}>{shown.length} result{shown.length === 1 ? "" : "s"} for “{q}”</p>}

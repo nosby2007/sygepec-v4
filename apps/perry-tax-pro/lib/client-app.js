@@ -49,3 +49,33 @@ export function averageRating(reviews) {
   if (!reviews?.length) return null;
   return Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10;
 }
+
+// A review the client leaves from "My bookings" (the business-sent links use random IDs).
+export const clientFeedbackId = (bookingId) => `c_${bookingId}`;
+
+export function clientFeedbackRecord(session, booking, input, nowIso) {
+  const rating = Number(input.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return null;
+  return {
+    tenantId: "perry-tax-pro",
+    businessId: booking.businessId,
+    bookingId: booking.id,
+    requestId: clientFeedbackId(booking.id),
+    serviceName: String(booking.service || "").slice(0, 120),
+    displayName: String(session.name || "").trim().split(/\s+/)[0].slice(0, 40) || "Customer",
+    rating,
+    comment: String(input.comment || "").trim().slice(0, 1000),
+    publishConsent: input.publishConsent === true,
+    featured: false,
+    seenAt: null,
+    authorUid: session.uid,
+    createdAt: nowIso,
+  };
+}
+
+// Saved businesses: one row per client and business (see firestore rules).
+export const favoriteId = (uid, businessId) => `${uid}_${businessId}`;
+
+export function favoriteRecord(uid, business, nowIso) {
+  return { tenantId: "perry-tax-pro", ownerUid: uid, businessId: business.businessId, slug: business.slug, createdAt: nowIso };
+}

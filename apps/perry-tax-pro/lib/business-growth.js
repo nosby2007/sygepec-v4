@@ -225,7 +225,7 @@ export async function submitFeedback(token, input) {
 
 export async function updateFeedback(session, rawId, input) {
   const id = String(rawId || "");
-  if (!/^[A-Za-z0-9_-]{32}$/.test(id)) throw new BusinessError("Feedback not found.", 404);
+  if (!/^[A-Za-z0-9_-]{32,40}$/.test(id)) throw new BusinessError("Feedback not found.", 404);
   const row = await getDocument(`bizFeedback/${id}`, session.idToken).catch(() => null);
   if (!row || row.businessId !== session.uid) throw new BusinessError("Feedback not found.", 404);
   if (input.featured === true && !row.publishConsent) throw new BusinessError("The customer did not agree to publish this feedback.");

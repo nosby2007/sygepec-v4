@@ -40,6 +40,7 @@ export default function ClientBookings({ bookings, nowMs }) {
                 <b className="t">{b.service}</b>
                 <small>{b.businessName} · {at(b, { weekday: "short", hour: "numeric", minute: "2-digit" })}</small>
                 <span className={`m-pill ${b.status}`}>{BOOKING_STATUS_LABEL[b.status] || b.status}</span>
+                {b.status === "COMPLETED" && !b.reviewed && <span className="m-rate-hint"><Icon name="star" size={14} /> Rate your visit</span>}
               </div>
               <Icon name="chevron" size={18} className="m-chev" />
             </button>
@@ -120,7 +121,48 @@ function BookingSheet({ booking: b, onClose }) {
           </div>
         </div>
       )}
+      {b.status === "COMPLETED" && <Review booking={b} />}
       {state.error && <div className="m-alert">{state.error}</div>}
     </Sheet>
+  );
+}
+
+// Stars and an optional comment for a finished visit; sent once per booking.
+function Review({ booking: b }) {
+  const router = useRouter();
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [publish, setPublish] = useState(true);
+  const [state, setState] = useState({ done: b.reviewed });
+
+  if (state.done) return <div className="m-alert info m-gap">Thanks for rating your visit to {b.businessName}.</div>;
+
+  const send = async () => {
+    tap();
+    setState({ busy: true });
+    try {
+      await api(`/api/client/bookings/${b.id}/review`, { body: { rating, comment, publishConsent: publish } });
+      setState({ done: true });
+      router.refresh();
+    } catch (e) {
+      setState({ error: e.message });
+    }
+  };
+
+  return (
+    <div className="m-card m-gap" style={{ marginBottom: 0 }}>
+      <b>How was your visit?</b>
+      <div className="m-stars" role="radiogroup" aria-label="Rating">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} star${n === 1 ? "" : "s"}`} className={n <= rating ? "on" : undefined} onClick={() => { tap(); setRating(n); }}>
+            <Icon name="star" size={32} />
+          </button>
+        ))}
+      </div>
+      <label className="m-field"><span>Comment (optional)</span><textarea className="m-input" rows={3} maxLength={1000} value={comment} onChange={(e) => setComment(e.target.value)} /></label>
+      <label className="m-check"><input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} /> {b.businessName} may show my first name, rating and comment on its page</label>
+      <button type="button" className="m-btn teal m-gap" disabled={!rating || state.busy} onClick={send}>{state.busy ? "Sending…" : "Send review"}</button>
+      {state.error && <div className="m-alert m-gap">{state.error}</div>}
+    </div>
   );
 }

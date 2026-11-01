@@ -5,7 +5,7 @@ import { parseCheckout } from "./mobile-checkout.js";
 import { growthFacts, growthLevels, LEVELS } from "./growth-levels.js";
 import { safeNext } from "./idle.js";
 import { featureForPath } from "./plans.js";
-import { averageRating, clientBookingRecord, searchBusinesses, splitBookings } from "./client-app.js";
+import { averageRating, clientBookingRecord, clientFeedbackRecord, favoriteId, favoriteRecord, searchBusinesses, splitBookings } from "./client-app.js";
 
 // ---- Checkout ------------------------------------------------------------------------------
 
@@ -127,4 +127,25 @@ test("sign-in can return to the client app, the app's paths need no business pla
   assert.equal(safeNext("/m/client/book/amas-braiding?service=svc_1"), "/m/client/book/amas-braiding?service=svc_1");
   assert.equal(featureForPath("/m/client"), null);
   assert.equal(featureForPath("/api/client/bookings"), null);
+});
+
+test("a client review keeps the rules' shape: one per booking, never pre-featured", () => {
+  const session = { uid: "uid_1", name: "  Ama   Mensah " };
+  const booking = { id: "bk_1", businessId: "biz_1", service: "Knotless braids" };
+  const r = clientFeedbackRecord(session, booking, { rating: 5, comment: " Lovely ", publishConsent: true }, "2026-10-31T12:00:00.000Z");
+  assert.deepEqual(Object.keys(r).sort(), ["authorUid", "bookingId", "businessId", "comment", "createdAt", "displayName", "featured", "publishConsent", "rating", "requestId", "seenAt", "serviceName", "tenantId"]);
+  assert.equal(r.requestId, "c_bk_1");
+  assert.equal(r.displayName, "Ama", "first name only");
+  assert.equal(r.comment, "Lovely");
+  assert.equal(r.featured, false);
+  assert.equal(r.seenAt, null);
+  assert.equal(clientFeedbackRecord(session, booking, { rating: 0 }, "x"), null);
+  assert.equal(clientFeedbackRecord(session, booking, { rating: 4.5 }, "x"), null);
+  assert.equal(clientFeedbackRecord(session, booking, { rating: "3", publishConsent: "yes" }, "x").publishConsent, false, "consent must be an explicit true");
+  assert.equal(clientFeedbackRecord({ uid: "u", name: "" }, booking, { rating: 3 }, "x").displayName, "Customer");
+});
+
+test("a saved business row is keyed by client and business", () => {
+  assert.equal(favoriteId("uid_1", "biz_1"), "uid_1_biz_1");
+  assert.deepEqual(favoriteRecord("uid_1", { businessId: "biz_1", slug: "amas", name: "Ama's" }, "t"), { tenantId: "perry-tax-pro", ownerUid: "uid_1", businessId: "biz_1", slug: "amas", createdAt: "t" });
 });

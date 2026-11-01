@@ -659,6 +659,25 @@ match /clientBookings/{bookingId} {
   allow delete: if taxSignedIn() && resource.data.ownerUid == request.auth.uid;
 }
 
+// Businesses a client saved in the app: one row per client and published business.
+match /clientFavorites/{favoriteId} {
+  allow get, list: if taxSignedIn()
+    && resource.data.tenantId == 'perry-tax-pro'
+    && resource.data.ownerUid == request.auth.uid;
+  allow create: if taxSignedIn()
+    && exists(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
+    && request.resource.data.keys().hasOnly(['tenantId', 'ownerUid', 'businessId', 'slug', 'createdAt'])
+    && request.resource.data.tenantId == 'perry-tax-pro'
+    && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.businessId is string
+    && favoriteId == request.auth.uid + '_' + request.resource.data.businessId
+    && bizProfileOf(request.resource.data.businessId).status == 'PUBLISHED'
+    && request.resource.data.slug is string && request.resource.data.slug.size() <= 80
+    && request.resource.data.createdAt is string;
+  allow update: if false;
+  allow delete: if taxSignedIn() && resource.data.ownerUid == request.auth.uid;
+}
+
 // One document per public link, created with the profile, so two businesses can never
 // claim the same link.
 match /bizSlugs/{slug} {
@@ -1036,21 +1055,36 @@ match /bizFeedbackRequests/{token} {
   allow update, delete: if false;
 }
 
-// One answer per request (same ID). Public only when featured with the customer's consent.
+// One answer per request (same ID), or per booking for reviews from the client app
+// (ID c_<bookingId>). Public only when featured with the customer's consent.
 match /bizFeedback/{token} {
   allow get, list: if resource.data.tenantId == 'perry-tax-pro'
     && ((businessOwner() && resource.data.businessId == request.auth.uid)
+      || (request.auth != null && resource.data.authorUid == request.auth.uid)
       || (resource.data.featured == true && resource.data.publishConsent == true));
   allow create: if request.auth != null
     && request.resource.data.keys().hasOnly(['tenantId', 'businessId', 'bookingId', 'requestId', 'serviceName', 'displayName', 'rating', 'comment', 'publishConsent', 'featured', 'seenAt', 'authorUid', 'createdAt'])
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.requestId == token
     && request.resource.data.authorUid == request.auth.uid
-    && exists(/databases/$(database)/documents/bizFeedbackRequests/$(token))
-    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.businessId == request.resource.data.businessId
-    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.bookingId == request.resource.data.bookingId
-    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.expiresAtMs > request.time.toMillis()
-    && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.customerFirstName == request.resource.data.displayName
+    && (
+      // An answer to a feedback link the business sent.
+      (exists(/databases/$(database)/documents/bizFeedbackRequests/$(token))
+        && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.businessId == request.resource.data.businessId
+        && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.bookingId == request.resource.data.bookingId
+        && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.expiresAtMs > request.time.toMillis()
+        && get(/databases/$(database)/documents/bizFeedbackRequests/$(token)).data.customerFirstName == request.resource.data.displayName)
+      // A signed-in client reviewing their own finished booking from "My bookings".
+      || (request.resource.data.bookingId is string
+        && token == 'c_' + request.resource.data.bookingId
+        && get(/databases/$(database)/documents/clientBookings/$(request.resource.data.bookingId)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/bizBookings/$(request.resource.data.bookingId)).data.businessId == request.resource.data.businessId
+        && get(/databases/$(database)/documents/bizBookings/$(request.resource.data.bookingId)).data.status == 'COMPLETED'
+        && request.auth.token.email is string
+        && get(/databases/$(database)/documents/bizBookings/$(request.resource.data.bookingId)).data.customerEmail.lower() == request.auth.token.email.lower()
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0 && request.resource.data.displayName.size() <= 40)
+    )
     && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
     && request.resource.data.comment is string && request.resource.data.comment.size() <= 1000
     && request.resource.data.publishConsent is bool

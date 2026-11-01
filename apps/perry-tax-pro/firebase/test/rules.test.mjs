@@ -17,7 +17,7 @@ function token(uid) {
   const b64 = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
   return `${b64({ alg: "none", typ: "JWT" })}.${b64({
-    iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: uid, user_id: uid,
+    iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: uid, user_id: uid, email: `${uid}@example.test`,
     iat: now, exp: now + 3600, auth_time: now, firebase: { sign_in_provider: "password", identities: {} },
   })}.`;
 }
@@ -320,6 +320,48 @@ describe("client app bookings", () => {
     denied(await write("alice", "clientBookings/cb1", row("alice", "cb1", { startMs: 1 })));
     denied(await status(fetch(`${DOCS}/clientBookings/cb1`, { method: "DELETE", headers: headers("bob") })));
     ok(await status(fetch(`${DOCS}/clientBookings/cb1`, { method: "DELETE", headers: headers("alice") })));
+  });
+});
+
+describe("client app favorites and reviews", () => {
+  const fav = (owner, businessId, extra = {}) => ({ tenantId: T, ownerUid: owner, businessId, slug: "biz-a", createdAt: now, ...extra });
+  const review = (bookingId, extra = {}) => ({
+    tenantId: T, businessId: "bizA", bookingId, requestId: `c_${bookingId}`, serviceName: "Cut", displayName: "Alice",
+    rating: 5, comment: "Great", publishConsent: true, featured: false, seenAt: null, authorUid: "alice", createdAt: now, ...extra,
+  });
+  before(async () => {
+    await seed("bizProfiles/bizA", { tenantId: T, status: "PUBLISHED", name: "Biz A", slug: "biz-a" });
+    await seed("bizProfiles/bizB", { tenantId: T, status: "DRAFT", name: "Biz B", slug: "biz-b" });
+    const booking = (status, email = "Alice@Example.test") => ({ tenantId: T, businessId: "bizA", status, customerEmail: email, guestUid: "guest1" });
+    await seed("bizBookings/done1", booking("COMPLETED"));
+    await seed("bizBookings/open1", booking("CONFIRMED"));
+    await seed("bizBookings/else1", booking("COMPLETED", "someone@example.test"));
+    for (const id of ["done1", "open1", "else1"]) {
+      await seed(`clientBookings/${id}`, { tenantId: T, ownerUid: "alice", bookingId: id, businessId: "bizA", slug: "biz-a", businessName: "Biz A", serviceName: "Cut", startMs: 1, link: "x", createdAt: now });
+    }
+  });
+  test("a client saves published businesses under their own ID only", async () => {
+    ok(await write("alice", "clientFavorites/alice_bizA", fav("alice", "bizA"), true));
+    denied(await write("alice", "clientFavorites/alice_bizB", fav("alice", "bizB"), true));
+    denied(await write("alice", "clientFavorites/bob_bizA", fav("bob", "bizA"), true));
+    denied(await write("bob", "clientFavorites/alice_bizA2", fav("alice", "bizA"), true));
+    denied(await write("alice", "clientFavorites/alice_bizA", fav("alice", "bizA", { slug: "x" })));
+    ok(await read("alice", "clientFavorites/alice_bizA"));
+    denied(await read("bob", "clientFavorites/alice_bizA"));
+    denied(await status(fetch(`${DOCS}/clientFavorites/alice_bizA`, { method: "DELETE", headers: headers("bob") })));
+    ok(await status(fetch(`${DOCS}/clientFavorites/alice_bizA`, { method: "DELETE", headers: headers("alice") })));
+  });
+  test("a client reviews only their own finished booking, once", async () => {
+    denied(await write("alice", "bizFeedback/c_open1", review("open1"), true));
+    denied(await write("alice", "bizFeedback/c_else1", review("else1"), true));
+    denied(await write("bob", "bizFeedback/c_done1", review("done1", { authorUid: "bob" }), true));
+    denied(await write("alice", "bizFeedback/c_done1", review("done1", { featured: true }), true));
+    denied(await write("alice", "bizFeedback/x_done1", review("done1", { requestId: "x_done1" }), true));
+    ok(await write("alice", "bizFeedback/c_done1", review("done1"), true));
+    denied(await write("alice", "bizFeedback/c_done1", review("done1", { rating: 1 })));
+    ok(await read("alice", "bizFeedback/c_done1"));
+    ok(await read("bizA", "bizFeedback/c_done1"));
+    denied(await read("bob", "bizFeedback/c_done1"));
   });
 });
 
