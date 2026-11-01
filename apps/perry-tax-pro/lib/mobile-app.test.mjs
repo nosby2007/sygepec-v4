@@ -149,3 +149,14 @@ test("a saved business row is keyed by client and business", () => {
   assert.equal(favoriteId("uid_1", "biz_1"), "uid_1_biz_1");
   assert.deepEqual(favoriteRecord("uid_1", { businessId: "biz_1", slug: "amas", name: "Ama's" }, "t"), { tenantId: "perry-tax-pro", ownerUid: "uid_1", businessId: "biz_1", slug: "amas", createdAt: "t" });
 });
+
+test("app mode: which native app a screen belongs to, and where its sign-in goes", async () => {
+  const { appForPath, appHome, appSignIn } = await import("./app-mode.js");
+  assert.equal(appForPath("/m/business/appointments"), "business");
+  assert.equal(appForPath("/m/login", "/m/business/appointments"), "business");
+  assert.equal(appForPath("/m/client/taxes"), "client");
+  assert.equal(appForPath("/m/login", "/m"), null);
+  assert.equal(appHome("business"), "/m/business/appointments");
+  assert.equal(appHome("client"), "/m/client");
+  assert.equal(appSignIn("client"), "/m/login?next=%2Fm%2Fclient");
+});

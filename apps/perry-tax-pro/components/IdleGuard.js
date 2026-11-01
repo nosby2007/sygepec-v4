@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { IDLE_MINUTES, IDLE_MS, WARN_MS } from "@/lib/idle";
+import { appSignIn } from "@/lib/app-mode";
 
 // Signs the user out after IDLE_MINUTES without activity, with a one-minute warning.
 // Activity in any open tab counts (shared through localStorage), and pages can report
@@ -18,7 +19,8 @@ const writeLast = (ms) => {
   try { localStorage.setItem(KEY, String(ms)); } catch { /* private mode: this tab only */ }
 };
 
-export default function IdleGuard() {
+// app: inside the native apps sign-out goes to the app's sign-in screen.
+export default function IdleGuard({ app = null }) {
   const last = useRef(0);
   const lastPing = useRef(0);
   const [left, setLeft] = useState(null);
@@ -27,17 +29,15 @@ export default function IdleGuard() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     const next = encodeURIComponent(window.location.pathname);
     // Full page load on purpose: drops every cached page of private data after sign-out.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.assign(`/signed-out?reason=idle&next=${next}`);
-  }, []);
+    window.location.assign(app ? appSignIn(app) : `/signed-out?reason=idle&next=${next}`);
+  }, [app]);
 
   const ping = useCallback(async () => {
     lastPing.current = Date.now();
     const res = await fetch("/api/auth/ping", { method: "POST" }).catch(() => null);
     // Full page load on purpose: drops every cached page of private data after sign-out.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    if (res?.status === 401) window.location.assign("/signed-out?reason=expired");
-  }, []);
+    if (res?.status === 401) window.location.assign(app ? appSignIn(app) : "/signed-out?reason=expired");
+  }, [app]);
 
   const touch = useCallback(() => {
     const now = Date.now();

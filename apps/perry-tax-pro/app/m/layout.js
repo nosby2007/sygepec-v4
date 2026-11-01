@@ -1,4 +1,5 @@
 import "./mobile.css";
+import AppMark from "@/components/mobile/AppMark";
 
 // The InnovaCare mobile app. The Android/iOS shell (mobile/ in this repo) opens /m on
 // the live site; the same screens also work in a phone browser.
@@ -17,5 +18,5 @@ export const viewport = {
 };
 
 export default function MobileLayout({ children }) {
-  return <div className="m-app">{children}</div>;
+  return <div className="m-app"><AppMark />{children}</div>;
 }

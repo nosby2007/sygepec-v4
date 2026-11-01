@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Icon from "@/components/Icon";
 import IdleGuard from "@/components/IdleGuard";
+import AppBar from "@/components/AppBar";
+import { appHome } from "@/lib/app-mode";
 
-export default function AppShell({ links, user, children }) {
+// app: "client" or "business" inside the native apps (see lib/app-mode.js), where the
+// page gets the app bar and no sidebar; sign-out happens in the app's own Profile.
+export default function AppShell({ links, user, app = null, children }) {
   const path = usePathname();
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -40,6 +44,16 @@ export default function AppShell({ links, user, children }) {
       <span>InnovaCare<small>{isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
     </Link>
   );
+
+  if (app) {
+    return (
+      <div className="app-mode">
+        <IdleGuard app={app} />
+        <AppBar title={current.label} home={appHome(app)} />
+        <main className="app-main"><div className="fade-in" key={path}>{children}</div></main>
+      </div>
+    );
+  }
 
   return (
     <div className="shell">

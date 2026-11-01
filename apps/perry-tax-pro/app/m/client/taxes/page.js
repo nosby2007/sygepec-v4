@@ -9,7 +9,8 @@ export const metadata = { title: "My taxes" };
 export const dynamic = "force-dynamic";
 
 // The tax return at a glance. The detailed screens (questionnaire, uploads, messages,
-// signing, payment) are the client portal pages, which open inside the app.
+// signing, payment) are the client portal pages, shown with the app bar inside the
+// native app (lib/app-mode.js).
 export default async function Page() {
   const session = await getFirebaseSession();
   if (!session) return <Pitch signedIn={false} />;
@@ -75,7 +76,6 @@ export default async function Page() {
           <Icon name="chevron" size={18} className="m-chev" />
         </a>
       </div>
-      <p className="m-sub m-gap" style={{ fontSize: 13 }}>Payments, signing and uploads open the secure client portal.</p>
     </main>
   );
 }

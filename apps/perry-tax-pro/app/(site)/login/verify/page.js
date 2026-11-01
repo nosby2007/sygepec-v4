@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getPendingSession } from "@/lib/auth";
+import { appMode, getPendingSession, signInPath } from "@/lib/auth";
+import { appHome } from "@/lib/app-mode";
 import { mfaRequired, mfaStatus } from "@/lib/mfa";
 import { safeNext } from "@/lib/idle";
 import { mfaPending } from "@/lib/session-token";
@@ -11,8 +12,10 @@ const homeOf = (s) => (s.role === "PREPARER" ? "/admin" : s.accountType === "BUS
 
 export default async function Page({ searchParams }) {
   const session = await getPendingSession();
-  if (!session) redirect("/login");
-  const home = homeOf(session);
+  if (!session) redirect(await signInPath());
+  // Inside the native apps the user lands back in the app, not the web portal.
+  const app = session.role === "PREPARER" ? null : await appMode();
+  const home = app ? appHome(app) : homeOf(session);
   const asked = safeNext((await searchParams)?.next);
   // The app (/m) opens the right screens for any account, so its paths are always fine.
   const next = asked && (asked.startsWith(home) || asked === "/m" || asked.startsWith("/m/")) ? asked : home;

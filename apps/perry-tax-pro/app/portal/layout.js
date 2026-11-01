@@ -1,5 +1,5 @@
 import AppShell from "@/components/AppShell";
-import { requireRole } from "@/lib/auth";
+import { appMode, requireRole } from "@/lib/auth";
 
 export const metadata = { title: "Client Portal", robots: { index: false } };
 
@@ -27,6 +27,6 @@ const businessLinks = [
 ];
 
 export default async function PortalLayout({ children }) {
-  const s = await requireRole("CLIENT");
-  return <AppShell links={s.accountType === "BUSINESS" ? businessLinks : taxLinks} user={s}>{children}</AppShell>;
+  const [s, app] = await Promise.all([requireRole("CLIENT"), appMode()]);
+  return <AppShell links={s.accountType === "BUSINESS" ? businessLinks : taxLinks} user={s} app={app}>{children}</AppShell>;
 }

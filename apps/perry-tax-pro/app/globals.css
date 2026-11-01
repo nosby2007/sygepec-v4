@@ -987,3 +987,12 @@ tr.muted td { color: var(--faint); }
 /* Public business page: portfolio photos */
 .biz-portfolio { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
 .biz-portfolio img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
+
+/* Web pages opened inside the native apps (lib/app-mode.js): app bar, no site menus. */
+.app-bar { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 6px; min-height: 56px; padding: env(safe-area-inset-top) 8px 0; background: var(--surface); border-bottom: 1px solid var(--border); color: var(--ink); }
+.app-bar b { flex: 1; min-width: 0; font-size: 1.05rem; }
+.app-bar-back { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none; color: inherit; cursor: pointer; }
+.app-bar-back:active { background: var(--surface-2); }
+.app-bar-home { padding: 10px 12px; font-weight: 700; color: var(--teal-2); text-decoration: none; }
+.app-mode { min-height: 100vh; background: var(--bg); }
+.app-main { padding: 16px 16px 48px; min-width: 0; }

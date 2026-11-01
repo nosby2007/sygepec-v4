@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getSession, signInPath } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import BookForm from "./BookForm";
 
@@ -9,7 +9,7 @@ export const metadata = {
 
 export default async function Page() {
   const s = await getSession();
-  if (!s) redirect("/login");
+  if (!s) redirect(await signInPath());
   if (s.role !== "CLIENT") redirect("/admin");
   return (
     <main className="section" style={{ paddingTop: 60 }}>

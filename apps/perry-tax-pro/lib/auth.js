@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
+import { APP_COOKIE, APP_MODES, appSignIn } from "@/lib/app-mode";
 import { COOKIE, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
 
 // mfa: "ok", or "verify" / "setup" while the second sign-in step is still owed.
@@ -80,9 +81,21 @@ export async function getSession() {
   return { id: session.id, uid: session.uid, email: session.email, name: session.name, role: session.role, accountType: session.accountType };
 }
 
+// "client" or "business" inside the native apps, otherwise null (see lib/app-mode.js).
+export async function appMode() {
+  const value = (await cookies()).get(APP_COOKIE)?.value;
+  return APP_MODES.includes(value) ? value : null;
+}
+
+// Inside the apps a missing session goes to the app's own sign-in screen.
+export async function signInPath() {
+  const mode = await appMode();
+  return mode ? appSignIn(mode) : "/login";
+}
+
 export async function requireRole(role) {
   const s = await getFirebaseSession();
-  if (!s) redirect("/login");
+  if (!s) redirect(await signInPath());
   if (role && s.role !== role) redirect(s.role === "PREPARER" ? "/admin" : "/portal");
   return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role, accountType: s.accountType };
 }
@@ -93,14 +106,14 @@ export function hasBusinessAccess(session) {
 
 export async function requireBusinessClient() {
   const s = await getFirebaseSession();
-  if (!s) redirect("/login");
+  if (!s) redirect(await signInPath());
   if (!hasBusinessAccess(s)) redirect(s.role === "PREPARER" ? "/admin" : "/portal");
   return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role, accountType: s.accountType };
 }
 
 export async function requireTaxClient() {
   const s = await getFirebaseSession();
-  if (!s) redirect("/login");
+  if (!s) redirect(await signInPath());
   if (s.role !== "CLIENT") redirect("/admin");
   if (s.accountType === "BUSINESS") redirect("/portal/business");
   return { id: s.id, uid: s.uid, email: s.email, name: s.name, role: s.role, accountType: s.accountType };

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { IDLE_MINUTES, safeNext } from "@/lib/idle";
+import { appMode } from "@/lib/auth";
+import { appHome } from "@/lib/app-mode";
 
 export const metadata = { title: "Signed out", robots: { index: false } };
 
@@ -31,6 +33,7 @@ export default async function Page({ searchParams }) {
   const params = await searchParams;
   const m = MESSAGES[params?.reason] || MESSAGES.expired;
   const next = safeNext(params?.next);
+  const app = await appMode();
   return (
     <main className="signed-out">
       <div className="signed-out-card">
@@ -39,7 +42,7 @@ export default async function Page({ searchParams }) {
         <p>{m.text}</p>
         <div className="row" style={{ justifyContent: "center" }}>
           <Link id="sign-in-again" href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="btn btn-primary btn-lg">Sign in again</Link>
-          <Link href="/" className="btn btn-ghost btn-lg">Go to the home page</Link>
+          <Link href={app ? appHome(app) : "/"} className="btn btn-ghost btn-lg">{app ? "Back to the app" : "Go to the home page"}</Link>
         </div>
         <ul className="signed-out-tips">
           <li><Icon name="shield" size={16} /> Sessions close after {IDLE_MINUTES} minutes without activity.</li>
