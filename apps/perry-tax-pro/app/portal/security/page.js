@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { TwoStepSettings } from "@/components/TwoStep";
 import { PageHead } from "@/components/ui";
@@ -19,6 +20,7 @@ export default async function Page() {
             <li>Your signed Form 8879 and its identity-check record are kept for the 3 years the IRS requires and cannot be deleted.</li>
             <li>Each time staff open one of your documents, it is recorded.</li>
           </ul>
+          <Link href="/m/account/delete" className="small">Delete my account</Link>
         </div>
       </div>
     </>

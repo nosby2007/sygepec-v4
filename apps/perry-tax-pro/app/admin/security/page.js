@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getFirebaseSession, requireRole } from "@/lib/auth";
+import { deletionRequests } from "@/lib/account-deletion";
 import { AUDIT_LABELS, recentAudit } from "@/lib/audit";
 import { getDocument, queryCollection, TAX_TENANT } from "@/lib/firebase";
 import { serviceToken } from "@/lib/service-identity";
@@ -15,7 +16,7 @@ const GROUPS = {
   documents: ["DOCUMENT_UPLOADED", "DOCUMENT_VIEWED", "DOCUMENT_DELETED", "UPLOAD_BLOCKED"],
   returns: ["RETURN_UPDATED", "SIGNATURE_SENT", "SIGNATURE_CANCELLED", "SIGNATURE_COMPLETED"],
   money: ["FEE_CHANGED", "PAYMENT_CONFIRMED", "SUBSCRIPTION_CHANGED"],
-  system: ["RETENTION_RUN"],
+  system: ["RETENTION_RUN", "ACCOUNT_DELETED", "ACCOUNT_DELETION_REQUESTED"],
 };
 const GROUP_LABELS = { all: "All", signin: "Sign-in", documents: "Documents", returns: "Returns", money: "Money", system: "System" };
 const ALERTS = new Set(["LOGIN_FAILED", "MFA_FAILED", "MFA_LOCKED", "UPLOAD_BLOCKED", "DOCUMENT_DELETED", "MFA_DISABLED"]);
@@ -28,6 +29,7 @@ export default async function Page({ searchParams }) {
   const asked = (await searchParams)?.show;
   const group = GROUPS[asked] ? asked : "all";
   const token = await serviceToken().catch(() => null);
+  const deletions = await deletionRequests().catch(() => []);
   const [entries, preparers] = await Promise.all([
     token ? recentAudit({ limit: 500 }).catch(() => []) : [],
     queryCollection("taxUsers", session.idToken, { filters: [["role", "EQUAL", "PREPARER"]], limit: 50 }).catch(() => []),
@@ -45,6 +47,14 @@ export default async function Page({ searchParams }) {
   return (
     <>
       <PageHead kicker="Protection" icon="shield" title="Security" desc="Two-step sign-in for the team and a permanent record of sign-ins, document access, return changes and payments." />
+      {deletions.length > 0 && (
+        <div className="card stack-sm" style={{ marginBottom: 18 }}>
+          <div className="card-title"><h3>Account deletion requests ({deletions.length})</h3></div>
+          <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+            {deletions.map((d) => <li key={d.id}><b>{d.name}</b> ({d.email}), {when(d.requestedAt)}. Records: {(d.reasons || []).join(", ")}.</li>)}
+          </ul>
+        </div>
+      )}
       <div className="grid-4 stagger">
         <Kpi label="Sign-ins (24 h)" icon="user" value={count(last24, "LOGIN")} foot={`${count(last24, "LOGIN_FAILED")} failed`} />
         <Kpi label="Two-step problems (24 h)" icon="lock" tone={twoStepTrouble ? "gold" : ""} value={twoStepTrouble} foot="wrong codes and lock-outs" />

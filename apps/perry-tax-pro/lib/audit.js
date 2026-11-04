@@ -35,6 +35,8 @@ export const AUDIT_LABELS = {
   SIGNATURE_CANCELLED: "Cancelled a signature request",
   SIGNATURE_COMPLETED: "Form 8879 signed",
   RETENTION_RUN: "Data retention clean-up",
+  ACCOUNT_DELETED: "Deleted their account",
+  ACCOUNT_DELETION_REQUESTED: "Asked to delete their account",
 };
 
 const clip = (value, max) => String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, max);

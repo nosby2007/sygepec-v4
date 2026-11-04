@@ -40,6 +40,7 @@ export default async function Page() {
           {row("/m/client/taxes", "receipt", "My taxes", "Return status and documents")}
           {session.accountType === "BUSINESS" && row("/m/business/appointments", "store", "My business", "Open your business tabs")}
           {row(session.accountType === "BUSINESS" ? "/portal/business" : "/portal/security", "lock", "Security", "Password and two-step sign-in", true)}
+          {row("/m/account/delete", "x", "Delete account", "Remove your account and sign-in")}
         </div>
       )}
 

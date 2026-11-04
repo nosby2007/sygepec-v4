@@ -5,6 +5,11 @@
 // forwards; signed out, the cookie holds just { app }. Browsers keep the normal website.
 export const APP_MODES = ["client", "business"];
 
+// Custom link schemes the apps answer to (AndroidManifest.xml), for coming back from the browser.
+export const APP_SCHEMES = { client: "innovacare", business: "innovacarebusiness" };
+// Where Stripe returns someone who started in a native app.
+export const appReturn = (mode, status) => `/pay/back?app=${mode}&status=${status}`;
+
 export const appHome = (mode) => (mode === "business" ? "/m/business/appointments" : "/m/client");
 export const appSignIn = (mode) => `/m/login?next=${encodeURIComponent(appHome(mode))}`;
 

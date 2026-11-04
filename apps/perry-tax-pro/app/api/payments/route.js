@@ -1,5 +1,5 @@
 import { audit } from "@/lib/audit";
-import { getFirebaseSession } from "@/lib/auth";
+import { appMode, getFirebaseSession } from "@/lib/auth";
 import {
   PaymentError, chooseRefundTransfer, setFee, setSubscriptionCancel, startCheckout, startSubscription,
 } from "@/lib/payments";
@@ -16,12 +16,12 @@ const ACTIONS = {
   paid: (s, b) => setFee(s, b.kind, b.refId, b),
   waive: (s, b) => setFee(s, b.kind, b.refId, b),
   reopen: (s, b) => setFee(s, b.kind, b.refId, b),
-  checkout: (s, b) => startCheckout(s, b.kind, b.refId),
+  checkout: (s, b, app) => startCheckout(s, b.kind, b.refId, app),
   refund: (s, b) => chooseRefundTransfer(s, b.kind, b.refId),
-  plan: (s, b) => startSubscription(s, String(b.plan || "")),
+  plan: (s, b, app) => startSubscription(s, String(b.plan || ""), app),
   cancelPlan: (s) => setSubscriptionCancel(s, true),
   resumePlan: (s) => setSubscriptionCancel(s, false),
-  connect: (s) => startConnect(s),
+  connect: (s, b, app) => startConnect(s, app),
   payouts: (s) => payoutDashboard(s),
   taxRates: (s, b) => setTaxRates(s, b),
   invoiceLink: (s, b) => invoicePayLink(s, b.invoiceId, b.serviceId),
@@ -37,7 +37,7 @@ export async function POST(req) {
   const run = ACTIONS[body.action];
   if (!run) return Response.json({ error: "Unsupported action." }, { status: 400, headers: privateHeaders });
   try {
-    const result = await run(session, body);
+    const result = await run(session, body, await appMode());
     if (["fee", "paid", "waive", "reopen"].includes(body.action)) await audit(session, "FEE_CHANGED", { target: `${body.kind}/${body.refId}`, details: { action: body.action, amount: body.amount ?? "", timing: body.timing ?? "", method: body.method ?? "", note: body.note ?? "" } });
     return Response.json({ ok: true, url: result?.url || null, changed: Boolean(result?.changed), expiresAt: result?.expiresAt || null }, { headers: privateHeaders });
   } catch (error) {

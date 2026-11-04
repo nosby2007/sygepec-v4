@@ -5,6 +5,7 @@ import { parseCheckout } from "./mobile-checkout.js";
 import { growthFacts, growthLevels, LEVELS } from "./growth-levels.js";
 import { safeNext } from "./idle.js";
 import { featureForPath } from "./plans.js";
+import { retainedReasons } from "./account-deletion-rules.js";
 import { averageRating, clientBookingRecord, clientFeedbackRecord, favoriteId, favoriteRecord, searchBusinesses, splitBookings } from "./client-app.js";
 
 // ---- Checkout ------------------------------------------------------------------------------
@@ -159,4 +160,18 @@ test("app mode: which native app a screen belongs to, and where its sign-in goes
   assert.equal(appHome("business"), "/m/business/appointments");
   assert.equal(appHome("client"), "/m/client");
   assert.equal(appSignIn("client"), "/m/login?next=%2Fm%2Fclient");
+});
+
+test("account deletion: only an untouched account can go at once", () => {
+  const empty = { status: "INTAKE", docCount: 0, intake: { personal: { firstName: "A" } }, preparerId: null, signatureStatus: "NOT_REQUESTED" };
+  assert.deepEqual(retainedReasons({ returns: [empty] }), []);
+  assert.deepEqual(retainedReasons({}), []);
+  assert.deepEqual(retainedReasons({ returns: [{ ...empty, docCount: 1 }] }), ["tax return"]);
+  assert.deepEqual(retainedReasons({ returns: [{ ...empty, intake: { submitted: true } }] }), ["tax return"]);
+  assert.deepEqual(retainedReasons({ returns: [{ ...empty, status: "ACCEPTED" }] }), ["tax return"]);
+  assert.deepEqual(retainedReasons({ charges: [{}] }), ["fees or payments"]);
+  assert.deepEqual(retainedReasons({ appointments: [{}] }), ["tax appointments"]);
+  assert.deepEqual(retainedReasons({ profile: {} }), ["business profile"]);
+  assert.deepEqual(retainedReasons({ customers: [{}] }), ["business records"]);
+  assert.deepEqual(retainedReasons({ billing: {} }), ["business plan"]);
 });

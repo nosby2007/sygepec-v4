@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 
@@ -6,6 +7,12 @@ import Icon from "@/components/Icon";
 // the app's home when there is none) instead of the website's menus.
 export default function AppBar({ title, home }) {
   const router = useRouter();
+  // Coming back from the browser (a Stripe payment, say): show the latest state.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") router.refresh(); };
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, [router]);
   const back = () => {
     if (window.history.length > 1) router.back();
     else window.location.assign(home);

@@ -1,4 +1,5 @@
 import "server-only";
+import { appReturn } from "@/lib/app-mode";
 import { getDocument, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { serviceToken } from "@/lib/service-identity";
 import { call, StripeError, stripeConfigured } from "@/lib/stripe";
@@ -47,7 +48,7 @@ function describe(account) {
 }
 
 // Starts or resumes Stripe's own onboarding (identity, business details, bank account).
-export async function startConnect(session) {
+export async function startConnect(session, app = null) {
   owner(session);
   if (!stripeConfigured()) throw new ConnectError("Online payments are not available yet.", 409);
   const current = await getPayout(session.uid);
@@ -72,8 +73,8 @@ export async function startConnect(session) {
   const link = await call("POST", "/account_links", {
     account: accountId,
     type: "account_onboarding",
-    refresh_url: `${SITE}/portal/business/plan?connect=retry`,
-    return_url: `${SITE}/portal/business/plan?connect=return`,
+    refresh_url: `${SITE}${app ? appReturn(app, "connect") : "/portal/business/plan?connect=retry"}`,
+    return_url: `${SITE}${app ? appReturn(app, "connect") : "/portal/business/plan?connect=return"}`,
   }).catch(() => { throw new ConnectError("Stripe could not open the setup page. Please try again.", 502); });
   return { url: link.url };
 }

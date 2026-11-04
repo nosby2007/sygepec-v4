@@ -1,4 +1,4 @@
-import { requireBusinessClient } from "@/lib/auth";
+import { requireBusinessClient, appMode } from "@/lib/auth";
 import { ACTIVE_SUBSCRIPTION, BUSINESS_PLANS, money } from "@/lib/billing";
 import { chargeView, getBilling, listClientCharges, paymentsReady } from "@/lib/payments";
 import { getDocument } from "@/lib/firebase";
@@ -28,7 +28,8 @@ export default async function Page({ searchParams }) {
   const params = await searchParams;
   const notice = params?.payment;
   // Coming back from Stripe onboarding: read the account's new status from Stripe.
-  const payout = ready ? await (params?.connect ? syncConnect(s.uid) : getPayout(s.uid)).catch(() => null) : null;
+  // Stripe returns to the browser, so in the apps the account status is read fresh here.
+  const payout = ready ? await (params?.connect || await appMode() ? syncConnect(s.uid) : getPayout(s.uid)).catch(() => null) : null;
   const reserve = ready ? await reserveSummary(s.uid).catch(() => null) : null;
   const ent = await getEntitlement(s.uid);
   const locked = FEATURES[params?.upgrade];

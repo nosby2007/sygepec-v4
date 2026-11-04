@@ -1,4 +1,5 @@
 import "server-only";
+import { appReturn } from "@/lib/app-mode";
 import { getDocument, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
 import {
   ACTIVE_SUBSCRIPTION, BUSINESS_PLANS, CHARGE_KINDS, SETTLED, chargeId, money, parseFee, paymentBlock, paymentDue,
@@ -119,7 +120,15 @@ async function ownCharge(session, kind, rawRefId) {
   return charge;
 }
 
-export async function startCheckout(session, kind, rawRefId) {
+// Inside a native app, Stripe's browser page returns to a page with a button back to the app.
+function checkoutReturns(cancelPath, app) {
+  return {
+    successUrl: `${SITE}/api/payments/confirm?session_id={CHECKOUT_SESSION_ID}${app ? `&app=${app}` : ""}`,
+    cancelUrl: `${SITE}${app ? appReturn(app, "cancelled") : `${cancelPath}?payment=cancelled`}`,
+  };
+}
+
+export async function startCheckout(session, kind, rawRefId, app = null) {
   if (!stripeConfigured()) throw new PaymentError("Online payment is not available yet. Please contact your preparer.", 409);
   const charge = await ownCharge(session, kind, rawRefId);
   const back = kind === "BUSINESS_RETURN" ? "/portal/business/plan" : "/portal";
@@ -128,8 +137,7 @@ export async function startCheckout(session, kind, rawRefId) {
     description: charge.description,
     email: session.email,
     metadata: { kind, refId: charge.refId, clientId: session.uid, tenantId: TAX_TENANT },
-    successUrl: `${SITE}/api/payments/confirm?session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${SITE}${back}?payment=cancelled`,
+    ...checkoutReturns(back, app),
   }).catch(() => { throw new PaymentError("The payment page could not be opened. Please try again.", 502); });
   await saveCharge({ ...strip(charge), lastCheckoutId: checkout.id, updatedAt: new Date().toISOString() });
   return { url: checkout.url };
@@ -193,7 +201,7 @@ const businessOnly = (session) => {
   if (session?.role !== "CLIENT" || session.accountType !== "BUSINESS") throw new PaymentError("Business workspace access required.", 403);
 };
 
-export async function startSubscription(session, plan) {
+export async function startSubscription(session, plan, app = null) {
   businessOnly(session);
   if (!stripeConfigured()) throw new PaymentError("Online payment is not available yet.", 409);
   const chosen = BUSINESS_PLANS[plan];
@@ -209,8 +217,7 @@ export async function startSubscription(session, plan) {
   const checkout = await createSubscriptionCheckout({
     plan: chosen.name, cents: chosen.cents, email: session.email,
     metadata: { clientId: session.uid, plan, tenantId: TAX_TENANT },
-    successUrl: `${SITE}/api/payments/confirm?session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${SITE}/portal/business/plan?payment=cancelled`,
+    ...checkoutReturns("/portal/business/plan", app),
   }).catch(() => { throw new PaymentError("The payment page could not be opened. Please try again.", 502); });
   return { url: checkout.url };
 }

@@ -15,9 +15,17 @@
 <body>
   <main>
     <span class="dot">!</span>
-    <h1>You're offline</h1>
-    <p>InnovaCare needs an internet connection to load your calendar, clients and payments.</p>
-    <button type="button" onclick="location.href='https://perry-tax-pro-sygepec-v4.web.app/m'">Try again</button>
+    <h1 id="t">You're offline</h1>
+    <p id="m">InnovaCare needs an internet connection to load your calendar, clients and payments.</p>
+    <button id="b" type="button" onclick="location.href='https://perry-tax-pro-sygepec-v4.web.app/m'">Try again</button>
   </main>
+  <script>
+    // Capacitor also shows this page for a page that returns an error, while still online.
+    if (navigator.onLine) {
+      document.getElementById("t").textContent = "This page isn't available";
+      document.getElementById("m").textContent = "We could not open that page. Your connection looks fine, so please go back to the app.";
+      document.getElementById("b").textContent = "Back to the app";
+    }
+  </script>
 </body>
 </html>
