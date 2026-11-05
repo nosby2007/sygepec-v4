@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
-import { getFirebaseSession, getSupportSession, signInPath } from "@/lib/auth";
+import { getFirebaseSession, getStaffAccount, getSupportSession, signInPath } from "@/lib/auth";
 import { bumpCounter, TAX_TENANT } from "@/lib/firebase";
 import { mutationGuard, privateHeaders } from "@/lib/security";
 import { serviceToken } from "@/lib/service-identity";
@@ -90,7 +90,7 @@ export function supportApi({ permission, rate = RATES.read, operation, label }, 
       }
       const session = await getSupportSession();
       if (!session) {
-        const base = await getFirebaseSession().catch(() => null);
+        const base = await getFirebaseSession().catch(() => null) || await getStaffAccount().catch(() => null);
         if (base) await supportAudit(base, "SUPPORT_ACCESS_DENIED", { outcome: "DENIED", correlationId, details: { operation: label || operation, path: new URL(req.url).pathname } });
         return reply({ error: "Authentication required.", code: base ? "FORBIDDEN" : "UNAUTHENTICATED", correlationId }, base ? 403 : 401, correlationId);
       }

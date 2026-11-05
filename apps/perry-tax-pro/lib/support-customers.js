@@ -39,7 +39,7 @@ export async function rebuildCustomerIndex(token) {
 export async function searchCustomers(session, query, correlationId) {
   await requirePermission(session, P.CUSTOMER_SEARCH, correlationId);
   const term = searchTerm(query);
-  if (!term) return { customers: [], term: null };
+  if (!term) return { customers: [] };
   const token = await serviceToken();
   const rows = await queryCollection("taxSupportCustomerIndex", token, {
     filters: [["tenantId", "EQUAL", TAX_TENANT], ["terms", "ARRAY_CONTAINS", term]], limit: 25,
@@ -51,7 +51,7 @@ export async function searchCustomers(session, query, correlationId) {
     return { uid: row.uid, name: user.name || "", type: row.type, businessName: row.businessName || null, ...contact(session, user) };
   }));
   await supportAudit(session, "SUPPORT_CUSTOMER_SEARCH", { correlationId, details: { results: customers.filter(Boolean).length } });
-  return { customers: customers.filter(Boolean), term };
+  return { customers: customers.filter(Boolean) };
 }
 
 const returnLine = (r) => ({

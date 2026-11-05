@@ -73,6 +73,10 @@ const SUPPORT_ACCOUNT_ROLES = ["PREPARER", "SUPPORT"];
 
 export const getFirebaseSession = () => loadSession(APP_ROLES);
 
+// Any staff account past two-step sign-in, with or without a support role. Only for telling
+// "no permission" apart from "not signed in"; it opens nothing by itself.
+export const getStaffAccount = () => loadSession(SUPPORT_ACCOUNT_ROLES);
+
 // A preparer or support account that holds a support role and finished two-step sign-in.
 export async function getSupportSession() {
   const session = await loadSession(SUPPORT_ACCOUNT_ROLES);
