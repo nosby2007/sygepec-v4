@@ -7,9 +7,14 @@
 
 const env = (name) => (process.env[name] || "").trim() || null;
 
-// The tax site: its own subdomain once TAX_SITE_URL is set (https://tax.<domain>),
-// otherwise the /tax pages of this same site.
-export const taxUrl = (path = "") => (env("TAX_SITE_URL") ? `${env("TAX_SITE_URL").replace(/\/$/, "")}${path || ""}` : `/tax${path && path !== "/" ? path : ""}`);
+// The tax site: its own subdomain once TAX_SITE_URL is set (https://tax.<domain>).
+// Otherwise this same site, where only the tax home moved (to /tax): every other tax
+// page, such as /login, keeps its own path.
+export function taxUrl(path = "") {
+  const base = env("TAX_SITE_URL");
+  if (base) return `${base.replace(/\/$/, "")}${path || ""}`;
+  return !path || path === "/" ? "/tax" : path;
+}
 
 // True when this request came in on the tax subdomain.
 export const isTaxHost = (host) => /^tax\./i.test(String(host || ""));
