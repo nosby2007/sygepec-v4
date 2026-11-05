@@ -4,6 +4,7 @@ import { getReturnForSession } from "@/lib/data";
 import { deleteDocument, deleteObject, downloadObject, getDocument, incrementDocument, mergeDocument, TAX_TENANT } from "@/lib/firebase";
 import { SYSTEM_DOC_TYPES } from "@/lib/constants";
 import { mutationGuard, privateHeaders, safeId } from "@/lib/security";
+import { editRefused, mayEditReturn, sensitiveAllowed } from "@/lib/staff";
 
 async function authorizedDocument(rawId, session) {
   const id = safeId(rawId);
@@ -18,6 +19,7 @@ export async function GET(_req, { params }) {
   if (!session) return new Response("Not found", { status: 404 });
   const result = await authorizedDocument((await params).id, session);
   if (!result) return new Response("Not found", { status: 404 });
+  if (session.role === "PREPARER" && !await sensitiveAllowed(session, result.taxReturn)) return new Response("Give a reason in the client file before opening this document.", { status: 403, headers: privateHeaders });
   const response = await downloadObject(result.doc.storagePath, session.idToken);
   if (!response.ok) return new Response("File missing", { status: response.status === 404 ? 410 : 502 });
   const headers = new Headers(privateHeaders);
@@ -35,6 +37,7 @@ export async function DELETE(req, { params }) {
   if (!session) return Response.json({ error: "Not found" }, { status: 404 });
   const result = await authorizedDocument((await params).id, session);
   if (!result) return Response.json({ error: "Not found" }, { status: 404 });
+  if (session.role === "PREPARER" && !await mayEditReturn(session, result.taxReturn)) return editRefused(session, `taxReturns/${result.taxReturn.id}`);
   if (SYSTEM_DOC_TYPES[result.doc.type])
     return Response.json({ error: "Signed forms and their audit trail must be kept and cannot be removed." }, { status: 409, headers: privateHeaders });
   if (session.role === "CLIENT" && ["FILED", "ACCEPTED"].includes(result.taxReturn.status))

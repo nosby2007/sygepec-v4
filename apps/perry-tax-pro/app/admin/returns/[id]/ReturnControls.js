@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { STATUSES } from "@/lib/constants";
 import Icon from "@/components/Icon";
 
-export default function ReturnControls({ returnId, status, preparerId, preparers }) {
+export default function ReturnControls({ returnId, status, preparerId, preparers, canAssign = true }) {
   const [s, setS] = useState(status);
   const [p, setP] = useState(preparerId || "");
   const [state, setState] = useState({});
@@ -34,7 +34,7 @@ export default function ReturnControls({ returnId, status, preparerId, preparers
         </div>
         <div className="field">
           <label htmlFor="ret-preparer">Assigned preparer</label>
-          <select id="ret-preparer" className="select" value={p} onChange={(e) => setP(e.target.value)}>
+          <select id="ret-preparer" className="select" value={p} disabled={!canAssign} onChange={(e) => setP(e.target.value)}>
             <option value="">Unassigned</option>
             {preparers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>

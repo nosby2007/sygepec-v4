@@ -7,3 +7,6 @@ data
 uploads
 firebase-debug.log*
 npm-debug.log*
+
+# Local scripts, which can hold test credentials
+*.ps1

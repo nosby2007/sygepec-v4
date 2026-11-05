@@ -9,3 +9,6 @@ firebase-debug.log*
 npm-debug.log*
 README.md
 AGENTS.md
+
+# Local scripts, which can hold test credentials
+*.ps1

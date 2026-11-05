@@ -6,6 +6,7 @@ import { SIGNATURE_METHODS, SIGNATURE_STATUSES, STATUSES, SUBMISSION_STATUSES } 
 import { cleanText, mutationGuard, privateHeaders, sanitizeIntake } from "@/lib/security";
 import { paymentGate } from "@/lib/payments";
 import { notifyStatusChange } from "@/lib/notifications";
+import { editRefused, isGeneralAdmin, mayEditReturn } from "@/lib/staff";
 
 export async function GET(_req, { params }) {
   const r = await getReturnForSession((await params).id, await getFirebaseSession());
@@ -42,7 +43,9 @@ export async function PUT(req, { params }) {
     return Response.json({ ok: true, status }, { headers: privateHeaders });
   }
 
-  // Preparer updates
+  // Preparer updates: the assigned preparer or the general admin. Only the admin assigns.
+  if (!await mayEditReturn(session, r)) return editRefused(session, `taxReturns/${r.id}`);
+  if (Object.hasOwn(body, "preparerId") && (body.preparerId || null) !== r.preparer_id && !await isGeneralAdmin(session)) return editRefused(session, `taxReturns/${r.id}`, "Only the general admin assigns a preparer.");
   if (body.status && !STATUSES.some((s) => s.key === body.status))
     return Response.json({ error: "Invalid status" }, { status: 400 });
   if (body.signatureStatus && !SIGNATURE_STATUSES.some((s) => s.key === body.signatureStatus))

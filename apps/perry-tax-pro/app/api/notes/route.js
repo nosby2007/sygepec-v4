@@ -3,6 +3,7 @@ import { getFirebaseSession } from "@/lib/auth";
 import { getReturnForSession, touchReturn } from "@/lib/data";
 import { setDocument, TAX_TENANT } from "@/lib/firebase";
 import { cleanText, mutationGuard, privateHeaders } from "@/lib/security";
+import { editRefused, mayEditReturn } from "@/lib/staff";
 
 export async function POST(req) {
   const blocked = mutationGuard(req);
@@ -11,6 +12,7 @@ export async function POST(req) {
   const { returnId, message } = await req.json().catch(() => ({}));
   const r = await getReturnForSession(returnId, session);
   if (!r) return Response.json({ error: "Not found" }, { status: 404 });
+  if (session.role === "PREPARER" && !await mayEditReturn(session, r)) return editRefused(session, `taxReturns/${r.id}`);
   const safeMessage = cleanText(message, 4000);
   if (!safeMessage) return Response.json({ error: "Message is empty" }, { status: 400 });
   const id = crypto.randomUUID();

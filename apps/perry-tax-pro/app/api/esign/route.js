@@ -3,6 +3,7 @@ import { getFirebaseSession } from "@/lib/auth";
 import { SignError, cancelSignature, sendForSignature, signatureView, syncSignature } from "@/lib/esign";
 import { ServiceIdentityError } from "@/lib/service-identity";
 import { mutationGuard, privateHeaders } from "@/lib/security";
+import { editRefused, mayEditCase } from "@/lib/staff";
 
 // body: { action: "send" | "cancel" | "sync", returnId, pdf?, spouseName?, spouseEmail? }
 export async function POST(req) {
@@ -11,6 +12,7 @@ export async function POST(req) {
   const session = await getFirebaseSession();
   if (!session || session.accountType === "BUSINESS") return Response.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
   const body = await req.json().catch(() => ({}));
+  if (["send", "cancel"].includes(body.action) && session.role === "PREPARER" && !await mayEditCase(session, "TAX_RETURN", body.returnId)) return editRefused(session, `taxReturns/${body.returnId}`);
   try {
     if (body.action === "send") {
       const signature = await sendForSignature(session, body.returnId, body);

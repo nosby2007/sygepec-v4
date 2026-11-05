@@ -609,10 +609,9 @@ describe("rate limits", () => {
 
 describe("existing app still works", () => {
   test("a preparer keeps their admin area, with or without a support role", async () => {
-    for (const who of [preparerNoGrant, admin]) {
-      assert.equal((await who.j.go("/admin")).status, 200);
-      assert.equal((await who.j.go("/admin/security")).status, 200);
-    }
+    for (const who of [preparerNoGrant, admin]) assert.equal((await who.j.go("/admin")).status, 200);
+    assert.equal((await admin.j.go("/admin/security")).status, 200);
+    assert.equal((await preparerNoGrant.j.go("/admin/security")).status, 307, "security is for the general admin");
   });
   test("a client keeps their portal and own return", async () => {
     assert.equal((await alice.j.go("/portal")).status, 200);

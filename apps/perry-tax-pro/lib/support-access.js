@@ -68,7 +68,7 @@ export const RATES = {
   customerWrite: { limit: 30, seconds: 60 },
 };
 
-const reply = (body, status, correlationId) =>
+export const reply = (body, status, correlationId) =>
   Response.json(body, { status, headers: { ...privateHeaders, "X-Correlation-Id": correlationId } });
 
 function failure(error, correlationId, label) {

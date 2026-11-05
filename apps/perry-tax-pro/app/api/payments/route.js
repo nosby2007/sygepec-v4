@@ -6,6 +6,7 @@ import {
 import { ConnectError, invoicePayLink, payoutDashboard, setServiceRate, setTaxRates, startConnect } from "@/lib/connect";
 import { ServiceIdentityError } from "@/lib/service-identity";
 import { mutationGuard, privateHeaders } from "@/lib/security";
+import { mayEditCase } from "@/lib/staff";
 
 // body: { action, kind?, refId?, ... }
 //   preparer: fee | paid | waive | reopen
@@ -36,6 +37,9 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const run = ACTIONS[body.action];
   if (!run) return Response.json({ error: "Unsupported action." }, { status: 400, headers: privateHeaders });
+  if (["fee", "paid", "waive", "reopen"].includes(body.action) && session.role === "PREPARER" && !await mayEditCase(session, body.kind, body.refId)) {
+    return Response.json({ error: "Only the assigned preparer or the general admin can change this fee." }, { status: 403, headers: privateHeaders });
+  }
   try {
     const result = await run(session, body, await appMode());
     if (["fee", "paid", "waive", "reopen"].includes(body.action)) await audit(session, "FEE_CHANGED", { target: `${body.kind}/${body.refId}`, details: { action: body.action, amount: body.amount ?? "", timing: body.timing ?? "", method: body.method ?? "", note: body.note ?? "" } });

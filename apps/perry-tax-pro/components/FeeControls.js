@@ -37,7 +37,8 @@ export default function FeeControls({ kind, refId, charge, defaultAmount = "", a
         <div className="kicker"><Icon name="dollar" size={14} /> Fee and payment</div>
         {charge && <span className={`badge ${settled ? "s-ACCEPTED" : "s-REQUESTED"}`}>{CHARGE_STATUSES[charge.status]}{charge.method ? ` · ${charge.method}` : ""}</span>}
       </div>
-      {charge?.status !== "PAID" && (
+      {charge?.refundedCents > 0 && <span className="hint">Refunded so far: ${(charge.refundedCents / 100).toFixed(2)}. Refunds are in the client file.</span>}
+      {!["PAID", "REFUNDED"].includes(charge?.status) && (
         <div className="form-grid">
           <div className="field"><label htmlFor="fee-amount">Fee (USD)</label><input id="fee-amount" type="number" min="1" step="0.01" className="input" value={form.amount} onChange={set("amount")} /></div>
           <div className="field">
@@ -49,7 +50,7 @@ export default function FeeControls({ kind, refId, charge, defaultAmount = "", a
         </div>
       )}
       <div className="row">
-        {charge?.status !== "PAID" && <button type="button" className="btn btn-primary btn-sm" disabled={state.busy} onClick={() => post("fee", { amount: form.amount, timing: form.timing }, "Fee saved. The client can pay from their portal.")}>{charge ? "Update fee" : "Set fee"}</button>}
+        {!["PAID", "REFUNDED"].includes(charge?.status) && <button type="button" className="btn btn-primary btn-sm" disabled={state.busy} onClick={() => post("fee", { amount: form.amount, timing: form.timing }, "Fee saved. The client can pay from their portal.")}>{charge ? "Update fee" : "Set fee"}</button>}
         {charge && !settled && (
           <>
             <select aria-label="How it was paid" className="input select" style={{ width: "auto" }} value={form.method} onChange={set("method")}>
@@ -59,7 +60,7 @@ export default function FeeControls({ kind, refId, charge, defaultAmount = "", a
             <button type="button" className="btn btn-ghost btn-sm" disabled={state.busy} onClick={() => post("waive", {}, "Fee waived.")}>Waive</button>
           </>
         )}
-        {settled && !(charge.status === "PAID" && charge.method === "Stripe") && <button type="button" className="btn btn-ghost btn-sm" disabled={state.busy} onClick={() => post("reopen", {}, "Marked unpaid again.")}>Mark unpaid</button>}
+        {settled && charge.status !== "REFUNDED" && !charge.refundedCents && !(charge.status === "PAID" && charge.method === "Stripe") && <button type="button" className="btn btn-ghost btn-sm" disabled={state.busy} onClick={() => post("reopen", {}, "Marked unpaid again.")}>Mark unpaid</button>}
       </div>
       {charge?.status === "REFUND_TRANSFER" && <span className="hint">The client chose to pay from their refund. Set up the refund transfer (bank product) in your e-file software before transmitting.</span>}
       {!charge && <span className="hint">No fee set: signing and e-file are not blocked.</span>}

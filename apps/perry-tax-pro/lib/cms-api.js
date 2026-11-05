@@ -1,5 +1,6 @@
 import "server-only";
 import { getFirebaseSession } from "@/lib/auth";
+import { isGeneralAdmin } from "@/lib/staff";
 import { CmsError } from "@/lib/cms";
 import { mutationGuard, privateHeaders } from "@/lib/security";
 
@@ -12,6 +13,8 @@ export async function preparerRoute(req, handler, { failure = "The request could
   }
   const session = await getFirebaseSession();
   if (session?.role !== "PREPARER") return Response.json({ error: "Forbidden" }, { status: 403, headers: privateHeaders });
+  // Reading drafts stays open to preparers; changing the website is for the general admin.
+  if (req.method !== "GET" && !await isGeneralAdmin(session)) return Response.json({ error: "Only the general admin can change the website." }, { status: 403, headers: privateHeaders });
   try {
     return Response.json((await handler(session)) ?? { ok: true }, { headers: privateHeaders });
   } catch (error) {

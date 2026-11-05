@@ -21,7 +21,8 @@ export default async function Page({ params }) {
   return (
     <>
       <PageHead kicker="Customer" icon={c.type === "BUSINESS" ? "building" : "user"} title={c.name || "No name"} desc={c.type === "BUSINESS" ? "Business account" : "Individual account"}>
-        <Link href={`/admin/support/tickets/new?customer=${c.uid}`} className="btn btn-primary"><Icon name="plus" size={16} /> New ticket</Link>
+        {session.role === "PREPARER" && <Link href={`/admin/clients/${c.uid}`} id="open-client-file" className="btn btn-primary"><Icon name="folder" size={16} /> Open full client file</Link>}
+        <Link href={`/admin/support/tickets/new?customer=${c.uid}`} className="btn btn-ghost"><Icon name="plus" size={16} /> New ticket</Link>
       </PageHead>
       {c.accountStatus === "DELETION_REQUESTED" && <div className="alert alert-info"><Icon name="info" size={16} />This customer asked to delete their account.</div>}
       <div className="grid-2 mt">
@@ -39,7 +40,7 @@ export default async function Page({ params }) {
         <div className="card">
           <h3>Fees</h3>
           {c.charges.length === 0 ? <p className="small muted">None recorded.</p> : <div className="breakdown">{c.charges.map((x) => <div key={x.id}><span>{words(x.kind)}</span><b>{words(x.status)}</b></div>)}</div>}
-          <p className="tiny muted mt-sm">Read only. Support cannot change payments or give refunds.</p>
+          <p className="tiny muted mt-sm">{session.role === "PREPARER" ? "Refunds are in the client file." : "Read only. Support accounts cannot change payments or give refunds."}</p>
         </div>
       </div>
       {c.business && (
@@ -63,7 +64,7 @@ export default async function Page({ params }) {
             <tbody>{c.returns.map((r) => <tr key={r.id}><td>{r.taxYear}</td><td className="small">{words(r.status)}</td><td className="small">{words(r.signatureStatus)}</td><td className="small">{words(r.submissionStatus)}</td><td className="small">{when(r.updatedAt)}</td></tr>)}</tbody>
           </table></div>
         )}
-        <p className="tiny muted mt-sm">Status only. Support does not see tax answers, SSNs or bank details.</p>
+        <p className="tiny muted mt-sm">{session.role === "PREPARER" ? "Open the client file to see the return." : "Status only. Support accounts do not see tax answers, SSNs or bank details."}</p>
       </div>
       <div className="card mt">
         <h3>Support tickets</h3>

@@ -1,4 +1,5 @@
 import { getFirebaseSession } from "@/lib/auth";
+import { isGeneralAdmin } from "@/lib/staff";
 import { SETTINGS_PATH } from "@/lib/appointments";
 import { parseBookingSettings } from "@/lib/booking";
 import { setDocument, TAX_TENANT } from "@/lib/firebase";
@@ -9,6 +10,7 @@ export async function PUT(req) {
   if (blocked) return blocked;
   const session = await getFirebaseSession();
   if (session?.role !== "PREPARER") return Response.json({ error: "Forbidden" }, { status: 403, headers: privateHeaders });
+  if (!await isGeneralAdmin(session)) return Response.json({ error: "Only the general admin can do this." }, { status: 403, headers: privateHeaders });
   const { settings, errors } = parseBookingSettings(await req.json().catch(() => ({})));
   if (errors.length) return Response.json({ error: errors.join(" ") }, { status: 400, headers: privateHeaders });
   try {
