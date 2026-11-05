@@ -22,7 +22,7 @@ export default async function Page({ searchParams }) {
         <span className="signed-out-icon"><Icon name={view.icon} size={30} /></span>
         <h1>{view.title}</h1>
         <p>{view.text}</p>
-        <Link href="/" className="btn btn-ghost btn-lg">Close</Link>
+        <Link href="/tax" className="btn btn-ghost btn-lg">Close</Link>
       </div>
     </main>
   );

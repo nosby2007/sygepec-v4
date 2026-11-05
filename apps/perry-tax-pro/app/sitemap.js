@@ -11,7 +11,7 @@ export default async function sitemap() {
   const [services, posts, pages, team, updates, businesses] = await Promise.all([
     publicEntries("SERVICE"), publicEntries("POST"), publicEntries("PAGE"), publicEntries("TEAM"), publicEntries("UPDATE"), publishedBusinesses(),
   ]);
-  const fixed = ["/", "/services", "/blog", "/estimator", "/business", "/business/directory", "/contact", "/login", "/register"];
+  const fixed = ["/", "/tax", "/ehr", "/find", "/services", "/blog", "/estimator", "/business", "/business/directory", "/contact", "/login", "/register"];
   if (team.length) fixed.push("/team");
   if (updates.length) fixed.push("/updates");
   return [

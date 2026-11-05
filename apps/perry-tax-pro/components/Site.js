@@ -3,10 +3,12 @@ import { getSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/cms";
 import Icon from "@/components/Icon";
 import MobileMenu from "@/components/MobileMenu";
+import { headers } from "next/headers";
+import { platformHome } from "@/lib/platform";
 
 export function Logo() {
   return (
-    <Link href="/" className="logo" aria-label="InnovaCare Tax home">
+    <Link href="/tax" className="logo" aria-label="InnovaCare Tax home">
       <span className="logo-mark">IC</span>
       <span>
         InnovaCare<small>Tax Services</small>
@@ -18,7 +20,7 @@ export function Logo() {
 const NAV = [
   ["/services", "Services"],
   ["/business", "Small business"],
-  ["/#pricing", "Pricing"],
+  ["/tax#pricing", "Pricing"],
   ["/blog", "Resources"],
   ["/team", "Our team"],
   ["/contact", "Contact"],
@@ -27,7 +29,8 @@ const NAV = [
 const tel = (phone) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 
 export async function SiteHeader() {
-  const [s, site] = await Promise.all([getSession(), getSiteSettings().catch(() => ({}))]);
+  const [s, site, h] = await Promise.all([getSession(), getSiteSettings().catch(() => ({})), headers()]);
+  const home = platformHome(h.get("x-forwarded-host") || h.get("host"));
   const portal = s ? (s.role === "PREPARER" ? "/admin" : s.accountType === "BUSINESS" ? "/portal/business" : "/portal") : null;
   return (
     <>
@@ -35,6 +38,7 @@ export async function SiteHeader() {
         <div className="container">
           <span className="tagline">Personal and small-business tax preparation, all year.</span>
           <div className="links">
+            <a href={home}><Icon name="layers" size={14} /> InnovaCare Software</a>
             {site.phone && <a href={tel(site.phone)}><Icon name="phone" size={14} /> {site.phone}</a>}
             <Link href={portal || "/login"}><Icon name="upload" size={14} /> Upload documents</Link>
             <Link href="/book"><Icon name="calendar" size={14} /> Book a visit</Link>

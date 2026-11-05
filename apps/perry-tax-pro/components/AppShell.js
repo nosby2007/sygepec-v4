@@ -40,7 +40,7 @@ export default function AppShell({ links, user, app = null, children }) {
     return () => { document.removeEventListener("keydown", key); document.body.classList.remove("drawer-open"); };
   }, [open]);
   const brand = (
-    <Link href="/" className="logo">
+    <Link href="/tax" className="logo">
       <span className="logo-mark">IC</span>
       <span>InnovaCare<small>{isSupport ? "Support" : isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
     </Link>
@@ -67,7 +67,7 @@ export default function AppShell({ links, user, app = null, children }) {
       </div>
       {open && <div className="drawer-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />}
       <aside id="app-sidebar" className={`sidebar${open ? " open" : ""}`}>
-        <Link href="/" className="logo">
+        <Link href="/tax" className="logo">
           <span className="logo-mark">IC</span>
           <span>InnovaCare<small>{isSupport ? "Support" : isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
         </Link>

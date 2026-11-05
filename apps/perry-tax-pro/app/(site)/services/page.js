@@ -16,7 +16,7 @@ export default async function ServicesPage() {
     <main className="section container" style={{ paddingTop: 48 }}>
       <PageHero eyebrow="Services" title="How we can help" summary="Pick a service to see what's included, how it works and common questions." />
       {services.length === 0 ? (
-        <div className="card"><Empty icon="layers" title="Service details are on their way">See an overview on the <Link href="/#services">home page</Link> or <Link href="/book">book a consultation</Link>.</Empty></div>
+        <div className="card"><Empty icon="layers" title="Service details are on their way">See an overview on the <Link href="/tax#services">home page</Link> or <Link href="/book">book a consultation</Link>.</Empty></div>
       ) : (
         <div className="grid-3">
           {services.map((s) => (
