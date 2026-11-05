@@ -88,6 +88,16 @@ export async function signInAnonymously() {
   });
 }
 
+// Firebase emails the person a link to choose a new password. No admin permission is needed.
+export async function sendPasswordResetEmail(email) {
+  const { apiKey } = firebaseConfig();
+  return jsonRequest(`${identityUrl("sendOobCode")}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requestType: "PASSWORD_RESET", email }),
+  });
+}
+
 export async function deleteFirebaseAccount(idToken) {
   const { apiKey } = firebaseConfig();
   return jsonRequest(`${identityUrl("delete")}?key=${apiKey}`, {

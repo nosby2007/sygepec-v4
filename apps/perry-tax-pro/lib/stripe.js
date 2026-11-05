@@ -33,7 +33,7 @@ export class StripeError extends Error {
 
 // `account` makes the call on behalf of a business's own connected account (Stripe
 // Connect), so the payment belongs to that business and pays out to its bank.
-export async function call(method, path, data, fetcher = fetch, account = null) {
+export async function call(method, path, data, fetcher = fetch, account = null, idempotencyKey = null) {
   if (!stripeConfigured()) throw new Error("Stripe is not configured");
   const response = await fetcher(`${API}${path}`, {
     method,
@@ -41,6 +41,7 @@ export async function call(method, path, data, fetcher = fetch, account = null) 
       Authorization: `Bearer ${secretKey()}`,
       ...(data ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
       ...(account ? { "Stripe-Account": account } : {}),
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: data ? formEncode(data) : undefined,
     cache: "no-store",
@@ -73,6 +74,11 @@ export function createSubscriptionCheckout({ plan, cents, email, metadata, succe
     cancel_url: cancelUrl,
   }, fetcher);
 }
+
+// The key means a retry can never refund the same money twice.
+export const createRefund = ({ paymentIntent, amountCents, idempotencyKey, metadata }, fetcher = fetch) =>
+  call("POST", "/refunds", { payment_intent: paymentIntent, amount: amountCents, reason: "requested_by_customer", metadata }, fetcher, null, idempotencyKey);
+export const getStripeCharge = (id, fetcher = fetch) => call("GET", `/charges/${encodeURIComponent(id)}`, null, fetcher);
 
 export const getCheckoutSession = (id, fetcher = fetch) => call("GET", `/checkout/sessions/${encodeURIComponent(id)}`, null, fetcher);
 export const getSubscription = (id, fetcher = fetch) => call("GET", `/subscriptions/${encodeURIComponent(id)}`, null, fetcher);

@@ -17,8 +17,9 @@ export const CHARGE_STATUSES = {
   PAID: "Paid",
   REFUND_TRANSFER: "From refund",
   WAIVED: "Waived",
+  REFUNDED: "Refunded",
 };
-export const SETTLED = new Set(["PAID", "REFUND_TRANSFER", "WAIVED"]);
+export const SETTLED = new Set(["PAID", "REFUND_TRANSFER", "WAIVED", "REFUNDED"]);
 
 export const CHARGE_KINDS = { TAX_RETURN: "Personal tax return", BUSINESS_RETURN: "Business tax return" };
 export const chargeId = (kind, refId) => `${kind}_${refId}`;

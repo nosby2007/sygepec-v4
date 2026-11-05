@@ -2,6 +2,7 @@ import { getFirebaseSession } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { getDocument, TAX_TENANT } from "@/lib/firebase";
 import { resetByPreparer } from "@/lib/mfa";
+import { editRefused, isGeneralAdmin } from "@/lib/staff";
 import { mutationGuard, privateHeaders, safeId } from "@/lib/security";
 
 // body: { action: "resetMfa", uid } — a preparer resets another account's two-step
@@ -11,6 +12,7 @@ export async function POST(req) {
   if (blocked) return blocked;
   const session = await getFirebaseSession();
   if (session?.role !== "PREPARER") return Response.json({ error: "Not found" }, { status: 404, headers: privateHeaders });
+  if (!await isGeneralAdmin(session)) return editRefused(session, "taxMfa", "Only the general admin can do this.");
   const body = await req.json().catch(() => ({}));
   const uid = safeId(body.uid);
   if (body.action !== "resetMfa" || !uid) return Response.json({ error: "Unsupported action." }, { status: 400, headers: privateHeaders });

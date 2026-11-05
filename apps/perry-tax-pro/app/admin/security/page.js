@@ -7,6 +7,8 @@ import { serviceToken } from "@/lib/service-identity";
 import { TwoStepSettings } from "@/components/TwoStep";
 import { Empty, Kpi, PageHead } from "@/components/ui";
 import ResetMfaButton from "./ResetMfaButton";
+import { redirect } from "next/navigation";
+import { isGeneralAdmin } from "@/lib/staff";
 
 export const metadata = { title: "Security" };
 
@@ -14,11 +16,12 @@ const when = (iso) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium
 const GROUPS = {
   signin: ["LOGIN", "LOGIN_FAILED", "LOGOUT", "MFA_PASSED", "MFA_FAILED", "MFA_LOCKED", "MFA_RECOVERY_USED", "MFA_ENABLED", "MFA_DISABLED"],
   documents: ["DOCUMENT_UPLOADED", "DOCUMENT_VIEWED", "DOCUMENT_DELETED", "UPLOAD_BLOCKED"],
-  returns: ["RETURN_UPDATED", "SIGNATURE_SENT", "SIGNATURE_CANCELLED", "SIGNATURE_COMPLETED"],
-  money: ["FEE_CHANGED", "PAYMENT_CONFIRMED", "SUBSCRIPTION_CHANGED"],
+  returns: ["RETURN_UPDATED", "RETURN_CORRECTED", "SIGNATURE_SENT", "SIGNATURE_CANCELLED", "SIGNATURE_COMPLETED"],
+  money: ["FEE_CHANGED", "PAYMENT_CONFIRMED", "SUBSCRIPTION_CHANGED", "REFUND_REQUESTED", "REFUND_DONE", "REFUND_FAILED", "REFUND_DECLINED", "REFUND_SEEN_FROM_STRIPE"],
+  staff: ["CLIENT_FILE_OPENED", "CLIENT_SENSITIVE_OPENED", "CLIENT_CHECK_RUN", "CLIENT_RESET_LINK_SENT", "CLIENT_BLOCKED", "CLIENT_UNBLOCKED", "CLIENT_CONTACT_CORRECTED", "CLIENT_FOLLOW_UP_SENT", "STAFF_ACCESS_REFUSED", "STAFF_CREATED", "STAFF_INVITE_SENT", "STAFF_DEACTIVATED", "STAFF_REACTIVATED", "STAFF_WORK_REASSIGNED", "TASK_CREATED", "TASK_UPDATED"],
   system: ["RETENTION_RUN", "ACCOUNT_DELETED", "ACCOUNT_DELETION_REQUESTED"],
 };
-const GROUP_LABELS = { all: "All", signin: "Sign-in", documents: "Documents", returns: "Returns", money: "Money", system: "System" };
+const GROUP_LABELS = { all: "All", signin: "Sign-in", documents: "Documents", returns: "Returns", money: "Money", staff: "Staff", system: "System" };
 const ALERTS = new Set(["LOGIN_FAILED", "MFA_FAILED", "MFA_LOCKED", "UPLOAD_BLOCKED", "DOCUMENT_DELETED", "MFA_DISABLED"]);
 const targetLink = (t) => (t?.startsWith("taxReturns/") ? `/admin/returns/${t.split("/")[1]}` : null);
 const detail = (d) => Object.entries(d || {}).filter(([, v]) => v !== "").map(([k, v]) => `${k}: ${v}`).join(" · ");
@@ -26,6 +29,7 @@ const detail = (d) => Object.entries(d || {}).filter(([, v]) => v !== "").map(([
 export default async function Page({ searchParams }) {
   await requireRole("PREPARER");
   const session = await getFirebaseSession();
+  if (!await isGeneralAdmin(session)) redirect("/admin/my-work");
   const asked = (await searchParams)?.show;
   const group = GROUPS[asked] ? asked : "all";
   const token = await serviceToken().catch(() => null);

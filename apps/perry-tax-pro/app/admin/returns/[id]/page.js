@@ -14,6 +14,8 @@ import BankDetailsStaff from "@/components/BankDetailsStaff";
 import { bankStatus } from "@/lib/bank-details";
 import { esignConfigured, signatureView, syncSignature } from "@/lib/esign";
 import { getFirebaseSession } from "@/lib/auth";
+import { SensitiveGate } from "@/components/admin/StaffForms";
+import { hasFreshGrant, isGeneralAdmin } from "@/lib/staff";
 import { chargeView, getCharge, paymentsReady } from "@/lib/payments";
 import WorkflowEditor from "@/components/WorkflowEditor";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
@@ -32,6 +34,11 @@ export default async function Page({ params }) {
   ]);
   // Opening the return also picks up any signing progress (and files the signed form).
   const signature = esignConfigured() ? await syncSignature(await getFirebaseSession(), r.id).catch(() => null) : null;
+  const session = await getFirebaseSession();
+  const isAdmin = await isGeneralAdmin(session);
+  const canEdit = isAdmin || r.preparer_id === s.uid;
+  // The assigned preparer needs no reason; anyone else gives one in the client file first.
+  const sensitiveOpen = r.preparer_id === s.uid || await hasFreshGrant(session, r.client_id);
   const i = r.intake;
   const p = i.personal || {};
   const est = intakeToEstimate(i);
@@ -55,7 +62,10 @@ export default async function Page({ params }) {
 
   return (
     <>
-      <Link href="/admin" className="small muted" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><Icon name="back" size={14} /> All clients</Link>
+      <div className="row between">
+        <Link href="/admin" className="small muted" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><Icon name="back" size={14} /> All clients</Link>
+        <Link href={`/admin/clients/${r.client_id}`} className="btn btn-ghost btn-sm"><Icon name="user" size={14} /> Client file</Link>
+      </div>
       <section className="page-banner" style={{ marginTop: 12 }}>
         <div>
           <div className="row nowrap">
@@ -77,15 +87,16 @@ export default async function Page({ params }) {
       </section>
 
       <div className="card"><Timeline status={r.status} /></div>
-      <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} />
-      <div className="mt"><ESignPanel returnId={r.id} signature={signatureView(signature)} available={esignConfigured() && payments} jointReturn={r.filing_status === "MFJ" || r.intake?.personal?.filingStatus === "MFJ"} /></div>
-      <div className="mt"><BankDetailsStaff returnId={r.id} status={bank} /></div>
-      <div className="mt"><FeeControls kind="TAX_RETURN" refId={r.id} charge={chargeView(charge, r.status)} available={payments} defaultAmount="149" /></div>
+      {!canEdit && <div className="alert alert-info mt"><Icon name="info" size={16} />View only: {r.preparer_name ? `this return is assigned to ${r.preparer_name}` : "this return has no preparer yet"}. Only the assigned preparer or the general admin can change it.</div>}
+      {canEdit && <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} canAssign={isAdmin} />}
+      {canEdit && <div className="mt"><ESignPanel returnId={r.id} signature={signatureView(signature)} available={esignConfigured() && payments} jointReturn={r.filing_status === "MFJ" || r.intake?.personal?.filingStatus === "MFJ"} /></div>}
+      {sensitiveOpen && <div className="mt"><BankDetailsStaff returnId={r.id} status={bank} /></div>}
+      {canEdit && <div className="mt"><FeeControls kind="TAX_RETURN" refId={r.id} charge={chargeView(charge, r.status)} available={payments} defaultAmount="149" /></div>}
       <div className="card mt">
         <div className="card-title">
           <div className="row nowrap"><span className="kpi-icon violet"><Icon name="shield" size={18} /></span><div><h3>Signature & e-file workflow</h3><p className="small">Verify Form 8879 before recording a submission or IRS acknowledgement.</p></div></div>
         </div>
-        <WorkflowEditor item={r} />
+        {canEdit ? <WorkflowEditor item={r} /> : <p className="small muted">Only the assigned preparer or the general admin can change this.</p>}
       </div>
 
       <div className="grid-3 mt">
@@ -135,11 +146,11 @@ export default async function Page({ params }) {
       </div>
 
       <h2 className="mt" style={{ fontSize: "1.4rem", marginTop: 36, marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}><Icon name="folder" size={22} /> Documents</h2>
-      <DocumentCenter returnId={r.id} docs={documents} checklist={buildChecklist(i)} />
+      {sensitiveOpen ? <DocumentCenter returnId={r.id} docs={documents} checklist={buildChecklist(i)} /> : <div className="card"><SensitiveGate clientUid={r.client_id} /></div>}
 
       <div className="card mt">
         <div className="card-title"><div className="person"><Avatar name={r.client_name} /><h3>Messages with {r.client_name.split(" ")[0]}</h3></div><span className="pill">{notes.length}</span></div>
-        <Messages returnId={r.id} notes={notes} meId={s.id} />
+        {sensitiveOpen ? <Messages returnId={r.id} notes={notes} meId={s.id} /> : <p className="small muted">Open documents and messages above, with a reason.</p>}
       </div>
     </>
   );

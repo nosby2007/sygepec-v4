@@ -1,5 +1,5 @@
 import { audit } from "@/lib/audit";
-import { createSession } from "@/lib/auth";
+import { accountBlocked, createSession } from "@/lib/auth";
 import { getDocument, signInWithPassword, TAX_TENANT } from "@/lib/firebase";
 import { loginState } from "@/lib/mfa";
 import { cleanEmail, mutationGuard, privateHeaders } from "@/lib/security";
@@ -16,6 +16,10 @@ export async function POST(req) {
     if (!profile || profile.tenantId !== TAX_TENANT || !["CLIENT", "PREPARER", "SUPPORT"].includes(profile.role)) {
       await audit(null, "LOGIN_FAILED", { email, details: { reason: "not a Perry Tax Pro account" } });
       return Response.json({ error: "This account is not authorized for Perry Tax Pro." }, { status: 403, headers: privateHeaders });
+    }
+    if (await accountBlocked(auth.localId)) {
+      await audit({ uid: auth.localId, role: profile.role, email }, "LOGIN_FAILED", { details: { reason: "account blocked" } });
+      return Response.json({ error: "This account is blocked. Please contact the office." }, { status: 403, headers: privateHeaders });
     }
     // Fails closed: if the two-step record cannot be read, nobody signs in.
     const mfa = await loginState(auth.localId, profile.role).catch(() => null);

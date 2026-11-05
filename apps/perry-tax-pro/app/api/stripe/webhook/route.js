@@ -1,6 +1,7 @@
 import { audit } from "@/lib/audit";
 import { confirmInvoicePayment, getPayout, syncConnect } from "@/lib/connect";
 import { TAX_TENANT } from "@/lib/firebase";
+import { refundSeenInStripe } from "@/lib/admin-refunds";
 import { PaymentError, confirmCheckout, syncBilling } from "@/lib/payments";
 import { getSubscription } from "@/lib/stripe";
 import { verifyStripeSignature, webhookSecrets } from "@/lib/stripe-signature";
@@ -41,6 +42,8 @@ async function handle(event) {
       if (result.paid) await audit(null, "PAYMENT_CONFIRMED", { target: `${result.kind}/${object.metadata.refId || object.metadata.clientId}`, details: { kind: result.kind, amount: (object.amount_total || 0) / 100 } });
       return "confirmed";
     }
+    case "charge.refunded":
+      return event.account ? "ignored" : refundSeenInStripe(object.id);
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted":

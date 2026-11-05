@@ -9,7 +9,7 @@ import { Empty, Kpi, PageHead } from "@/components/ui";
 
 export const metadata = { title: "Payments & growth" };
 
-const sum = (rows) => rows.reduce((total, c) => total + (c.amountCents || 0), 0);
+const sum = (rows) => rows.reduce((total, c) => total + (c.amountCents || 0) - (c.refundedCents || 0), 0);
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
 const refLink = (c) => (c.kind === "TAX_RETURN" ? `/admin/returns/${c.refId}` : `/admin/business/${c.refId}`);
 

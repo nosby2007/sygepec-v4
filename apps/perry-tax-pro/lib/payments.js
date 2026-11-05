@@ -79,7 +79,7 @@ export async function setFee(session, kind, rawRefId, input) {
   const now = new Date().toISOString();
 
   if (input.action === "fee") {
-    if (current?.status === "PAID") throw new PaymentError("This fee was already paid. Record any change outside the app.", 409);
+    if (["PAID", "REFUNDED"].includes(current?.status)) throw new PaymentError("This fee was already paid. Use a refund to return money.", 409);
     const fee = parseFee(input);
     if (fee.error) throw new PaymentError(fee.error);
     return saveCharge({
@@ -97,7 +97,8 @@ export async function setFee(session, kind, rawRefId, input) {
   }
   if (input.action === "waive") return saveCharge({ ...strip(current), status: "WAIVED", settledBy: session.uid, settledByName: session.name, note: cleanText(input.note, 200) || null, updatedAt: now });
   if (input.action === "reopen") {
-    if (current.status === "PAID" && current.method === "Stripe") throw new PaymentError("Card payments are refunded in Stripe, not here.", 409);
+    if (Number(current.refundedCents || 0) > 0 || current.status === "REFUNDED") throw new PaymentError("This fee has refunds on it, so it cannot be reopened.", 409);
+    if (current.status === "PAID" && current.method === "Stripe") throw new PaymentError("Card payments go back through a refund, not here.", 409);
     return saveCharge({ ...strip(current), status: "UNPAID", method: null, paidAt: null, settledBy: null, settledByName: null, updatedAt: now });
   }
   throw new PaymentError("Unsupported action.");
@@ -235,7 +236,7 @@ export function chargeView(charge, stage) {
   if (!charge) return null;
   return {
     kind: charge.kind, refId: charge.refId, amount: money(charge.amountCents), amountCents: charge.amountCents,
-    timing: charge.timing, status: charge.status, method: charge.method || null, paidAt: charge.paidAt || null,
+    timing: charge.timing, status: charge.status, method: charge.method || null, paidAt: charge.paidAt || null, refundedCents: Number(charge.refundedCents || 0),
     due: paymentDue(charge, stage), description: charge.description,
   };
 }

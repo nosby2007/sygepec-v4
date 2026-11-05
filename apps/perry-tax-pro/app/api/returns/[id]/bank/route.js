@@ -2,6 +2,7 @@ import { getFirebaseSession } from "@/lib/auth";
 import { BankError, bankStatus, removeBankDetails, revealBankDetails, saveBankDetails } from "@/lib/bank-details";
 import { getReturnForSession } from "@/lib/data";
 import { mutationGuard, privateHeaders } from "@/lib/security";
+import { editRefused, mayEditReturn, sensitiveAllowed } from "@/lib/staff";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: privateHeaders });
 
@@ -14,6 +15,10 @@ async function run(req, params, action) {
   const r = await getReturnForSession((await params).id, session).catch(() => null);
   if (!r) return json({ error: "Not found" }, 404);
   if (session.role === "CLIENT" && session.accountType !== "TAX") return json({ error: "Not found" }, 404);
+  if (session.role === "PREPARER") {
+    if (req.method === "POST" && !await sensitiveAllowed(session, r)) return json({ error: "Give a reason in the client file before opening bank details." }, 403);
+    if (req.method === "DELETE" && !await mayEditReturn(session, r)) return editRefused(session, `taxReturns/${r.id}`);
+  }
   const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
   try {
     return json(await action(session, r, body));

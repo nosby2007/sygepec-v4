@@ -2,6 +2,7 @@ import { getFirebaseSession } from "@/lib/auth";
 import { BUSINESS_TAX_PRIORITIES, BUSINESS_TAX_STATUSES, stripBusinessTaxMeta } from "@/lib/business-admin";
 import { commitWrites, getDocument, isConflict, replaceWrite, TAX_TENANT } from "@/lib/firebase";
 import { cleanText, mutationGuard, privateHeaders, safeId } from "@/lib/security";
+import { editRefused, isGeneralAdmin, mayEditCase } from "@/lib/staff";
 
 export async function PATCH(request, { params }) {
   const blocked = mutationGuard(request);
@@ -12,7 +13,9 @@ export async function PATCH(request, { params }) {
   if (!id) return Response.json({ error: "Invalid business tax case." }, { status: 400, headers: privateHeaders });
   const current = await getDocument(`taxBusinessYearEnd/${id}`, session.idToken);
   if (!current || current.tenantId !== TAX_TENANT) return Response.json({ error: "Business tax case not found." }, { status: 404, headers: privateHeaders });
+  if (!await mayEditCase(session, "BUSINESS_RETURN", id)) return editRefused(session, `taxBusinessYearEnd/${id}`);
   const body = await request.json().catch(() => ({}));
+  if (Object.hasOwn(body, "assignedPreparerId") && (body.assignedPreparerId || null) !== (current.assignedPreparerId || null) && !await isGeneralAdmin(session)) return editRefused(session, `taxBusinessYearEnd/${id}`, "Only the general admin assigns a preparer.");
   const allowedStatuses = new Set(BUSINESS_TAX_STATUSES.map((item) => item.key));
   const status = body.status || current.status;
   const priority = Object.prototype.hasOwnProperty.call(body, "priority") ? body.priority : current.priority || "NORMAL";

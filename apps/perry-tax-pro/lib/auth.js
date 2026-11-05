@@ -1,5 +1,6 @@
 import "server-only";
 import { supportMember } from "@/lib/support-settings";
+import { serviceToken } from "@/lib/service-identity";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
@@ -85,6 +86,13 @@ export async function getSupportSession() {
   return grant ? { ...session, supportRole: grant.role } : null;
 }
 
+// A block set by the general admin. A database outage must not sign everyone out, so a failed
+// read counts as not blocked.
+export async function accountBlocked(uid) {
+  const block = await getDocument(`taxAccountBlocks/${uid}`, await serviceToken()).catch(() => null);
+  return block?.tenantId === "perry-tax-pro";
+}
+
 async function loadSession(roles) {
   const session = await decryptSession();
   if (!session?.uid || !session?.refreshToken || mfaPending(session)) return null;
@@ -101,6 +109,7 @@ async function loadSession(roles) {
     // The second sign-in step was decided for the role held at sign-in. If the role has changed
     // since (a client made support staff), this session must not carry over: sign in again.
     if (session.role !== profile.role) return null;
+    if (await accountBlocked(session.uid)) return null;
     return {
       id: session.uid,
       uid: session.uid,

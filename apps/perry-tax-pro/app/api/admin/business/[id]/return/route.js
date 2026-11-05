@@ -1,6 +1,7 @@
 import { getFirebaseSession } from "@/lib/auth";
 import { ReturnError, updateReturn } from "@/lib/business-return-server";
 import { mutationGuard, privateHeaders } from "@/lib/security";
+import { editRefused, mayEditCase } from "@/lib/staff";
 
 // body: { action: "save" | "move" | "sign" | "transmit" | "acknowledge", ...input }
 export async function PUT(req, { params }) {
@@ -8,6 +9,7 @@ export async function PUT(req, { params }) {
   if (blocked) return blocked;
   const session = await getFirebaseSession();
   if (session?.role !== "PREPARER") return Response.json({ error: "Preparer access required." }, { status: 403, headers: privateHeaders });
+  if (!await mayEditCase(session, "BUSINESS_RETURN", (await params).id)) return editRefused(session, "taxBusinessReturns");
   const { action, ...input } = await req.json().catch(() => ({}));
   try {
     const ret = await updateReturn(session, (await params).id, String(action || ""), input);

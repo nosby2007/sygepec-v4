@@ -15,6 +15,14 @@ function taxPreparer() {
     && taxUser().role == 'PREPARER';
 }
 
+// The general admin: a preparer holding PLATFORM_ADMIN.
+function taxGeneralAdmin() {
+  return taxPreparer()
+    && exists(/databases/$(database)/documents/taxSupportRoles/$(request.auth.uid))
+    && get(/databases/$(database)/documents/taxSupportRoles/$(request.auth.uid)).data.tenantId == 'perry-tax-pro'
+    && get(/databases/$(database)/documents/taxSupportRoles/$(request.auth.uid)).data.role == 'PLATFORM_ADMIN';
+}
+
 function taxClientAccount() {
   return taxSignedIn()
     && existsAfter(/databases/$(database)/documents/taxUsers/$(request.auth.uid))
@@ -56,6 +64,15 @@ match /taxUsers/{uid} {
   allow delete: if false;
 }
 
+// Every preparer reads every file. Changing one takes the assignment or the general admin role.
+function canEditTaxReturn(returnId) {
+  return taxSignedIn()
+    && exists(/databases/$(database)/documents/taxReturns/$(returnId))
+    && taxReturn(returnId).tenantId == 'perry-tax-pro'
+    && (taxReturn(returnId).clientId == request.auth.uid
+      || (taxPreparer() && (taxReturn(returnId).get('preparerId', null) == request.auth.uid || taxGeneralAdmin())));
+}
+
 match /taxReturns/{returnId} {
   allow get, list: if taxSignedIn()
     && resource.data.tenantId == 'perry-tax-pro'
@@ -90,6 +107,8 @@ match /taxReturns/{returnId} {
     && resource.data.tenantId == 'perry-tax-pro'
     && (
       (taxPreparer()
+        && (resource.data.get('preparerId', null) == request.auth.uid || taxGeneralAdmin())
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['preparerId', 'preparerName']) || taxGeneralAdmin())
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.tenantId == resource.data.tenantId
         && request.resource.data.taxYear == resource.data.taxYear
@@ -125,7 +144,7 @@ match /taxReturns/{returnId} {
 
 match /taxDocuments/{docId} {
   allow get, list: if canAccessTaxReturn(resource.data.returnId);
-  allow create: if canAccessTaxReturn(request.resource.data.returnId)
+  allow create: if canEditTaxReturn(request.resource.data.returnId)
     && request.resource.data.keys().hasOnly([
       'tenantId', 'returnId', 'clientId', 'type', 'filename', 'storagePath', 'mime', 'size', 'uploadedBy', 'createdAt'
     ])
@@ -141,7 +160,7 @@ match /taxDocuments/{docId} {
     );
   allow update: if false;
   // Signed Form 8879 and its audit trail must be kept (3 years); nobody deletes them here.
-  allow delete: if canAccessTaxReturn(resource.data.returnId)
+  allow delete: if canEditTaxReturn(resource.data.returnId)
     && !(resource.data.type in ['SIGNED_8879', 'SIGNATURE_AUDIT'])
     && (
       taxPreparer()
@@ -154,7 +173,7 @@ match /taxDocuments/{docId} {
 
 match /taxNotes/{noteId} {
   allow get, list: if canAccessTaxReturn(resource.data.returnId);
-  allow create: if canAccessTaxReturn(request.resource.data.returnId)
+  allow create: if canEditTaxReturn(request.resource.data.returnId)
     && request.resource.data.tenantId == 'perry-tax-pro'
     && request.resource.data.clientId == taxReturn(request.resource.data.returnId).clientId
     && request.resource.data.keys().hasOnly([

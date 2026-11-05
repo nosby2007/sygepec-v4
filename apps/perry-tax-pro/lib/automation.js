@@ -1,4 +1,5 @@
 import "server-only";
+import { remindOverdueTasks } from "@/lib/admin-tasks";
 import { deleteDocument, getDocument, patchFields, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { AUDIT_RETENTION_YEARS, audit } from "@/lib/audit";
 import { reserveSummary } from "@/lib/connect";
@@ -26,7 +27,7 @@ const DAY = 24 * HOUR;
 const older = (iso, ms, nowMs) => !iso || Date.parse(iso) < nowMs - ms;
 const mine = (rows) => rows.filter((row) => row.tenantId === TAX_TENANT);
 
-export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve", "retention", "support"];
+export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve", "retention", "support", "staffTasks"];
 
 // How long records are kept. Tax files follow IRS guidance: a preparer keeps a copy of
 // each return and Form 8879 for 3 years, and records that support a return are kept
@@ -242,6 +243,9 @@ const RUNNERS = {
     if (ctx.dryRun) return job;
     return { ...job, ...(await rebuildCustomerIndex(ctx.token)) };
   },
+
+  // One reminder a day to each person with overdue tasks.
+  staffTasks: (ctx) => remindOverdueTasks(ctx),
 
   // Keeps business plan status in step with Stripe (renewals, failed cards, cancellations).
   async subscriptions(ctx) {

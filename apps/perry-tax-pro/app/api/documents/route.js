@@ -6,6 +6,7 @@ import { deleteObject, incrementDocument, setDocument, TAX_TENANT, uploadObject 
 import { DOC_TYPES } from "@/lib/constants";
 import { scanFile, scanMessage } from "@/lib/file-scan";
 import { mutationGuard, privateHeaders } from "@/lib/security";
+import { editRefused, mayEditReturn } from "@/lib/staff";
 
 const MAX = 10 * 1024 * 1024;
 
@@ -18,6 +19,7 @@ export async function POST(req) {
   if (!form) return Response.json({ error: "Invalid upload" }, { status: 400 });
   const r = await getReturnForSession(form.get("returnId"), session);
   if (!r) return Response.json({ error: "Not found" }, { status: 404 });
+  if (session.role === "PREPARER" && !await mayEditReturn(session, r)) return editRefused(session, `taxReturns/${r.id}`);
   const type = String(form.get("type") || "OTHER");
   const file = form.get("file");
   if (!DOC_TYPES[type]) return Response.json({ error: "Invalid document type" }, { status: 400 });

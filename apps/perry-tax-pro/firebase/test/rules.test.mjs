@@ -70,6 +70,11 @@ before(async () => {
   await seed("taxUsers/alice", user("alice"));
   await seed("taxUsers/bob", user("bob"));
   await seed("taxUsers/prep", user("prep", { role: "PREPARER", accountType: null }));
+  await seed("taxUsers/prep2", user("prep2", { role: "PREPARER", accountType: null }));
+  await seed("taxUsers/boss", user("boss", { role: "PREPARER", accountType: null }));
+  await seed("taxSupportRoles/boss", { tenantId: T, uid: "boss", role: "PLATFORM_ADMIN" });
+  await seed("taxSupportRoles/prep2", { tenantId: T, uid: "prep2", role: "SUPPORT_SUPERVISOR" });
+  await seed("taxReturns/alice_mine", newReturn("alice", 2024, { status: "IN_REVIEW", preparerId: "prep", preparerName: "User prep", docCount: 1 }));
   await seed("taxUsers/bizA", user("bizA", { accountType: "BUSINESS" }));
   await seed("taxUsers/bizB", user("bizB", { accountType: "BUSINESS" }));
   await seed("taxBusinessEntries/adminReviewEntry", { tenantId: T, clientId: "bizA", taxYear: 2026, kind: "income", category: "Services", amountCents: 50000, date: "2026-10-01", description: "Review", createdAt: now });
@@ -78,6 +83,34 @@ before(async () => {
     await seed(`taxReturns/alice_${id}`, newReturn("alice", 2025, { status, docCount: 1 }));
   }
   await seed("taxBusinessCustomers/custB", { tenantId: T, ownerUid: "bizB", name: "Customer of B", phone: "", email: "", notes: "", createdAt: now });
+});
+
+describe("preparers change only what is assigned to them", () => {
+  const changed = (extra) => newReturn("alice", 2024, { status: "READY_TO_SIGN", preparerId: "prep", preparerName: "User prep", docCount: 1, ...extra });
+  const note = (who, id) => ["taxNotes/" + id, { tenantId: T, returnId: "alice_mine", clientId: "alice", authorId: who, authorName: "User " + who, authorRole: "PREPARER", message: "hello", createdAt: now }];
+  const doc = (who, id) => ["taxDocuments/" + id, { tenantId: T, returnId: "alice_mine", clientId: "alice", type: "W2", filename: "a.pdf", storagePath: "tax/perry-tax-pro/alice/alice_mine/" + id + "/a.pdf", mime: "application/pdf", size: 1, uploadedBy: who, createdAt: now }];
+  test("every preparer can read", async () => ok(await read("prep2", "taxReturns/alice_mine")));
+  test("another preparer cannot change it, whatever other support role they hold", async () => denied(await write("prep2", "taxReturns/alice_mine", changed())));
+  test("another preparer cannot post a message or a document on it", async () => {
+    denied(await write("prep2", ...note("prep2", "wrongNote"), true));
+    denied(await write("prep2", ...doc("prep2", "wrongDoc"), true));
+  });
+  test("the assigned preparer can change it, post and add a document", async () => {
+    ok(await write("prep", "taxReturns/alice_mine", changed()));
+    ok(await write("prep", ...note("prep", "rightNote"), true));
+    ok(await write("prep", ...doc("prep", "rightDoc"), true));
+  });
+  test("the assigned preparer cannot give it to someone else", async () => denied(await write("prep", "taxReturns/alice_mine", changed({ preparerId: "prep2", preparerName: "User prep2" }))));
+  test("the general admin can change and assign it", async () => ok(await write("boss", "taxReturns/alice_mine", changed({ preparerId: "prep2", preparerName: "User prep2" }))));
+  test("the client's own upload and message still work", async () => {
+    ok(await write("alice", "taxNotes/aliceNote", { tenantId: T, returnId: "alice_mine", clientId: "alice", authorId: "alice", authorName: "User alice", authorRole: "CLIENT", message: "hello", createdAt: now }, true));
+  });
+  test("staff collections stay closed to browsers", async () => {
+    for (const path of ["taxTasks/x", "taxRefunds/x", "taxCorrections/x", "taxAccessGrants/x", "taxAccountBlocks/x"]) {
+      denied(await read("boss", path));
+      denied(await write("boss", path, { tenantId: T }));
+    }
+  });
 });
 
 describe("taxReturns", () => {

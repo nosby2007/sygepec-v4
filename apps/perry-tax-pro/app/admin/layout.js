@@ -1,18 +1,25 @@
 import AppShell from "@/components/AppShell";
 import { getSupportSession, requireRole } from "@/lib/auth";
+import { isGeneralAdmin } from "@/lib/staff";
 import { PERMISSIONS as P, can } from "@/lib/support-rules";
 
 export const metadata = { title: "Preparer Dashboard", robots: { index: false } };
 
-const links = [
-  { href: "/admin", label: "Clients & Returns", icon: "chart" },
+const staffLinks = (isAdmin) => [
+  { href: "/admin/my-work", label: "My work", icon: "clipboard" },
+  { href: "/admin", label: "Clients & Returns", icon: "chart", exact: true },
+  { href: "/admin/clients", label: "Client files", icon: "users" },
   { href: "/admin/appointments", label: "Appointments", icon: "calendar" },
   { href: "/admin/signatures", label: "Signatures", icon: "pen" },
   { href: "/admin/submissions", label: "Submissions", icon: "send" },
   { href: "/admin/business", label: "Business Tax", icon: "building" },
   { href: "/admin/payments", label: "Payments & growth", icon: "dollar" },
-  { href: "/admin/content", label: "Website", icon: "megaphone" },
-  { href: "/admin/security", label: "Security", icon: "shield" },
+  ...(isAdmin ? [
+    { href: "/admin/refunds", label: "Refunds", icon: "refresh" },
+    { href: "/admin/team", label: "Team and reports", icon: "users" },
+    { href: "/admin/content", label: "Website", icon: "megaphone" },
+    { href: "/admin/security", label: "Security", icon: "shield" },
+  ] : []),
 ];
 
 const supportLinks = (s) => [
@@ -33,5 +40,6 @@ export default async function AdminLayout({ children }) {
     return <AppShell links={supportLinks(support)} user={{ id, uid, email, name, role, accountType }}>{children}</AppShell>;
   }
   const s = await requireRole("PREPARER");
+  const links = staffLinks(support?.supportRole === "PLATFORM_ADMIN" || await isGeneralAdmin(s));
   return <AppShell links={support ? [...links, ...supportLinks(support)] : links} user={s}>{children}</AppShell>;
 }
