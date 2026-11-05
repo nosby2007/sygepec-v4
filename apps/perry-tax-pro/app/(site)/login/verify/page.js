@@ -8,13 +8,13 @@ import { TwoStepSignIn } from "@/components/TwoStep";
 
 export const metadata = { title: "Two-step sign-in", robots: { index: false } };
 
-const homeOf = (s) => (s.role === "PREPARER" ? "/admin" : s.accountType === "BUSINESS" ? "/portal/business" : "/portal");
+const homeOf = (s) => (s.role === "SUPPORT" ? "/admin/support" : s.role === "PREPARER" ? "/admin" : s.accountType === "BUSINESS" ? "/portal/business" : "/portal");
 
 export default async function Page({ searchParams }) {
   const session = await getPendingSession();
   if (!session) redirect(await signInPath());
   // Inside the native apps the user lands back in the app, not the web portal.
-  const app = session.role === "PREPARER" ? null : await appMode();
+  const app = session.role === "PREPARER" || session.role === "SUPPORT" ? null : await appMode();
   const home = app ? appHome(app) : homeOf(session);
   const asked = safeNext((await searchParams)?.next);
   // The app (/m) opens the right screens for any account, so its paths are always fine.

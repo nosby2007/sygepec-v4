@@ -13,7 +13,7 @@ export async function POST(req) {
   try {
     const auth = await signInWithPassword(email, body.password);
     const profile = await getDocument(`taxUsers/${auth.localId}`, auth.idToken);
-    if (!profile || profile.tenantId !== TAX_TENANT || !["CLIENT", "PREPARER"].includes(profile.role)) {
+    if (!profile || profile.tenantId !== TAX_TENANT || !["CLIENT", "PREPARER", "SUPPORT"].includes(profile.role)) {
       await audit(null, "LOGIN_FAILED", { email, details: { reason: "not a Perry Tax Pro account" } });
       return Response.json({ error: "This account is not authorized for Perry Tax Pro." }, { status: 403, headers: privateHeaders });
     }

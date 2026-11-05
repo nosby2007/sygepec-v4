@@ -224,6 +224,23 @@ export async function incrementDocument(path, fieldPath, amount, idToken) {
   });
 }
 
+// Adds one to a counter, creating it if needed, and returns the new count. The database does
+// the adding, so it is correct across server instances.
+export async function bumpCounter(path, fields, idToken) {
+  const result = await jsonRequest(`${docBase()}:commit`, {
+    method: "POST",
+    headers: authHeaders(idToken),
+    body: JSON.stringify({
+      writes: [{
+        update: { name: documentName(path), fields: encodeFields(fields) },
+        updateMask: { fieldPaths: Object.keys(fields) },
+        updateTransforms: [{ fieldPath: "count", increment: { integerValue: "1" } }],
+      }],
+    }),
+  });
+  return Number(result.writeResults?.[0]?.transformResults?.[0]?.integerValue);
+}
+
 // Sets only the named fields of an existing document, leaving every other field as it is.
 export async function patchFields(path, fields, idToken) {
   const mask = Object.keys(fields).map((field) => `updateMask.fieldPaths=${encodeURIComponent(field)}`).join("&");
@@ -248,7 +265,8 @@ function fieldFilter(collectionId, fieldPath, op, value) {
   return { fieldFilter: { field: { fieldPath }, op, value: encoded } };
 }
 
-export async function queryCollection(collectionId, idToken, { filters = [], orderBy = [], limit = 200 } = {}) {
+// startAfter holds one value per orderBy field; a "__name__" value is a document ID.
+export async function queryCollection(collectionId, idToken, { filters = [], orderBy = [], limit = 200, startAfter } = {}) {
   const where = filters.length === 0 ? undefined : filters.length === 1
     ? fieldFilter(collectionId, ...filters[0])
     : { compositeFilter: { op: "AND", filters: filters.map((filter) => fieldFilter(collectionId, ...filter)) } };
@@ -256,6 +274,7 @@ export async function queryCollection(collectionId, idToken, { filters = [], ord
     from: [{ collectionId }],
     ...(where ? { where } : {}),
     ...(orderBy.length ? { orderBy: orderBy.map(([fieldPath, direction = "ASCENDING"]) => ({ field: { fieldPath }, direction })) } : {}),
+    ...(startAfter ? { startAt: { before: false, values: startAfter.map((value, i) => (orderBy[i]?.[0] === "__name__" ? { referenceValue: documentName(`${collectionId}/${value}`) } : encodeValue(value))) } } : {}),
     limit,
   };
   const rows = await jsonRequest(`${docBase()}:runQuery`, {

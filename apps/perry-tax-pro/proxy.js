@@ -75,6 +75,17 @@ export async function proxy(request) {
       : NextResponse.redirect(publicUrl(request, `/login/verify?next=${encodeURIComponent(request.nextUrl.pathname)}`));
   }
 
+  // Support accounts live in the support area alone, whatever else they try to open.
+  if (session.role === "SUPPORT") {
+    const p = request.nextUrl.pathname;
+    const allowed = p === "/admin/support" || p.startsWith("/admin/support/") || p.startsWith("/api/support/") || p.startsWith("/api/auth/");
+    if (!allowed) {
+      return isApi
+        ? NextResponse.json({ error: "Not available for support accounts." }, { status: 403 })
+        : NextResponse.redirect(publicUrl(request, "/admin/support"));
+    }
+  }
+
   // Business plans: the feature this path needs, checked against the cached plan. The
   // plan page always reads it fresh, so an upgrade shows at once.
   const path = request.nextUrl.pathname;

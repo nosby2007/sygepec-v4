@@ -20,6 +20,30 @@ function businessEntry(entryId) {
   return firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data;
 }
 
+function taxSupportStaff() {
+  return request.auth != null
+    && firestore.exists(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid))
+    && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.tenantId == 'perry-tax-pro';
+}
+
+function taxSupportCustomer(ticketId) {
+  return request.auth != null
+    && firestore.exists(/databases/(default)/documents/taxSupportTickets/$(ticketId))
+    && firestore.get(/databases/(default)/documents/taxSupportTickets/$(ticketId)).data.customerUid == request.auth.uid;
+}
+
+// Ticket attachments. The app decides who may open what (quarantine, permissions); these rules
+// are the backstop: staff with a support role, or the ticket's own customer for external files.
+match /taxsupport/perry-tax-pro/{ticketId}/{visibility}/{attachmentId}/{fileName} {
+  allow read: if taxSupportStaff() || (visibility == 'external' && taxSupportCustomer(ticketId));
+  allow create: if (taxSupportStaff() || (visibility == 'external' && taxSupportCustomer(ticketId)))
+    && visibility in ['internal', 'external']
+    && request.resource.size > 0
+    && request.resource.size <= 10 * 1024 * 1024
+    && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png|image/webp|image/heic)');
+  allow update, delete: if false;
+}
+
 match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
   allow read: if request.auth != null
     && validTaxReturn(clientUid, returnId)

@@ -1,4 +1,5 @@
 import "server-only";
+import { supportMember } from "@/lib/support-settings";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
@@ -65,7 +66,22 @@ export async function setMfaState(mfa) {
   (await cookies()).set(COOKIE, await sealSession({ ...rest, mfa, lastSeen: Date.now() }), cookieOptions());
 }
 
-export async function getFirebaseSession() {
+// Support staff sign in like everyone else but never get an ordinary session: every existing
+// page and API sees them as signed out. They reach only what getSupportSession() opens.
+const APP_ROLES = ["CLIENT", "PREPARER"];
+const SUPPORT_ACCOUNT_ROLES = ["PREPARER", "SUPPORT"];
+
+export const getFirebaseSession = () => loadSession(APP_ROLES);
+
+// A preparer or support account that holds a support role and finished two-step sign-in.
+export async function getSupportSession() {
+  const session = await loadSession(SUPPORT_ACCOUNT_ROLES);
+  if (!session) return null;
+  const grant = await supportMember(session.uid).catch(() => null);
+  return grant ? { ...session, supportRole: grant.role } : null;
+}
+
+async function loadSession(roles) {
   const session = await decryptSession();
   if (!session?.uid || !session?.refreshToken || mfaPending(session)) return null;
   try {
@@ -77,7 +93,7 @@ export async function getFirebaseSession() {
     // One retry, so a brief network or Firestore hiccup does not look like a sign-out.
     const profile = await getDocument(`taxUsers/${session.uid}`, idToken)
       .catch(() => getDocument(`taxUsers/${session.uid}`, idToken));
-    if (!profile || profile.tenantId !== "perry-tax-pro" || !["CLIENT", "PREPARER"].includes(profile.role)) return null;
+    if (!profile || profile.tenantId !== "perry-tax-pro" || !roles.includes(profile.role)) return null;
     return {
       id: session.uid,
       uid: session.uid,

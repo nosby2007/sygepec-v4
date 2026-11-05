@@ -31,7 +31,7 @@ export default function AuthForm({ mode, accountType = "TAX", next = null }) {
     const res = await fetch(`/api/auth/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
     const data = await res.json();
     if (!res.ok) return setState({ error: data.error });
-    const home = data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : isReg ? "/portal/intake" : "/portal";
+    const home = data.role === "SUPPORT" ? "/admin/support" : data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : isReg ? "/portal/intake" : "/portal";
     // Back to the page the user was on before signing out, if it belongs to their area.
     // The mobile app (/m) sends everyone back to it; it opens the right tabs by account.
     const back = next && (next === "/m" || next.startsWith("/m/") || next.startsWith(data.role === "PREPARER" ? "/admin" : data.accountType === "BUSINESS" ? "/portal/business" : "/portal")) ? next : null;
