@@ -123,7 +123,7 @@ export default async function Dashboard({ searchParams }) {
         <div className="card kpi card-hover">
           <div className="kpi-head"><div className="lbl">Your preparer</div><span className="kpi-icon violet"><Icon name="user" size={18} /></span></div>
           {r.preparer_name ? (
-            <div className="row nowrap mt-sm"><Avatar name={r.preparer_name} /><div><b>{r.preparer_name}</b><div className="tiny muted">Certified Tax Preparer</div></div></div>
+            <div className="row nowrap mt-sm"><Avatar name={r.preparer_name} /><div><b>{r.preparer_name}</b><div className="tiny muted">Tax Preparer · PTIN holder</div></div></div>
           ) : <p className="small mt-sm">Assigned once your questionnaire is submitted.</p>}
         </div>
       </div>

@@ -94,7 +94,7 @@ function Pitch({ signedIn, business = false }) {
           : <Link className="m-btn" href="/m/register?next=/m/client/taxes">Get started</Link>}
       </div>
       <div className="m-list">
-        {[["shield", "Certified preparers", "Every return is prepared and checked by a person."], ["upload", "Upload from your phone", "Snap W-2s, 1099s and receipts; files are encrypted."], ["pen", "Sign online", "Review and sign Form 8879 without printing."]].map(([icon, title, text]) => (
+        {[["shield", "Preparers with a PTIN", "Every return is prepared and checked by a person."], ["upload", "Upload from your phone", "Snap W-2s, 1099s and receipts; files are encrypted."], ["pen", "Sign online", "Review and sign Form 8879 without printing."]].map(([icon, title, text]) => (
           <div key={title} className="m-row"><div className="m-row-icon"><Icon name={icon} size={24} /></div><div className="m-row-text"><b>{title}</b><span>{text}</span></div></div>
         ))}
       </div>
