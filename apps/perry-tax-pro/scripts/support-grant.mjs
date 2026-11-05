@@ -30,6 +30,18 @@ async function query(collection, field, value, limit = 1) {
   return rows.filter((row) => row.document).map((row) => row.document);
 }
 
+// The empty return made at sign-up, with only the name and phone given then.
+function untouchedReturn(f) {
+  const intake = f.intake?.mapValue?.fields || {};
+  const personal = intake.personal?.mapValue?.fields || {};
+  return f.status?.stringValue === "INTAKE"
+    && Number(f.docCount?.integerValue || 0) === 0
+    && !f.preparerId?.stringValue
+    && (f.signatureStatus?.stringValue || "NOT_REQUESTED") === "NOT_REQUESTED"
+    && Object.keys(intake).every((k) => k === "personal")
+    && Object.keys(personal).every((k) => ["firstName", "lastName", "phone"].includes(k));
+}
+
 // Ends by returning, not process.exit(), so open connections close cleanly.
 async function main() {
   const users = (await query("taxUsers", "email", email.toLowerCase())).filter((u) => u.fields.tenantId?.stringValue === TENANT);
@@ -38,7 +50,10 @@ async function main() {
   const uid = user.name.split("/").pop();
   const current = user.fields.role.stringValue;
   if (current === "CLIENT") {
-    for (const [collection, field] of [["taxDocuments", "clientId"], ["taxNotes", "clientId"], ["taxCharges", "clientId"], ["taxBankDetails", "clientId"], ["taxBusinessEntries", "ownerUid"], ["taxSupportTickets", "customerUid"]]) {
+    for (const r of await query("taxReturns", "clientId", uid, 20)) {
+      if (!untouchedReturn(r.fields)) { console.error("Refused: this customer has started a tax return. Use a separate staff account."); return void (process.exitCode = 1); }
+    }
+    for (const [collection, field] of [["taxDocuments", "clientId"], ["taxNotes", "clientId"], ["taxCharges", "clientId"], ["taxAppointments", "clientId"], ["taxBankDetails", "clientId"], ["taxBusinessEntries", "ownerUid"], ["taxSupportTickets", "customerUid"]]) {
       if ((await query(collection, field, uid)).length) { console.error(`Refused: this customer account has records in ${collection}. Use a separate staff account.`); return void (process.exitCode = 1); }
     }
     if (user.fields.accountType?.stringValue === "BUSINESS") { console.error("Refused: this is a business account. Use a separate staff account."); return void (process.exitCode = 1); }

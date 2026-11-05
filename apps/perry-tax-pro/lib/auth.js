@@ -98,6 +98,9 @@ async function loadSession(roles) {
     const profile = await getDocument(`taxUsers/${session.uid}`, idToken)
       .catch(() => getDocument(`taxUsers/${session.uid}`, idToken));
     if (!profile || profile.tenantId !== "perry-tax-pro" || !roles.includes(profile.role)) return null;
+    // The second sign-in step was decided for the role held at sign-in. If the role has changed
+    // since (a client made support staff), this session must not carry over: sign in again.
+    if (session.role !== profile.role) return null;
     return {
       id: session.uid,
       uid: session.uid,

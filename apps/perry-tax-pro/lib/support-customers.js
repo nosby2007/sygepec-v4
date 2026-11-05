@@ -1,5 +1,5 @@
 import "server-only";
-import { getDocument, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
+import { deleteDocument, getDocument, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { serviceToken } from "@/lib/service-identity";
 import { requirePermission, supportAudit } from "@/lib/support-access";
 import { PERMISSIONS as P, SupportError, can, customerTerms, maskEmail, maskPhone, searchTerm } from "@/lib/support-rules";
@@ -33,7 +33,17 @@ export async function rebuildCustomerIndex(token) {
   const users = await queryCollection("taxUsers", t, { filters: [["tenantId", "EQUAL", TAX_TENANT], ["role", "EQUAL", "CLIENT"]], limit: 5000 });
   let indexed = 0;
   for (const user of users) if (await indexCustomer(user.uid || user.id, t).catch(() => false)) indexed++;
-  return { indexed, total: users.length };
+  // Removes entries whose account is gone or is no longer a customer. If the account list was
+  // cut short, some customers would look gone, so nothing is removed in that case.
+  let removed = 0;
+  if (users.length < 5000) {
+    const current = new Set(users.map((user) => user.uid || user.id));
+    const entries = await queryCollection("taxSupportCustomerIndex", t, { filters: [["tenantId", "EQUAL", TAX_TENANT]], limit: 5000 });
+    for (const entry of entries) {
+      if (!current.has(entry.id) && await deleteDocument(`taxSupportCustomerIndex/${entry.id}`, t).then(() => true, () => false)) removed++;
+    }
+  }
+  return { indexed, removed, total: users.length };
 }
 
 export async function searchCustomers(session, query, correlationId) {

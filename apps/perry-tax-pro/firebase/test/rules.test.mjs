@@ -388,23 +388,57 @@ describe("Support", () => {
 });
 
 describe("Support files", () => {
-  const external = "taxsupport/perry-tax-pro/IC-2611-RULES22/external/f1/file.pdf";
-  const internal = "taxsupport/perry-tax-pro/IC-2611-RULES22/internal/f2/file.pdf";
-  test("the ticket's customer and support staff reach external files; others do not", async () => {
-    ok(await upload("alice", external));
-    ok(await download("alice", external));
-    ok(await download("supportRulesUser", external));
-    denied(await download("bob", external));
-    denied(await download("prep", external));
-    denied(await upload("bob", "taxsupport/perry-tax-pro/IC-2611-RULES22/external/f3/file.pdf"));
+  const BODY_SIZE = "%PDF-1.4 test".length;
+  const pathOf = (id, side = "external") => `taxsupport/perry-tax-pro/IC-2611-RULES22/${side}/${id}/file.pdf`;
+  const record = (id, extra = {}) => write("owner", `taxSupportAttachments/${id}`, {
+    tenantId: T, ticketId: "IC-2611-RULES22", customerUid: "alice", uploadedBy: "alice", visibility: "EXTERNAL", state: "UPLOADING",
+    storagePath: pathOf(id, extra.visibility === "INTERNAL" ? "internal" : "external"), size: BODY_SIZE, mime: "application/pdf", ...extra,
   });
-  test("internal files are for support staff only, and nobody deletes through the rules", async () => {
-    denied(await upload("alice", internal));
-    ok(await upload("supportRulesUser", internal));
-    ok(await download("supportRulesUser", internal));
-    denied(await download("alice", internal));
-    assert.equal(await remove("supportRulesUser", internal), 403);
-    assert.equal(await remove("alice", external), 403);
+  const set = (id, extra) => record(id, extra);
+  before(async () => {
+    ok(await write("owner", "taxSupportRoles/rulesAgent", { tenantId: T, role: "SUPPORT_AGENT" }));
+    ok(await write("owner", "taxSupportRoles/rulesSup", { tenantId: T, role: "SUPPORT_SUPERVISOR" }));
+  });
+  test("no file without a record the server wrote for that person, size and type", async () => {
+    denied(await upload("alice", pathOf("no-record")));
+    denied(await upload("rulesSup", pathOf("no-record")));
+    ok(await record("f-other", { uploadedBy: "bob" }));
+    denied(await upload("alice", pathOf("f-other")));
+    ok(await record("f-size", { size: 999 }));
+    denied(await upload("alice", pathOf("f-size")));
+    ok(await record("f-type", { mime: "image/png" }));
+    denied(await upload("alice", pathOf("f-type")));
+    ok(await record("f-state", { state: "QUARANTINED" }));
+    denied(await upload("alice", pathOf("f-state")));
+    ok(await record("f-path"));
+    denied(await upload("alice", pathOf("f-path", "internal")));
+  });
+  test("a quarantined file opens for its uploader and a supervisor, not an agent or others", async () => {
+    ok(await record("f-q"));
+    ok(await upload("alice", pathOf("f-q")));
+    ok(await set("f-q", { state: "QUARANTINED" }));
+    ok(await download("alice", pathOf("f-q")));
+    ok(await download("rulesSup", pathOf("f-q")));
+    denied(await download("rulesAgent", pathOf("f-q")));
+    denied(await download("bob", pathOf("f-q")));
+    denied(await download("prep", pathOf("f-q")));
+  });
+  test("a released file opens for agents and the customer, not for others", async () => {
+    ok(await set("f-q", { state: "AVAILABLE" }));
+    ok(await download("rulesAgent", pathOf("f-q")));
+    ok(await download("alice", pathOf("f-q")));
+    denied(await download("bob", pathOf("f-q")));
+  });
+  test("a customer never reaches an internal file; nobody overwrites or deletes through the rules", async () => {
+    const side = { visibility: "INTERNAL", uploadedBy: "rulesAgent" };
+    ok(await record("f-int", side));
+    ok(await upload("rulesAgent", pathOf("f-int", "internal")));
+    ok(await set("f-int", { ...side, state: "AVAILABLE" }));
+    ok(await download("rulesAgent", pathOf("f-int", "internal")));
+    denied(await download("alice", pathOf("f-int", "internal")));
+    denied(await upload("rulesAgent", pathOf("f-int", "internal")));
+    denied(await remove("rulesSup", pathOf("f-int", "internal")));
+    denied(await remove("alice", pathOf("f-q")));
   });
 });
 

@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
-import { commitWrites, createWrite, deleteObject, downloadObject, getDocument, isConflict, replaceWrite, TAX_TENANT, uploadObject } from "@/lib/firebase";
+import { commitWrites, createWrite, deleteDocument, downloadObject, getDocument, isConflict, replaceWrite, setDocument, TAX_TENANT, uploadObject } from "@/lib/firebase";
 import { scanFile, scanMessage } from "@/lib/file-scan";
 import { serviceToken } from "@/lib/service-identity";
 import { denied, requirePermission, supportAudit } from "@/lib/support-access";
@@ -12,6 +12,9 @@ import { PERMISSIONS as P, SupportError, can, canWork, isTicketNumber } from "@/
 // The app's file check is a content check, not a full antivirus (lib/file-scan.js). So it
 // fails closed: a file that fails is never stored, and one that passes stays QUARANTINED
 // until a supervisor releases it. Only then can agents, or the customer, open it.
+// The Storage rules hold to the same record, so a browser token cannot get around this:
+// a file can be created only for a record the server wrote after its check (state UPLOADING,
+// same person, path, size and type), and read only as that record's state allows.
 const MAX = 10 * 1024 * 1024;
 const notFound = () => new SupportError("NOT_FOUND", "File not found.", 404);
 
@@ -36,21 +39,25 @@ async function store(actor, side, ticket, form, visibility, correlationId, token
   const id = crypto.randomUUID();
   const storagePath = `taxsupport/${TAX_TENANT}/${ticket.id}/${visibility.toLowerCase()}/${id}/file.${scan.ext}`;
   const filename = String(file.name || `file.${scan.ext}`).replace(/[\u0000-\u001f\u007f"\\/]/g, "").slice(0, 200) || `file.${scan.ext}`;
-  await uploadObject(storagePath, bytes, scan.mime, actor.idToken);
   const nowIso = new Date().toISOString();
+  const record = {
+    tenantId: TAX_TENANT, ticketId: ticket.id, customerUid: ticket.customerUid, filename, mime: scan.mime, size: bytes.byteLength, storagePath, visibility,
+    state: "UPLOADING", uploadedBy: actor.uid, uploadedByName: actor.name, uploadedSide: side, createdAt: nowIso, releasedBy: null, releasedAt: null,
+  };
+  const path = `taxSupportAttachments/${id}`;
+  await setDocument(path, record, token, { createOnly: true });
   try {
+    await uploadObject(storagePath, bytes, scan.mime, actor.idToken);
     await commitWrites([
-      createWrite(`taxSupportAttachments/${id}`, {
-        tenantId: TAX_TENANT, ticketId: ticket.id, customerUid: ticket.customerUid, filename, mime: scan.mime, size: file.size, storagePath, visibility,
-        state: "QUARANTINED", uploadedBy: actor.uid, uploadedByName: actor.name, uploadedSide: side, createdAt: nowIso, releasedBy: null, releasedAt: null,
-      }),
+      replaceWrite(path, { ...record, state: "QUARANTINED" }),
       createWrite(`taxSupportEvents/${crypto.randomUUID()}`, {
         tenantId: TAX_TENANT, ticketId: ticket.id, type: "ATTACHMENT_ADDED", data: { attachmentId: id, visibility }, at: nowIso,
         actorUid: actor.uid, actorName: actor.name, actorRole: actor.supportRole || "CUSTOMER",
       }),
     ], token);
   } catch (error) {
-    await deleteObject(storagePath, actor.idToken).catch(() => null);
+    // Without its record a stored file can never be opened, and the rules forbid deleting it here.
+    await deleteDocument(path, token).catch(() => null);
     throw error;
   }
   await supportAudit(actor, "SUPPORT_ATTACHMENT_ADDED", { target, correlationId, details: { attachmentId: id, visibility, size: file.size } });
@@ -77,7 +84,7 @@ export async function addCustomerAttachment(session, ticketId, form, correlation
 async function loadAttachment(id, token) {
   if (typeof id !== "string" || !/^[0-9a-f-]{36}$/.test(id)) return null;
   const row = await getDocument(`taxSupportAttachments/${id}`, token);
-  return row?.tenantId === TAX_TENANT ? row : null;
+  return row?.tenantId === TAX_TENANT && row.state !== "UPLOADING" ? row : null;
 }
 
 function fileResponse(upstream, row, correlationId) {

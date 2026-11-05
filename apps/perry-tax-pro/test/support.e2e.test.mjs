@@ -132,6 +132,20 @@ describe("who can reach support", () => {
     const r = await fetch(`${B}/api/support/tickets`, { method: "POST", headers: { Origin: "https://example.com", "Content-Type": "application/json", Cookie: `__session=${agent.j.cookie}` }, body: "{}" });
     assert.equal(r.status, 403);
   });
+  test("a customer made staff must sign in again; their old session carries nothing over", async () => {
+    const convert = await client("converted");
+    assert.equal((await convert.j.go("/portal")).status, 200);
+    await seed(`taxUsers/${convert.uid}`, { uid: convert.uid, name: convert.name, email: convert.email, role: "SUPPORT", tenantId: T, accountType: "TAX" });
+    await seed(`taxSupportRoles/${convert.uid}`, { uid: convert.uid, tenantId: T, role: "PLATFORM_ADMIN", name: convert.name, email: convert.email });
+    for (const path of ["/api/support/tickets", "/api/support/audit", "/api/support/settings/roles"]) {
+      const r = await convert.j.data(path);
+      assert.ok([401, 403].includes(r.status), `${path} answered ${r.status}`);
+    }
+    const fresh = new Jar();
+    const login = await fresh.post("/api/auth/login", { email: convert.email, password });
+    assert.equal(login.body.mfa, "setup");
+    assert.equal((await fresh.data("/api/support/tickets")).status, 401, "two-step sign-in comes first");
+  });
   test("every answer carries a correlation ID", async () => {
     const r = await new Jar().data("/api/support/tickets");
     assert.ok(r.body.correlationId);
@@ -296,6 +310,24 @@ describe("tickets", () => {
     assert.ok(JSON.stringify(staffSide.body).includes("SECRET-INTERNAL-NOTE"));
     assert.ok(staffSide.body.ticket.firstRespondedAt, "the first reply stops the first-response clock");
     assert.ok(staffSide.body.events.some((e) => e.type === "NOTE_ADDED"));
+  });
+  test("retrying a saved message returns it, though the version has moved", async () => {
+    await refresh();
+    const key = `message-retry-${stamp}`;
+    const sent = { kind: "INTERNAL", body: "RETRIED-NOTE", version, idempotencyKey: key };
+    const first = await agent.j.post(`${url()}/messages`, sent);
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    const again = await agent.j.post(`${url()}/messages`, sent);
+    assert.equal(again.status, 200, JSON.stringify(again.body));
+    assert.equal(again.body.replayed, true);
+    assert.equal(again.body.id, first.body.id);
+    const seen = await agent.j.data(url());
+    assert.equal(seen.body.messages.filter((m) => m.body === "RETRIED-NOTE").length, 1);
+    const fresh = await agent.j.post(`${url()}/messages`, { ...sent, idempotencyKey: `${key}-2` });
+    assert.equal(fresh.status, 409, "a new message on an old version is still refused");
+    const other = await agent2.j.post(`${url()}/messages`, sent);
+    assert.equal(other.status, 403, "someone who cannot work the ticket gets no replay");
+    await refresh();
   });
   test("status rules are enforced on the server", async () => {
     await refresh();
@@ -509,6 +541,17 @@ describe("lists, queues and SLA", () => {
     const m = await agent.j.data("/api/support/metrics");
     assert.equal(m.status, 200);
     assert.ok(m.body.open >= 1);
+  });
+});
+
+describe("account deletion", () => {
+  test("deleting an unused account removes it from customer search", async () => {
+    const gone = await client("gone");
+    assert.ok(await raw(`taxSupportCustomerIndex/${gone.uid}`), "indexed at sign-up");
+    const r = await gone.j.post("/api/account/delete", { password });
+    assert.equal(r.body.result, "deleted", JSON.stringify(r.body));
+    assert.equal(await raw(`taxSupportCustomerIndex/${gone.uid}`), null);
+    assert.equal((await agent.j.data(`/api/support/customers?q=${encodeURIComponent(gone.email)}`)).body.customers.length, 0);
   });
 });
 

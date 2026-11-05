@@ -64,6 +64,24 @@ export function deadlines(createdMs, priority, policy) {
   return {
     firstResponseDueAt: new Date(addBusinessMinutes(createdMs, target.firstResponseMinutes, policy)).toISOString(),
     resolutionDueAt: new Date(addBusinessMinutes(createdMs, target.resolutionMinutes, policy)).toISOString(),
+    firstResponseMinutes: target.firstResponseMinutes,
+    resolutionMinutes: target.resolutionMinutes,
+    resolutionStartAt: new Date(createdMs).toISOString(),
+    slaPausedMinutes: 0,
+  };
+}
+
+// A new priority sets a new allowance, counted from when the current resolution cycle began
+// (a reopened ticket's start) and still adding the time already spent waiting on the customer.
+export function priorityDeadlines(ticket, priority, policy) {
+  const target = policy.targets[priority];
+  const start = Date.parse(ticket.resolutionStartAt || ticket.createdAt);
+  const paused = ticket.slaPausedMinutes || 0;
+  return {
+    firstResponseDueAt: new Date(addBusinessMinutes(Date.parse(ticket.createdAt), target.firstResponseMinutes, policy)).toISOString(),
+    resolutionDueAt: new Date(addBusinessMinutes(start, target.resolutionMinutes + paused, policy)).toISOString(),
+    firstResponseMinutes: target.firstResponseMinutes,
+    resolutionMinutes: target.resolutionMinutes,
   };
 }
 
@@ -73,22 +91,23 @@ export function resumedDeadline(resolutionDueAt, pausedAt, nowMs, policy) {
   return new Date(addBusinessMinutes(Date.parse(resolutionDueAt), paused, policy)).toISOString();
 }
 
-// One clock's state: "met", "breached", "at_risk", "on_track", or "paused".
-function clock(startMs, dueAt, doneAt, nowMs, percent) {
+// One clock's state: "met", "breached", "at_risk", "on_track", or "paused". The share used comes
+// from the office time left, so nights, weekends, holidays and customer waits do not count.
+function clock(targetMinutes, dueAt, doneAt, nowMs, policy) {
   const due = Date.parse(dueAt);
   if (doneAt) return Date.parse(doneAt) <= due ? "met" : "breached";
   if (nowMs > due) return "breached";
-  const span = due - startMs;
-  return span > 0 && (nowMs - startMs) / span >= percent / 100 ? "at_risk" : "on_track";
+  const left = businessMinutesBetween(nowMs, due, policy);
+  return targetMinutes > 0 && (targetMinutes - left) / targetMinutes >= policy.escalateAtPercent / 100 ? "at_risk" : "on_track";
 }
 
 export function slaState(ticket, nowMs, policy) {
-  const start = Date.parse(ticket.createdAt);
-  const percent = policy.escalateAtPercent;
-  const firstResponse = clock(start, ticket.firstResponseDueAt, ticket.firstRespondedAt, nowMs, percent);
+  // Each ticket keeps the targets it was given; the policy may have changed since.
+  const fallback = policy.targets[ticket.priority] || {};
+  const firstResponse = clock(ticket.firstResponseMinutes ?? fallback.firstResponseMinutes, ticket.firstResponseDueAt, ticket.firstRespondedAt, nowMs, policy);
   const resolution = ticket.slaPausedAt && !ticket.resolvedAt
     ? "paused"
-    : clock(start, ticket.resolutionDueAt, ticket.resolvedAt, nowMs, percent);
+    : clock(ticket.resolutionMinutes ?? fallback.resolutionMinutes, ticket.resolutionDueAt, ticket.resolvedAt, nowMs, policy);
   const worst = [firstResponse, resolution].includes("breached") ? "breached"
     : [firstResponse, resolution].includes("at_risk") ? "at_risk" : "ok";
   return { firstResponse, resolution, overall: worst };

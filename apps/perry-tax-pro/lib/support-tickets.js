@@ -9,7 +9,7 @@ import {
   checkTicketInput, checkVersion, decodeCursor, encodeCursor, isOpenStatus, isReopen, isTicketNumber, newTicketNumber, pageSize, searchTerm, ticketTerms,
 } from "@/lib/support-rules";
 import { slaPolicy, supportMember } from "@/lib/support-settings";
-import { deadlines, resumedDeadline, shouldEscalate, slaState } from "@/lib/support-sla";
+import { businessMinutesBetween, deadlines, priorityDeadlines, resumedDeadline, shouldEscalate, slaState } from "@/lib/support-sla";
 
 // Tickets, messages and their history.
 //   taxSupportTickets/{number}      the ticket; the number is the document ID, so the
@@ -159,7 +159,7 @@ export async function getStaffTicket(session, id, correlationId) {
     canWork: canWork(session, ticket),
     messages: messages.sort(byTime("createdAt")).map(messageView),
     events: events.sort(byTime("at")).map((e) => ({ id: e.id, type: e.type, data: e.data, at: e.at, actorName: e.actorName, actorRole: e.actorRole })),
-    attachments: attachments.sort(byTime("createdAt")).map((a) => ({ id: a.id, filename: a.filename, size: a.size, visibility: a.visibility, state: a.state, uploadedByName: a.uploadedByName, createdAt: a.createdAt })),
+    attachments: attachments.filter((a) => a.state !== "UPLOADING").sort(byTime("createdAt")).map((a) => ({ id: a.id, filename: a.filename, size: a.size, visibility: a.visibility, state: a.state, uploadedByName: a.uploadedByName, createdAt: a.createdAt })),
   };
 }
 
@@ -248,14 +248,19 @@ function statusChanges(ticket, to, policy, nowMs) {
   if (to === "resolved") changes.resolvedAt = nowIso;
   if (to === "closed") changes.closedAt = nowIso;
   if (isReopen(ticket.status, to)) {
+    // A reopened ticket gets a fresh resolution cycle; its first response already happened or not.
     Object.assign(changes, { resolvedAt: null, closedAt: null, reopenCount: (ticket.reopenCount || 0) + 1, escalated: false, ...deadlines(nowMs, ticket.priority, policy), firstRespondedAt: ticket.firstRespondedAt || null });
     changes.firstResponseDueAt = ticket.firstResponseDueAt;
+    changes.firstResponseMinutes = ticket.firstResponseMinutes ?? changes.firstResponseMinutes;
   }
   // The resolution clock stops while we wait on the customer.
   if (to === "pending_customer") changes.slaPausedAt = nowIso;
   else if (ticket.slaPausedAt) {
     changes.slaPausedAt = null;
-    if (!isReopen(ticket.status, to)) changes.resolutionDueAt = resumedDeadline(ticket.resolutionDueAt, ticket.slaPausedAt, nowMs, policy);
+    if (!isReopen(ticket.status, to)) {
+      changes.resolutionDueAt = resumedDeadline(ticket.resolutionDueAt, ticket.slaPausedAt, nowMs, policy);
+      changes.slaPausedMinutes = (ticket.slaPausedMinutes || 0) + businessMinutesBetween(Date.parse(ticket.slaPausedAt), nowMs, policy);
+    }
   }
   return changes;
 }
@@ -285,7 +290,7 @@ export async function updateTicket(session, id, body, correlationId) {
     const to = body.priority;
     if (!Object.hasOwn(PRIORITIES, to || "")) throw new SupportError("INVALID_INPUT", "Choose a valid priority.");
     if (to === ticket.priority) return staffView(ticket, policy, nowMs);
-    const due = deadlines(Date.parse(ticket.createdAt), to, policy);
+    const due = priorityDeadlines(ticket, to, policy);
     const saved = await commitChange(ticket, { priority: to, updatedAt: nowIso, ...due, escalated: false }, [event(ticket.id, session, "PRIORITY_CHANGED", { from: ticket.priority, to }, nowIso)], [], token);
     await supportAudit(session, "SUPPORT_TICKET_PRIORITY", { target, correlationId, details: { from: ticket.priority, to } });
     return staffView(saved, policy, nowMs);
@@ -329,13 +334,17 @@ export async function addStaffMessage(session, id, body, correlationId) {
   const kind = body?.kind === "INTERNAL" ? "INTERNAL" : body?.kind === "EXTERNAL" ? "EXTERNAL" : null;
   if (!kind) throw new SupportError("INVALID_INPUT", "Choose a reply or an internal note.");
   const text = checkMessageBody(body?.body);
-  const ticket = await workable(session, id, body?.version, correlationId, token);
-  if (kind === "EXTERNAL" && ticket.status === "closed") throw new SupportError("TICKET_CLOSED", "Reopen this ticket before replying.", 409);
+  const ticket = await loadTicket(id, token);
+  if (!ticket) throw notFound();
+  if (!canWork(session, ticket)) throw await denied(session, P.TICKET_WORK, correlationId, `taxSupportTickets/${id}`);
+  // A retry whose first attempt saved must get that result, though the version has since moved.
   const idem = key ? idemPath(session.uid, `message.${ticket.id}`, key) : null;
   if (idem) {
     const seen = await getDocument(idem, token);
     if (seen) return { id: seen.resultId, replayed: true, version: ticket.version };
   }
+  if (checkVersion(body?.version) !== ticket.version) throw stale();
+  if (kind === "EXTERNAL" && ticket.status === "closed") throw new SupportError("TICKET_CLOSED", "Reopen this ticket before replying.", 409);
   const nowIso = new Date().toISOString();
   const messageId = crypto.randomUUID();
   const changes = { updatedAt: nowIso };
@@ -444,6 +453,10 @@ export async function runSupportJob({ token, dryRun = false, nowMs = Date.now() 
   };
   const rateRemoved = await expired("taxSupportRate", "expiresAt", nowIso);
   const idemRemoved = await expired("taxSupportIdempotency", "createdAt", new Date(nowMs - 7 * 86_400_000).toISOString());
+  // An upload that died halfway leaves a record no file can use: it cannot be opened, so remove it.
+  const stuck = await queryCollection("taxSupportAttachments", token, { filters: [["state", "EQUAL", "UPLOADING"]], limit: 200 });
+  const dayAgo = new Date(nowMs - 86_400_000).toISOString();
+  await Promise.all(stuck.filter((a) => a.createdAt < dayAgo).map((a) => deleteDocument(`taxSupportAttachments/${a.id}`, token).catch(() => null)));
   return { escalated, rateRemoved, idemRemoved };
 }
 
@@ -490,7 +503,7 @@ export async function getCustomerTicket(session, id, correlationId) {
     ticket: customerView(ticket),
     messages: messages.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).map(customerMessageView),
     attachments: attachments
-      .filter((a) => a.uploadedBy === session.uid || a.state === "AVAILABLE")
+      .filter((a) => a.state === "AVAILABLE" || (a.state === "QUARANTINED" && a.uploadedBy === session.uid))
       .map((a) => ({ id: a.id, filename: a.filename, size: a.size, state: a.state, createdAt: a.createdAt })),
   };
 }

@@ -53,6 +53,7 @@ async function removeNow(session, auth, records, token) {
     ...favorites.map((r) => `clientFavorites/${r.id}`),
     ...bookings.map((r) => `clientBookings/${r.id}`),
     `taxMfa/${session.uid}`,
+    `taxSupportCustomerIndex/${session.uid}`,
     `taxUsers/${session.uid}`,
   ];
   await Promise.all(paths.map((path) => deleteDocument(path, token)));

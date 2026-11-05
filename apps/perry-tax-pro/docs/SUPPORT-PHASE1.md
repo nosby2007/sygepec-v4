@@ -84,10 +84,16 @@ Creating a ticket or message accepts `idempotencyKey`: a retry with the same key
 fails is never stored, and one that passes stays `QUARANTINED` until a supervisor releases it. Files
 always download, never display on our site.
 
+The Storage rules hold to the same record. A file can be created only for a record the server wrote
+after its checks, with the same person, path, size and type, and reading follows the record's state. So
+a browser token cannot skip the file check or open a quarantined file. Deploy the code before these
+rules: the current code works under the old rules, but older code cannot upload under these.
+
 ## SLA
 
 Deadlines count office hours in the policy's time zone, skip holidays and follow daylight saving. Time
-waiting on the customer moves the resolution deadline. The daily job escalates tickets at risk or
+waiting on the customer moves the resolution deadline. "At risk" is the share of office time used, and
+a change of priority keeps customer waiting time and a reopened ticket's fresh window. The daily job escalates tickets at risk or
 overdue; the SLA Monitor is computed when opened, so it is current even between runs.
 
 ## Deployment checklist

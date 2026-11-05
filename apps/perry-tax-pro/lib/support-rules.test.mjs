@@ -4,7 +4,7 @@ import {
   CATEGORIES, PERMISSIONS as P, PRIORITIES, STATUSES, SUPPORT_ROLES, SupportError, can, canAssign, canTransition, canWork, checkIdempotencyKey, checkMessageBody,
   checkTicketInput, checkVersion, customerTerms, decodeCursor, encodeCursor, isReopen, isTicketNumber, maskEmail, maskPhone, newTicketNumber, nextStatuses, pageSize, redactSensitive, searchTerm,
 } from "./support-rules.js";
-import { DEFAULT_SLA, addBusinessMinutes, businessMinutesBetween, checkPolicy, deadlines, resumedDeadline, shouldEscalate, slaState } from "./support-sla.js";
+import { DEFAULT_SLA, addBusinessMinutes, businessMinutesBetween, checkPolicy, deadlines, priorityDeadlines, resumedDeadline, shouldEscalate, slaState } from "./support-sla.js";
 
 const agent = { uid: "a1", supportRole: "SUPPORT_AGENT" };
 const other = { uid: "a2", supportRole: "SUPPORT_AGENT" };
@@ -201,7 +201,7 @@ describe("SLA", () => {
     const due = "2026-11-03T15:00:00.000Z";
     assert.equal(resumedDeadline(due, "2026-11-02T15:00:00Z", at("2026-11-02T16:00:00Z"), cal), "2026-11-03T16:00:00.000Z");
   });
-  const ticket = { status: "investigating", createdAt: "2026-11-02T15:00:00.000Z", firstResponseDueAt: "2026-11-02T16:00:00.000Z", resolutionDueAt: "2026-11-03T15:00:00.000Z", escalated: false };
+  const ticket = { status: "investigating", priority: "urgent", firstResponseMinutes: 60, resolutionMinutes: 480, createdAt: "2026-11-02T15:00:00.000Z", firstResponseDueAt: "2026-11-02T16:00:00.000Z", resolutionDueAt: "2026-11-03T15:00:00.000Z", escalated: false };
   test("states: on track, at risk, breached, met, paused", () => {
     assert.equal(slaState(ticket, at("2026-11-02T15:10:00Z"), cal).overall, "ok");
     assert.equal(slaState(ticket, at("2026-11-02T15:50:00Z"), cal).firstResponse, "at_risk");
@@ -216,6 +216,39 @@ describe("SLA", () => {
     assert.equal(shouldEscalate({ ...ticket, escalated: true }, late, cal), false);
     assert.equal(shouldEscalate({ ...ticket, status: "resolved" }, late, cal), false);
     assert.equal(shouldEscalate(ticket, at("2026-11-02T15:10:00Z"), cal), false);
+  });
+  test("risk counts office time only, not nights or weekends", () => {
+    // Urgent, opened Friday 4:30pm ET. By Monday 8am only 30 of its 60 office minutes are used.
+    const friday = at("2026-11-06T21:30:00Z");
+    const t = { status: "new", priority: "urgent", createdAt: new Date(friday).toISOString(), ...deadlines(friday, "urgent", cal) };
+    const mondayEarly = at("2026-11-09T13:00:00Z");
+    assert.equal(slaState(t, mondayEarly, cal).firstResponse, "on_track");
+    assert.equal(slaState(t, mondayEarly, cal).resolution, "on_track");
+    assert.equal(shouldEscalate(t, mondayEarly, cal), false);
+    // Monday 9:20am: 50 of 60 minutes used is 83%, past the 80% line.
+    assert.equal(slaState(t, at("2026-11-09T14:20:00Z"), cal).firstResponse, "at_risk");
+  });
+  test("a ticket keeps its own targets when the policy changes later", () => {
+    const start = at("2026-11-02T15:00:00Z");
+    const t = { status: "new", priority: "urgent", createdAt: new Date(start).toISOString(), ...deadlines(start, "urgent", cal) };
+    const changed = { ...cal, targets: { ...cal.targets, urgent: { firstResponseMinutes: 6000, resolutionMinutes: 9000 } } };
+    assert.equal(slaState(t, at("2026-11-02T15:55:00Z"), changed).firstResponse, "at_risk");
+  });
+  test("changing priority keeps customer waiting time", () => {
+    const start = at("2026-11-02T15:00:00Z");
+    const t = { createdAt: new Date(start).toISOString(), ...deadlines(start, "normal", cal), slaPausedMinutes: 120 };
+    const due = priorityDeadlines(t, "urgent", cal);
+    // 480 office minutes for urgent, plus 120 already waited.
+    assert.equal(due.resolutionDueAt, new Date(addBusinessMinutes(start, 600, cal)).toISOString());
+    assert.equal(due.resolutionMinutes, 480);
+  });
+  test("changing priority on a reopened ticket keeps its fresh window", () => {
+    const opened = at("2026-11-02T15:00:00Z");
+    const reopened = at("2026-11-20T15:00:00Z");
+    const t = { createdAt: new Date(opened).toISOString(), ...deadlines(reopened, "normal", cal) };
+    const due = priorityDeadlines(t, "high", cal);
+    assert.equal(due.resolutionDueAt, new Date(addBusinessMinutes(reopened, 960, cal)).toISOString());
+    assert.ok(Date.parse(due.resolutionDueAt) > reopened);
   });
   test("policy checks", () => {
     assert.ok(checkPolicy(DEFAULT_SLA));
