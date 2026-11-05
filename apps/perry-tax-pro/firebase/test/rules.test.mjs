@@ -365,6 +365,16 @@ describe("client app favorites and reviews", () => {
   });
 });
 
+describe("Bank details", () => {
+  test("nobody reads or writes them directly, including the client and preparers", async () => {
+    ok(await write("owner", "taxBankDetails/alice_2026", { tenantId: T, clientId: "alice", sealed: "x" }));
+    for (const who of ["alice", "prep", "bob"]) {
+      denied(await read(who, "taxBankDetails/alice_2026"));
+      denied(await write(who, "taxBankDetails/alice_2026", { tenantId: T, clientId: "alice", sealed: "y" }));
+    }
+  });
+});
+
 describe("Storage", () => {
   const docsFile = "tax/perry-tax-pro/alice/alice_docs/d1/document.pdf";
   const filedFile = "tax/perry-tax-pro/alice/alice_filed/f1/document.pdf";

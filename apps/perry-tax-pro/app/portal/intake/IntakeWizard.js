@@ -6,6 +6,7 @@ import { intakeToEstimate } from "@/lib/tax";
 import Icon from "@/components/Icon";
 import { MoneyCount } from "@/components/Motion";
 import { ProgressRing } from "@/components/charts";
+import BankDetailsForm from "@/components/BankDetailsForm";
 
 const STEPS = ["About You", "Filing Status", "Dependents", "Income", "Deductions", "Refund", "Review"];
 const STEP_META = [
@@ -162,10 +163,7 @@ export default function IntakeWizard({ returnId, initial, locked }) {
               ))}
             </div>
             {d.refund.method === "direct_deposit" && (
-              <div className="grid-2">
-                {Text({ section: "refund", k: "accountLast4", label: "Last 4 of bank account", maxLength: 4, inputMode: "numeric" })}
-                <p className="hint" style={{ alignSelf: "end" }}>Full routing & account numbers are collected securely at signing.</p>
-              </div>
+              <BankDetailsForm returnId={returnId} locked={locked} />
             )}
           </div>
         )}

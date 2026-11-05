@@ -33,6 +33,8 @@ export const RETENTION = {
   auditYears: AUDIT_RETENTION_YEARS,
   returnYears: 7,
   unpaidLinkDays: 30,
+  // Full bank numbers are working data: gone this long after the IRS accepts the return.
+  bankDaysAfterAccepted: 30,
 };
 
 export async function runDaily({ dryRun = false, nowMs = Date.now(), only = TASKS } = {}) {
@@ -207,7 +209,18 @@ const RUNNERS = {
     const auditDue = mine(oldAudit);
     const linksDue = mine(openLinks).filter((p) => older(p.createdAt, RETENTION.unpaidLinkDays * DAY, ctx.nowMs));
     const reviewDue = mine(oldReturns).length;
-    if (ctx.dryRun) return { auditRemoved: auditDue.length, linksClosed: linksDue.length, returnsToReview: reviewDue, dryRun: true };
+    const bankRows = mine(await queryCollection("taxBankDetails", ctx.token, { limit: 2000 }));
+    const bankDue = [];
+    for (const row of bankRows) {
+      const r = await getDocument(`taxReturns/${row.returnId}`, ctx.token).catch(() => undefined);
+      if (r === undefined) continue; // Could not check: keep it for the next run.
+      if (!r || (r.status === "ACCEPTED" && older(r.updatedAt, RETENTION.bankDaysAfterAccepted * DAY, ctx.nowMs))) bankDue.push(row);
+    }
+    if (ctx.dryRun) return { auditRemoved: auditDue.length, linksClosed: linksDue.length, bankRemoved: bankDue.length, returnsToReview: reviewDue, dryRun: true };
+    let bankRemoved = 0;
+    for (const row of bankDue) {
+      if (await deleteDocument(`taxBankDetails/${row.id}`, ctx.token).then(() => true, () => false)) bankRemoved++;
+    }
     let auditRemoved = 0;
     for (const entry of auditDue) {
       if (await deleteDocument(`taxAudit/${entry.id}`, ctx.token).then(() => true, () => false)) auditRemoved++;
@@ -216,8 +229,8 @@ const RUNNERS = {
     for (const link of linksDue) {
       if (await patchFields(`taxBizPayments/${link.id}`, { status: "EXPIRED", expiredAt: new Date(ctx.nowMs).toISOString() }, ctx.token).then(() => true, () => false)) linksClosed++;
     }
-    if (auditRemoved || linksClosed) await audit(null, "RETENTION_RUN", { details: { auditRemoved, linksClosed, auditOlderThan: auditCutoff.slice(0, 10), linksOlderThan: linkCutoff.slice(0, 10) } });
-    return { auditRemoved, linksClosed, returnsToReview: reviewDue };
+    if (auditRemoved || linksClosed || bankRemoved) await audit(null, "RETENTION_RUN", { details: { auditRemoved, linksClosed, bankRemoved, auditOlderThan: auditCutoff.slice(0, 10), linksOlderThan: linkCutoff.slice(0, 10) } });
+    return { auditRemoved, linksClosed, bankRemoved, returnsToReview: reviewDue };
   },
 
   // Keeps business plan status in step with Stripe (renewals, failed cards, cancellations).
