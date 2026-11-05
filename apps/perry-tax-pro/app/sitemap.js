@@ -1,6 +1,7 @@
 import { publishedBusinesses } from "@/lib/business-booking";
 import { mediaUrl } from "@/lib/business-display";
 import { publicEntries } from "@/lib/cms";
+import { SOFTWARE_SERVICES } from "@/lib/software-services";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 const url = (path) => new URL(path, SITE).toString();
@@ -19,6 +20,8 @@ export default async function sitemap() {
     { path: "/tax", changeFrequency: "weekly", priority: 0.9, images: image("/photos/consult.jpg") },
     { path: "/ehr", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/cloud.jpg") },
     { path: "/find", changeFrequency: "weekly", priority: 0.8, images: image("/photos/shop.jpg") },
+    { path: "/software", changeFrequency: "monthly", priority: 0.9, images: image("/photos/software/hero.jpg") },
+    ...SOFTWARE_SERVICES.map((service) => ({ path: `/software/${service.slug}`, changeFrequency: "monthly", priority: 0.8, images: image(service.image) })),
     { path: "/services", changeFrequency: "monthly", priority: 0.9, images: image("/photos/family.jpg") },
     { path: "/blog", changeFrequency: "weekly", priority: 0.8, images: image("/photos/paperwork.jpg") },
     { path: "/estimator", changeFrequency: "monthly", priority: 0.8, images: image("/photos/paperwork.jpg") },

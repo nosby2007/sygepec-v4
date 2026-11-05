@@ -44,6 +44,10 @@ export function products() {
       text: "InnovaSoftware Clinic and CameroHealth: charting, scheduling and care coordination.",
     },
     {
+      key: "software", name: "Software services", area: "Software", icon: "bolt", href: "/software",
+      text: "Websites, SaaS, cloud computing, AI agents, agentic automation, mobile apps and more.",
+    },
+    {
       key: "services", name: "Find your service", area: "General services", icon: "search", href: "/find",
       text: "Travel, braids, doctors, wound care, lawn care and more, from local providers.",
     },
