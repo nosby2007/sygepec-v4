@@ -25,7 +25,7 @@ export default async function Page({ searchParams }) {
         <p>{view.text}</p>
         {scheme
           ? <a id="back-to-app" href={`${scheme}://open`} className="btn btn-primary btn-lg">Back to the app</a>
-          : <Link href="/" className="btn btn-ghost btn-lg">Close</Link>}
+          : <Link href="/tax" className="btn btn-ghost btn-lg">Close</Link>}
       </div>
     </main>
   );

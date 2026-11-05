@@ -15,7 +15,10 @@ export default async function sitemap() {
     publicEntries("SERVICE"), publicEntries("POST"), publicEntries("PAGE"), publicEntries("TEAM"), publicEntries("UPDATE"), publishedBusinesses(),
   ]);
   const fixed = [
-    { path: "/", changeFrequency: "weekly", priority: 1, images: image("/photos/consult.jpg") },
+    { path: "/", changeFrequency: "weekly", priority: 1, images: image("/photos/software/hero.jpg") },
+    { path: "/tax", changeFrequency: "weekly", priority: 0.9, images: image("/photos/consult.jpg") },
+    { path: "/ehr", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/cloud.jpg") },
+    { path: "/find", changeFrequency: "weekly", priority: 0.8, images: image("/photos/shop.jpg") },
     { path: "/services", changeFrequency: "monthly", priority: 0.9, images: image("/photos/family.jpg") },
     { path: "/blog", changeFrequency: "weekly", priority: 0.8, images: image("/photos/paperwork.jpg") },
     { path: "/estimator", changeFrequency: "monthly", priority: 0.8, images: image("/photos/paperwork.jpg") },

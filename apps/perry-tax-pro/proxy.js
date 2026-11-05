@@ -3,6 +3,7 @@ import { appSignIn } from "@/lib/app-mode";
 import { COOKIE, appMarker, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
 import { allows, featureForPath, upgradeMessage } from "@/lib/plans";
 import { getEntitlement } from "@/lib/entitlements";
+import { isTaxHost } from "@/lib/platform";
 
 // Runs before every signed-in page and API request:
 // - a session idle for longer than the limit is cleared and the user is sent to a page
@@ -45,6 +46,12 @@ function withCookie(request, value) {
 const inApp = (request) => /^\/m(\/|$)/.test(request.nextUrl.pathname);
 
 export async function proxy(request) {
+  // One app, two addresses: the tax subdomain opens InnovaTax at its root, the main
+  // domain the InnovaCare Software home. Nothing else differs, so stop here for "/".
+  if (request.nextUrl.pathname === "/") {
+    const host = request.headers.get("x-forwarded-host") || request.nextUrl.host;
+    return isTaxHost(host) ? NextResponse.rewrite(new URL("/tax", request.url)) : NextResponse.next();
+  }
   const token = request.cookies.get(COOKIE)?.value;
   const session = await openSession(token);
   // No session, or only the native app marker of a signed-out app (lib/app-mode.js).
@@ -121,5 +128,5 @@ export async function proxy(request) {
 
 // Background requests the browser makes on its own must not count as activity.
 export const config = {
-  matcher: ["/portal/:path*", "/admin/:path*", "/m", "/m/:path*", "/api/((?!auth/logout|auth/app|cron|public|payments/confirm|stripe/webhook).*)"],
+  matcher: ["/", "/portal/:path*", "/admin/:path*", "/m", "/m/:path*", "/api/((?!auth/logout|auth/app|cron|public|payments/confirm|stripe/webhook).*)"],
 };
