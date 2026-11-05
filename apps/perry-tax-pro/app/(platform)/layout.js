@@ -21,6 +21,7 @@ const nav = () => [
   ["/#education", "Training"],
   ["/#compliance", "Compliance"],
   ["/ehr", "EHR"],
+  ["/software", "Software"],
   ["/find", "Find a service"],
 ];
 
@@ -53,6 +54,7 @@ export default function PlatformLayout({ children }) {
               <h4>Products</h4>
               <Link href={taxUrl()}>InnovaTax</Link>
               <Link href="/ehr">Health records</Link>
+              <Link href="/software">Software services</Link>
               <Link href="/find">Find a service</Link>
             </div>
             <div>

@@ -19,7 +19,7 @@ export default function PlatformHome() {
         <div className="container">
           <span className="eyebrow">InnovaCare Software</span>
           <h1>One platform for the work that keeps people cared for.</h1>
-          <p>Taxes, training, compliance, health records and trusted local services. Choose where you want to go.</p>
+          <p>Taxes, training, compliance, health records, software and trusted local services. Choose where you want to go.</p>
           <div className="row">
             <a href="#products" className="btn btn-primary btn-lg">See our products</a>
             <Link href="/find" className="btn btn-light btn-lg"><Icon name="search" size={18} /> Find a service</Link>
