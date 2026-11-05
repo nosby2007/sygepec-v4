@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Icon from "@/components/Icon";
 import IdleGuard from "@/components/IdleGuard";
@@ -17,11 +17,12 @@ export default function AppShell({ links, user, app = null, children }) {
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/signed-out?reason=manual");
   };
-  const isActive = (href) => (href === links[0].href ? path === href : path.startsWith(href));
-  const current = [...links].reverse().find((l) => isActive(l.href)) || links[0];
-  const isPreparer = user.role === "PREPARER";
+  const isActive = (href, exact) => (exact || href === links[0].href ? path === href : path.startsWith(href));
+  const current = [...links].reverse().find((l) => isActive(l.href, l.exact)) || links[0];
+  const isSupport = user.role === "SUPPORT";
+  const isPreparer = user.role === "PREPARER" || isSupport;
   const isBusiness = user.accountType === "BUSINESS";
-  const area = isPreparer ? "Preparer workspace" : isBusiness ? "Business workspace" : "Client portal";
+  const area = isSupport ? "Support Operations" : isPreparer ? "Preparer workspace" : isBusiness ? "Business workspace" : "Client portal";
   const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   // On phones the sidebar is a drawer behind a menu button. It closes when a page is
   // chosen, on Escape and on a tap on the dimmed page.
@@ -41,7 +42,7 @@ export default function AppShell({ links, user, app = null, children }) {
   const brand = (
     <Link href="/" className="logo">
       <span className="logo-mark">IC</span>
-      <span>InnovaCare<small>{isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
+      <span>InnovaCare<small>{isSupport ? "Support" : isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
     </Link>
   );
 
@@ -68,22 +69,25 @@ export default function AppShell({ links, user, app = null, children }) {
       <aside id="app-sidebar" className={`sidebar${open ? " open" : ""}`}>
         <Link href="/" className="logo">
           <span className="logo-mark">IC</span>
-          <span>InnovaCare<small>{isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
+          <span>InnovaCare<small>{isSupport ? "Support" : isPreparer ? "Preparer" : isBusiness ? "Business" : "Client Portal"}</small></span>
         </Link>
         <div>
-          <div className="side-label">{isPreparer ? "Operations" : "Workspace"}</div>
+          {!links[0].section && <div className="side-label">{isPreparer ? "Operations" : "Workspace"}</div>}
           <nav className="side-nav">
             {links.map((l) => (
-              <Link key={l.href} id={`side-${l.label.toLowerCase().replace(/\W+/g, "-")}`} href={l.href} className={isActive(l.href) ? "active" : ""} onClick={() => setOpen(false)}>
+              <Fragment key={l.href}>
+              {l.section && <div className="side-label" style={{ marginTop: l === links[0] ? 0 : 16 }}>{l.section}</div>}
+              <Link id={`side-${l.label.toLowerCase().replace(/\W+/g, "-")}`} href={l.href} className={isActive(l.href, l.exact) ? "active" : ""} onClick={() => setOpen(false)}>
                 <span className="ico"><Icon name={l.icon} size={18} /></span>
                 {l.label}
               </Link>
+              </Fragment>
             ))}
           </nav>
         </div>
         <div className="side-promo">
-          <b><Icon name={isPreparer ? "shield" : "sparkle"} size={16} />{isPreparer ? "Verification first" : "Need a hand?"}</b>
-          <p>{isPreparer ? "Confirm Form 8879 evidence before recording any submission." : "Your preparer replies to secure messages within one business day."}</p>
+          <b><Icon name={isPreparer ? "shield" : "sparkle"} size={16} />{isSupport ? "Privacy first" : isPreparer ? "Verification first" : "Need a hand?"}</b>
+          <p>{isSupport ? "Never ask a customer for an SSN or bank details in a ticket." : isPreparer ? "Confirm Form 8879 evidence before recording any submission." : "Your preparer replies to secure messages within one business day."}</p>
         </div>
         <div className="side-user">
           <div className="row nowrap">

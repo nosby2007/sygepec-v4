@@ -1,5 +1,3 @@
-import crypto from "node:crypto";
-
 // Customer Support rules: roles, permissions, ticket states, input checks, masking.
 // Pure, so everything here is unit-tested and shared by the services and the screens.
 
@@ -177,7 +175,7 @@ export function decodeCursor(value) {
 
 // ---- Numbers, masks and search terms ------------------------------------------------------
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
-export function newTicketNumber(nowMs = Date.now(), random = crypto.randomBytes) {
+export function newTicketNumber(nowMs = Date.now(), random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))) {
   const yymm = new Date(nowMs).toISOString().slice(2, 7).replace("-", "");
   const code = [...random(7)].map((b) => ALPHABET[b % ALPHABET.length]).join("");
   return `IC-${yymm}-${code}`;

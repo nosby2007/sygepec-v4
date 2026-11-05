@@ -375,6 +375,39 @@ describe("Bank details", () => {
   });
 });
 
+describe("Support", () => {
+  test("nobody reads or writes support records directly, not even staff", async () => {
+    for (const path of ["taxSupportTickets/IC-2611-RULES22", "taxSupportMessages/m1", "taxSupportEvents/e1", "taxSupportAttachments/a1", "taxSupportRoles/supportRulesUser", "taxSupportSettings/sla", "taxSupportCustomerIndex/alice", "taxSupportRate/r1", "taxSupportIdempotency/i1"]) {
+      ok(await write("owner", path, { tenantId: T, customerUid: "alice" }));
+      for (const who of ["alice", "prep", "bob", "supportRulesUser"]) {
+        denied(await read(who, path));
+        denied(await write(who, path, { tenantId: T, customerUid: who }));
+      }
+    }
+  });
+});
+
+describe("Support files", () => {
+  const external = "taxsupport/perry-tax-pro/IC-2611-RULES22/external/f1/file.pdf";
+  const internal = "taxsupport/perry-tax-pro/IC-2611-RULES22/internal/f2/file.pdf";
+  test("the ticket's customer and support staff reach external files; others do not", async () => {
+    ok(await upload("alice", external));
+    ok(await download("alice", external));
+    ok(await download("supportRulesUser", external));
+    denied(await download("bob", external));
+    denied(await download("prep", external));
+    denied(await upload("bob", "taxsupport/perry-tax-pro/IC-2611-RULES22/external/f3/file.pdf"));
+  });
+  test("internal files are for support staff only, and nobody deletes through the rules", async () => {
+    denied(await upload("alice", internal));
+    ok(await upload("supportRulesUser", internal));
+    ok(await download("supportRulesUser", internal));
+    denied(await download("alice", internal));
+    assert.equal(await remove("supportRulesUser", internal), 403);
+    assert.equal(await remove("alice", external), 403);
+  });
+});
+
 describe("Storage", () => {
   const docsFile = "tax/perry-tax-pro/alice/alice_docs/d1/document.pdf";
   const filedFile = "tax/perry-tax-pro/alice/alice_filed/f1/document.pdf";
