@@ -20,6 +20,9 @@ as custom domains and create the DNS records Firebase gives you. Then set `TAX_S
 
 ## Links (Cloud Run environment variables, no rebuild needed)
 
+Hosting is pinned to a Cloud Run revision (`pinTag` in `firebase.json`), so after changing a
+variable run `firebase deploy --only hosting --project sygepec-v4` for the public site to use it.
+
 | Variable | Card | Without it |
 | --- | --- | --- |
 | `TAX_SITE_URL` | InnovaTax, e.g. `https://tax.<domain>` | `/tax` |
@@ -30,6 +33,7 @@ as custom domains and create the DNS records Firebase gives you. Then set `TAX_S
 
 ```bash
 gcloud run services update perry-tax-pro --region us-central1 --project sygepec-v4 --update-env-vars TRAINING_URL=https://...
+firebase deploy --only hosting --project sygepec-v4
 ```
 
 Service shortcuts on `/find` are in `SERVICE_CATEGORIES` in `lib/platform.js`. A search
