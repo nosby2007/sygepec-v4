@@ -1,4 +1,5 @@
 import { createSession } from "@/lib/auth";
+import { indexCustomer } from "@/lib/support-customers";
 import { createDocuments, deleteFirebaseAccount, signUpWithPassword, TAX_TENANT } from "@/lib/firebase";
 import { cleanEmail, cleanText, mutationGuard, privateHeaders } from "@/lib/security";
 
@@ -50,6 +51,8 @@ export async function POST(req) {
         },
       });
     await createDocuments(documents, auth.idToken);
+    // Findable by support right away. The daily job catches any miss, so this may fail quietly.
+    await indexCustomer(auth.localId).catch(() => null);
     await createSession(auth, profile);
     return Response.json({ role: "CLIENT", accountType }, { headers: privateHeaders });
   } catch (error) {

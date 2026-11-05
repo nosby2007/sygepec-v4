@@ -41,6 +41,24 @@ export const AUDIT_LABELS = {
   RETENTION_RUN: "Data retention clean-up",
   ACCOUNT_DELETED: "Deleted their account",
   ACCOUNT_DELETION_REQUESTED: "Asked to delete their account",
+  SUPPORT_CUSTOMER_SEARCH: "Searched customers",
+  SUPPORT_CUSTOMER_VIEWED: "Opened a customer profile",
+  SUPPORT_TICKET_CREATED: "Created a support ticket",
+  SUPPORT_TICKET_STATUS: "Changed a ticket's status",
+  SUPPORT_TICKET_PRIORITY: "Changed a ticket's priority",
+  SUPPORT_TICKET_ASSIGNED: "Assigned a ticket",
+  SUPPORT_TICKET_ESCALATED: "Escalated a ticket",
+  SUPPORT_REPLY_SENT: "Replied to a customer",
+  SUPPORT_NOTE_ADDED: "Added an internal note",
+  SUPPORT_CUSTOMER_REPLIED: "Customer replied to a ticket",
+  SUPPORT_ATTACHMENT_ADDED: "Added a ticket attachment",
+  SUPPORT_ATTACHMENT_BLOCKED: "Blocked an unsafe ticket attachment",
+  SUPPORT_ATTACHMENT_OPENED: "Opened a ticket attachment",
+  SUPPORT_ATTACHMENT_RELEASED: "Released a ticket attachment",
+  SUPPORT_SLA_CHANGED: "Changed the SLA policy",
+  SUPPORT_ROLE_CHANGED: "Changed a support role",
+  SUPPORT_AUDIT_VIEWED: "Opened the support audit log",
+  SUPPORT_ACCESS_DENIED: "Refused a support action",
 };
 
 const clip = (value, max) => String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, max);
@@ -59,7 +77,7 @@ async function requestInfo() {
 
 // actor: a session ({ uid, role, email }) or null for the system / an anonymous visitor.
 // Never throws: a logging failure must not block the action being logged.
-export async function audit(actor, action, { target = null, details = {}, email = null } = {}) {
+export async function audit(actor, action, { target = null, details = {}, email = null, area = null, outcome = null, correlationId = null } = {}) {
   try {
     const now = new Date();
     const clean = Object.fromEntries(Object.entries(details || {}).slice(0, 12).map(([k, v]) => [clip(k, 40), clip(v, 300)]));
@@ -72,11 +90,22 @@ export async function audit(actor, action, { target = null, details = {}, email 
       actorEmail: clip(actor?.email || email || "", 200) || null,
       target: target ? clip(target, 200) : null,
       details: clean,
+      ...(area ? { area: clip(area, 20) } : {}),
+      ...(outcome ? { outcome: clip(outcome, 20) } : {}),
+      ...(correlationId ? { correlationId: clip(correlationId, 64) } : {}),
       ...(await requestInfo()),
     }, await serviceToken());
   } catch {
     // Logged nowhere else on purpose: the audit write is best-effort.
   }
+}
+
+// Support entries only, newest first, one page at a time.
+export async function supportAuditPage({ limit = 50, startAfter } = {}) {
+  const rows = await queryCollection("taxAudit", await serviceToken(), {
+    filters: [["area", "EQUAL", "SUPPORT"]], orderBy: [["at", "DESCENDING"], ["__name__", "DESCENDING"]], limit, startAfter,
+  });
+  return rows.filter((row) => row.tenantId === TAX_TENANT);
 }
 
 export async function recentAudit({ limit = 200 } = {}) {

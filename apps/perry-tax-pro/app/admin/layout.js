@@ -1,5 +1,6 @@
 import AppShell from "@/components/AppShell";
-import { requireRole } from "@/lib/auth";
+import { getSupportSession, requireRole } from "@/lib/auth";
+import { PERMISSIONS as P, can } from "@/lib/support-rules";
 
 export const metadata = { title: "Preparer Dashboard", robots: { index: false } };
 
@@ -14,7 +15,23 @@ const links = [
   { href: "/admin/security", label: "Security", icon: "shield" },
 ];
 
+const supportLinks = (s) => [
+  { href: "/admin/support", label: "Overview", icon: "help", section: "Support Operations", exact: true },
+  { href: "/admin/support/customers", label: "Customers", icon: "users" },
+  { href: "/admin/support/tickets", label: "Tickets", icon: "clipboard" },
+  { href: "/admin/support/queues", label: "Queues", icon: "layers" },
+  { href: "/admin/support/sla", label: "SLA Monitor", icon: "clock" },
+  ...(can(s, P.AUDIT_VIEW) ? [{ href: "/admin/support/audit", label: "Audit", icon: "shield" }] : []),
+  { href: "/admin/support/settings", label: "Support Settings", icon: "gear" },
+];
+
 export default async function AdminLayout({ children }) {
+  const support = await getSupportSession();
+  // A support account has no ordinary session, so it never sees the preparer's links.
+  if (support?.role === "SUPPORT") {
+    const { id, uid, email, name, role, accountType } = support;
+    return <AppShell links={supportLinks(support)} user={{ id, uid, email, name, role, accountType }}>{children}</AppShell>;
+  }
   const s = await requireRole("PREPARER");
-  return <AppShell links={links} user={s}>{children}</AppShell>;
+  return <AppShell links={support ? [...links, ...supportLinks(support)] : links} user={s}>{children}</AppShell>;
 }

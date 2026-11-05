@@ -50,7 +50,7 @@ export const appMarker = (session) => (APP_MODES.includes(session?.app) ? { app:
 
 // A password sign-in that still owes its second step ("verify" or "setup"). Preparer
 // sessions from before two-step sign-in existed carry no flag and must pass it too.
-export const mfaPending = (session) => (session?.mfa ? session.mfa !== "ok" : session?.role === "PREPARER");
+export const mfaPending = (session) => (session?.mfa ? session.mfa !== "ok" : session?.role === "PREPARER" || session?.role === "SUPPORT");
 
 export const idleExpired = (session, nowMs = Date.now()) =>
   Number.isFinite(session?.lastSeen) && nowMs - session.lastSeen > SERVER_IDLE_MS;

@@ -21,7 +21,7 @@ export class MfaError extends Error {
   }
 }
 
-export const mfaRequired = (role) => role === "PREPARER";
+export const mfaRequired = (role) => role === "PREPARER" || role === "SUPPORT";
 
 function key() {
   const secret = process.env.SESSION_SECRET;

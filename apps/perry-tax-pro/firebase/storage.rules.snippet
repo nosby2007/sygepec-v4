@@ -20,6 +20,33 @@ function businessEntry(entryId) {
   return firestore.get(/databases/(default)/documents/taxBusinessEntries/$(entryId)).data;
 }
 
+function taxSupportAttachment(attachmentId) {
+  return firestore.get(/databases/(default)/documents/taxSupportAttachments/$(attachmentId)).data;
+}
+
+function taxSupportCanRead(a) {
+  return (a.visibility == 'EXTERNAL' && a.customerUid == request.auth.uid && (a.state == 'AVAILABLE' || a.uploadedBy == request.auth.uid))
+    || (firestore.exists(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid))
+      && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.tenantId == 'perry-tax-pro'
+      && (a.state == 'AVAILABLE'
+        || firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.role in ['SUPPORT_SUPERVISOR', 'PLATFORM_ADMIN']));
+}
+
+// Ticket attachments. The server writes the record after its checks, and these rules hold to
+// it: no file without a record, the record decides who reads, and quarantine applies here too.
+match /taxsupport/perry-tax-pro/{ticketId}/{visibility}/{attachmentId}/{fileName} {
+  allow read: if request.auth != null
+    && taxSupportAttachment(attachmentId).storagePath == 'taxsupport/perry-tax-pro/' + ticketId + '/' + visibility + '/' + attachmentId + '/' + fileName
+    && taxSupportCanRead(taxSupportAttachment(attachmentId));
+  allow create: if request.auth != null
+    && taxSupportAttachment(attachmentId).state == 'UPLOADING'
+    && taxSupportAttachment(attachmentId).uploadedBy == request.auth.uid
+    && taxSupportAttachment(attachmentId).storagePath == 'taxsupport/perry-tax-pro/' + ticketId + '/' + visibility + '/' + attachmentId + '/' + fileName
+    && request.resource.size == taxSupportAttachment(attachmentId).size
+    && request.resource.contentType == taxSupportAttachment(attachmentId).mime;
+  allow update, delete: if false;
+}
+
 match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
   allow read: if request.auth != null
     && validTaxReturn(clientUid, returnId)

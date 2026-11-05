@@ -14,6 +14,8 @@ import { syncBilling } from "@/lib/payments";
 import { emailClient, textClient } from "@/lib/notifications";
 import { serviceToken } from "@/lib/service-identity";
 import { formatInZone } from "@/lib/timezone";
+import { rebuildCustomerIndex } from "@/lib/support-customers";
+import { runSupportJob } from "@/lib/support-tickets";
 
 // The daily job (Cloud Scheduler → /api/cron/daily). Each task looks for what is due,
 // sends at most one message per item, and records when it did so that a second run the
@@ -24,7 +26,7 @@ const DAY = 24 * HOUR;
 const older = (iso, ms, nowMs) => !iso || Date.parse(iso) < nowMs - ms;
 const mine = (rows) => rows.filter((row) => row.tenantId === TAX_TENANT);
 
-export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve", "retention"];
+export const TASKS = ["appointments", "bookings", "documents", "signatures", "payments", "subscriptions", "taxReserve", "retention", "support"];
 
 // How long records are kept. Tax files follow IRS guidance: a preparer keeps a copy of
 // each return and Form 8879 for 3 years, and records that support a return are kept
@@ -231,6 +233,14 @@ const RUNNERS = {
     }
     if (auditRemoved || linksClosed || bankRemoved) await audit(null, "RETENTION_RUN", { details: { auditRemoved, linksClosed, bankRemoved, auditOlderThan: auditCutoff.slice(0, 10), linksOlderThan: linkCutoff.slice(0, 10) } });
     return { auditRemoved, linksClosed, bankRemoved, returnsToReview: reviewDue };
+  },
+
+  // Raises support tickets near or past their deadlines, refreshes customer search, and
+  // removes expired rate-limit and retry records.
+  async support(ctx) {
+    const job = await runSupportJob(ctx);
+    if (ctx.dryRun) return job;
+    return { ...job, ...(await rebuildCustomerIndex(ctx.token)) };
   },
 
   // Keeps business plan status in step with Stripe (renewals, failed cards, cancellations).

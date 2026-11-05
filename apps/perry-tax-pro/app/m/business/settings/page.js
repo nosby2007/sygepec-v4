@@ -17,6 +17,7 @@ const ITEMS = [
   { icon: "shield", title: "Security", text: "Two-step sign-in and your password", href: "/portal/security" },
   { icon: "help", title: "Help center", text: "How-tos, tips and contact", href: "/m/business/help" },
   { icon: "file", title: "Terms & privacy", text: "InnovaCare terms of service and privacy policy", href: "/terms" },
+  { icon: "help", title: "Support", text: "Ask for help and see our replies", href: "/portal/support" },
   { icon: "x", title: "Delete account", text: "Remove your account and sign-in", href: "/m/account/delete" },
 ];
 
