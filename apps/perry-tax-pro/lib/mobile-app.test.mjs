@@ -171,6 +171,7 @@ test("account deletion: only an untouched account can go at once", () => {
   assert.deepEqual(retainedReasons({ returns: [{ ...empty, status: "ACCEPTED" }] }), ["tax return"]);
   assert.deepEqual(retainedReasons({ charges: [{}] }), ["fees or payments"]);
   assert.deepEqual(retainedReasons({ appointments: [{}] }), ["tax appointments"]);
+  assert.deepEqual(retainedReasons({ notes: [{}] }), ["secure messages"]);
   assert.deepEqual(retainedReasons({ profile: {} }), ["business profile"]);
   assert.deepEqual(retainedReasons({ customers: [{}] }), ["business records"]);
   assert.deepEqual(retainedReasons({ billing: {} }), ["business plan"]);

@@ -21,16 +21,18 @@ const owned = (collection, token, field, uid) =>
   queryCollection(collection, token, { filters: [[field, "EQUAL", uid], ["tenantId", "EQUAL", TAX_TENANT]], limit: 300 });
 
 async function loadRecords(uid, token) {
-  const [returns, charges, appointments, entries, customers, profile, billing] = await Promise.all([
+  const [returns, charges, appointments, notes, entries, customers, profile, billing] = await Promise.all([
     owned("taxReturns", token, "clientId", uid),
     owned("taxCharges", token, "clientId", uid),
     owned("taxAppointments", token, "clientId", uid),
+    // Messages can hold a full SSN (see the Privacy Policy), so they are tax records to keep.
+    owned("taxNotes", token, "clientId", uid),
     owned("taxBusinessEntries", token, "ownerUid", uid),
     owned("taxBusinessCustomers", token, "ownerUid", uid),
     getDocument(`bizProfiles/${uid}`, token),
     getDocument(`taxBilling/${uid}`, token),
   ]);
-  return { returns, charges, appointments, entries, customers, profile, billing };
+  return { returns, charges, appointments, notes, entries, customers, profile, billing };
 }
 
 export const pendingDeletion = async (uid) => getDocument(`taxDeletionRequests/${uid}`, await serviceToken());
