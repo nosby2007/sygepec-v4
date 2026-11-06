@@ -12,7 +12,7 @@ export default async function sitemap() {
   const [services, posts, pages, team, updates, businesses] = await Promise.all([
     publicEntries("SERVICE"), publicEntries("POST"), publicEntries("PAGE"), publicEntries("TEAM"), publicEntries("UPDATE"), publishedBusinesses(),
   ]);
-  const fixed = ["/", "/tax", "/ehr", "/find", "/software", ...SOFTWARE_SERVICES.map((s) => `/software/${s.slug}`), "/services", "/blog", "/estimator", "/business", "/business/directory", "/contact", "/login", "/register"];
+  const fixed = ["/", "/tax", "/ehr", "/find", "/training", "/compliance", "/software", ...SOFTWARE_SERVICES.map((s) => `/software/${s.slug}`), "/services", "/blog", "/estimator", "/business", "/business/directory", "/contact", "/login", "/register"];
   if (team.length) fixed.push("/team");
   if (updates.length) fixed.push("/updates");
   return [

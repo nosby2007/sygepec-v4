@@ -37,3 +37,5 @@ wide; `owner.jpg` is portrait).
 | `security.jpg` | teal-led-panel-EUsVwEOsblE | Security |
 | `ecommerce.jpg` | person-using-laptop-computer-holding-card-Q59HmzK38eQ | E-commerce |
 | `support.jpg` | man-sitting-on-chair-wearing-gray-crew-neck-long-sleeved-shirt-using-apple-magic-keyboard-CPs2X8JYmS8 | IT support |
+| `training.jpg` | woman-carrying-white-and-green-textbook-iQPr1XkF5F0 | Training page |
+| `compliance.jpg` | a-woman-in-a-blue-scrub-suit-and-a-man-in-a-blue-scrub-suit-Jusy7vxGPLM | Compliance page |

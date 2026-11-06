@@ -32,12 +32,12 @@ export function products() {
       text: "Individual, self-employed and small-business tax preparation with a secure client portal.",
     },
     {
-      key: "education", name: "InnovaCare Training", area: "Education", icon: "book", href: env("TRAINING_URL"),
-      text: "Courses, certifications and continuing education for health and service professionals.",
+      key: "education", name: "InnovaCare Training", area: "Education", icon: "book", href: "/training",
+      text: "NCLEX, nursing and medical exam review: question banks, practice exams and tutor support.",
     },
     {
-      key: "compliance", name: "Compliance", area: "Compliance", icon: "shield", href: env("COMPLIANCE_URL"),
-      text: "Document review, policies and audit readiness for regulated teams.",
+      key: "compliance", name: "Compliance", area: "Compliance", icon: "shield", href: "/compliance",
+      text: "Compliance training for healthcare teams: assign courses, track completion, keep certificates.",
     },
     {
       key: "ehr", name: "Electronic health records", area: "EHR", icon: "heart", href: "/ehr",
