@@ -28,6 +28,7 @@ export class StripeError extends Error {
     super(`Stripe refused the request (${status}${body.error?.code ? ` ${body.error.code}` : ""})`);
     this.status = status;
     this.stripeMessage = body.error?.message || "";
+    this.code = body.error?.code || "";
   }
 }
 

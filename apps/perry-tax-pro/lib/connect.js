@@ -47,12 +47,38 @@ function describe(account) {
   };
 }
 
+// Stripe no longer lets our key use this account: it was made in test mode, or the
+// business disconnected it. The old id is kept for the record and setup starts over.
+const lostAccount = (error) => error instanceof StripeError && error.code === "account_invalid";
+const RECONNECT = "Your payment account needs to be connected again. Go to Plan & payments and choose Connect my bank.";
+
+async function forgetAccount(uid, current) {
+  const next = {
+    ...strip(current),
+    stripeAccountId: null,
+    previousStripeAccountId: current.stripeAccountId,
+    chargesEnabled: false,
+    payoutsEnabled: false,
+    detailsSubmitted: false,
+    requirementsDue: 0,
+  };
+  await savePayout(uid, next);
+  return next;
+}
+
 // Starts or resumes Stripe's own onboarding (identity, business details, bank account).
 export async function startConnect(session, app = null) {
   owner(session);
   if (!stripeConfigured()) throw new ConnectError("Online payments are not available yet.", 409);
   const current = await getPayout(session.uid);
   let accountId = current?.stripeAccountId;
+  if (accountId) {
+    const lost = await call("GET", `/accounts/${encodeURIComponent(accountId)}`, null).then(() => false, lostAccount);
+    if (lost) {
+      await forgetAccount(session.uid, current);
+      accountId = null;
+    }
+  }
   if (!accountId) {
     const profile = await getDocument(`bizProfiles/${session.uid}`, session.idToken).catch(() => null);
     const account = await call("POST", "/accounts", {
@@ -82,7 +108,11 @@ export async function startConnect(session, app = null) {
 export async function syncConnect(uid) {
   const current = await getPayout(uid);
   if (!current?.stripeAccountId) return current;
-  const account = await call("GET", `/accounts/${encodeURIComponent(current.stripeAccountId)}`, null);
+  const account = await call("GET", `/accounts/${encodeURIComponent(current.stripeAccountId)}`, null).catch((error) => {
+    if (lostAccount(error)) return null;
+    throw error;
+  });
+  if (!account) return forgetAccount(uid, current);
   const next = { ...strip(current), ...describe(account) };
   await savePayout(uid, next);
   return next;
@@ -94,7 +124,13 @@ export async function payoutDashboard(session) {
   const current = await getPayout(session.uid);
   if (!current?.stripeAccountId || !current.detailsSubmitted) throw new ConnectError("Finish setting up your payment account first.", 409);
   const link = await call("POST", `/accounts/${encodeURIComponent(current.stripeAccountId)}/login_links`, {})
-    .catch(() => { throw new ConnectError("Stripe could not open your dashboard. Please try again.", 502); });
+    .catch(async (error) => {
+      if (lostAccount(error)) {
+        await forgetAccount(session.uid, current);
+        throw new ConnectError(RECONNECT, 409);
+      }
+      throw new ConnectError("Stripe could not open your dashboard. Please try again.", 502);
+    });
   return { url: link.url };
 }
 
@@ -144,7 +180,14 @@ export async function invoicePayLink(session, rawInvoiceId, rawServiceId) {
     payment_intent_data: { description: `${profile?.name || "Invoice"}: ${cleanText(invoice.description, 120)}` },
     success_url: `${SITE}/pay/thanks?session_id={CHECKOUT_SESSION_ID}&acct=${acct}`,
     cancel_url: `${SITE}/pay/thanks?cancelled=1`,
-  }, fetch, acct).catch(() => { throw new ConnectError("Stripe could not create the payment page. Please try again.", 502); });
+  }, fetch, acct).catch(async (error) => {
+    if (lostAccount(error)) {
+      await forgetAccount(session.uid, payout);
+      throw new ConnectError(RECONNECT, 409);
+    }
+    console.error("Invoice pay link failed", error.status, error.code || "", error.stripeMessage || error.message);
+    throw new ConnectError("Stripe could not create the payment page. Please try again.", 502);
+  });
   await setDocument(`taxBizPayments/${checkout.id}`, {
     tenantId: TAX_TENANT, clientId: session.uid, invoiceId, customerName: invoice.customerName, description: invoice.description,
     amountCents: invoice.amountCents, setAsidePercent: percent, status: "OPEN", stripeAccountId: acct, createdAt: new Date().toISOString(),

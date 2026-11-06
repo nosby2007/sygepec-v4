@@ -1,5 +1,7 @@
 import { publishedBusinesses } from "@/lib/business-booking";
 import { publicEntries } from "@/lib/cms";
+import { SOFTWARE_SERVICES } from "@/lib/software-services";
+import { platformVisibility } from "@/lib/platform-visibility";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
 const url = (path) => new URL(path, SITE).toString();
@@ -11,7 +13,10 @@ export default async function sitemap() {
   const [services, posts, pages, team, updates, businesses] = await Promise.all([
     publicEntries("SERVICE"), publicEntries("POST"), publicEntries("PAGE"), publicEntries("TEAM"), publicEntries("UPDATE"), publishedBusinesses(),
   ]);
-  const fixed = ["/", "/services", "/blog", "/estimator", "/business", "/business/directory", "/contact", "/login", "/register"];
+  const fixed = ["/", "/tax", "/training", "/compliance", "/software", ...SOFTWARE_SERVICES.map((s) => `/software/${s.slug}`), "/services", "/blog", "/estimator", "/business", "/business/directory", "/contact", "/login", "/register"];
+  const v = await platformVisibility();
+  if (v.ehr) fixed.push("/ehr");
+  if (v.find) fixed.push("/find");
   if (team.length) fixed.push("/team");
   if (updates.length) fixed.push("/updates");
   return [

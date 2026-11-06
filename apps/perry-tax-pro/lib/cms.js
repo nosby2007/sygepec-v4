@@ -195,7 +195,12 @@ export async function saveSiteSettings(session, input) {
 
 // ---- Contact form -----------------------------------------------------------------
 
-export const CONTACT_TOPICS = ["Individual return", "Self-employed / gig work", "Small business", "IRS notice", "Something else"];
+export const CONTACT_TOPICS = [
+  "Individual return", "Self-employed / gig work", "Small business", "IRS notice",
+  // InnovaCare Software pages (see topicFor in lib/platform.js).
+  "Software project", "InnovaCare Training", "Compliance training", "Health records (EHR)", "List my business",
+  "Something else",
+];
 
 export async function submitContactMessage(input, { ip = "unknown" } = {}) {
   if (input.company || (Number(input.startedAt) && Date.now() - Number(input.startedAt) < 2500)) throw new CmsError("Please try again.");
