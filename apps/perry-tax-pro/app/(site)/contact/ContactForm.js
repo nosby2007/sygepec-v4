@@ -2,8 +2,8 @@
 import { useState } from "react";
 import Icon from "@/components/Icon";
 
-export default function ContactForm({ topics }) {
-  const [f, setF] = useState({ name: "", email: "", phone: "", topic: topics[0], message: "", company: "" });
+export default function ContactForm({ topics, initialTopic = null, initialMessage = "" }) {
+  const [f, setF] = useState({ name: "", email: "", phone: "", topic: topics.includes(initialTopic) ? initialTopic : topics[0], message: initialMessage, company: "" });
   const [startedAt] = useState(() => Date.now());
   const [state, setState] = useState({});
   const set = (key) => (e) => setF({ ...f, [key]: e.target.value });

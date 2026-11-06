@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MobileMenu from "@/components/MobileMenu";
 import { taxUrl } from "@/lib/platform";
+import { platformVisibility } from "@/lib/platform-visibility";
 import "../(site)/site.css";
 import "./platform.css";
 
@@ -16,17 +17,21 @@ function PlatformLogo() {
   );
 }
 
-const nav = () => [
+const nav = (v) => [
   [taxUrl(), "InnovaTax"],
   ["/training", "Training"],
   ["/compliance", "Compliance"],
-  ["/ehr", "EHR"],
+  v.ehr && ["/ehr", "EHR"],
   ["/software", "Software"],
-  ["/find", "Find a service"],
-];
+  v.find && ["/find", "Find a service"],
+].filter(Boolean);
 
-export default function PlatformLayout({ children }) {
-  const links = nav();
+export const dynamic = "force-dynamic";
+
+export default async function PlatformLayout({ children }) {
+  const v = await platformVisibility();
+  const links = nav(v);
+  const cta = v.find ? ["/find", "Find a service"] : ["/contact?about=Software%20project", "Contact us"];
   return (
     <div className="pub plat">
       <header className="site-header">
@@ -37,7 +42,7 @@ export default function PlatformLayout({ children }) {
           </nav>
           <div className="row nowrap">
             <Link href={taxUrl("/login")} className="pub-login">Log in</Link>
-            <Link href="/find" className="btn btn-primary btn-sm hide-sm">Find a service</Link>
+            <Link href={cta[0]} className="btn btn-primary btn-sm hide-sm">{cta[1]}</Link>
             <MobileMenu links={[...links, [taxUrl("/login"), "Log in"]]} />
           </div>
         </div>
@@ -48,16 +53,16 @@ export default function PlatformLayout({ children }) {
           <div className="footer-grid">
             <div>
               <PlatformLogo />
-              <p className="small mt" style={{ maxWidth: 340 }}>Software for tax, training, compliance, health records and local services, under one roof.</p>
+              <p className="small mt" style={{ maxWidth: 340 }}>Software for tax, training, compliance and care organizations, under one roof.</p>
             </div>
             <div>
               <h4>Products</h4>
               <Link href={taxUrl()}>InnovaTax</Link>
               <Link href="/training">InnovaCare Training</Link>
               <Link href="/compliance">Compliance training</Link>
-              <Link href="/ehr">Health records</Link>
+              {v.ehr && <Link href="/ehr">Health records</Link>}
               <Link href="/software">Software services</Link>
-              <Link href="/find">Find a service</Link>
+              {v.find && <Link href="/find">Find a service</Link>}
             </div>
             <div>
               <h4>Businesses</h4>
