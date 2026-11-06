@@ -14,10 +14,12 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-// Every word typed must appear in the business's name, tagline or town.
+// Every word typed must appear in the business's name, tagline or town. Words are cut
+// to their root, so "braids" finds "Braiding" and "doctors" finds "doctor".
+const root = (w) => (w.length > 5 ? w.replace(/(ing|es|s)$/, "") : w.replace(/s$/, ""));
 const matches = (b, words) => {
   const text = `${b.name} ${b.tagline} ${b.city} ${b.state}`.toLowerCase();
-  return words.every((w) => text.includes(w));
+  return words.every((w) => text.includes(root(w)));
 };
 
 export default async function FindPage({ searchParams }) {
