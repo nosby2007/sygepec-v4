@@ -2,6 +2,7 @@ import { publishedBusinesses } from "@/lib/business-booking";
 import { mediaUrl } from "@/lib/business-display";
 import { publicEntries } from "@/lib/cms";
 import { SOFTWARE_SERVICES } from "@/lib/software-services";
+import { platformVisibility } from "@/lib/platform-visibility";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 const url = (path) => new URL(path, SITE).toString();
@@ -18,8 +19,6 @@ export default async function sitemap() {
   const fixed = [
     { path: "/", changeFrequency: "weekly", priority: 1, images: image("/photos/software/hero.jpg") },
     { path: "/tax", changeFrequency: "weekly", priority: 0.9, images: image("/photos/consult.jpg") },
-    { path: "/ehr", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/cloud.jpg") },
-    { path: "/find", changeFrequency: "weekly", priority: 0.8, images: image("/photos/shop.jpg") },
     { path: "/training", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/training.jpg") },
     { path: "/compliance", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/compliance.jpg") },
     { path: "/software", changeFrequency: "monthly", priority: 0.9, images: image("/photos/software/hero.jpg") },
@@ -31,6 +30,9 @@ export default async function sitemap() {
     { path: "/business/directory", changeFrequency: "weekly", priority: 0.8, images: image("/photos/owner.jpg") },
     { path: "/contact", changeFrequency: "monthly", priority: 0.7, images: image("/photos/consult.jpg") },
   ];
+  const visibility = await platformVisibility();
+  if (visibility.ehr) fixed.push({ path: "/ehr", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/cloud.jpg") });
+  if (visibility.find) fixed.push({ path: "/find", changeFrequency: "weekly", priority: 0.8, images: image("/photos/shop.jpg") });
   if (team.length) fixed.push({ path: "/team", changeFrequency: "monthly", priority: 0.6, images: image("/photos/consult.jpg") });
   if (updates.length) fixed.push({ path: "/updates", changeFrequency: "weekly", priority: 0.7, images: image("/photos/paperwork.jpg") });
   return [

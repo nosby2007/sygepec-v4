@@ -3,6 +3,7 @@ import Markdown from "@/components/Markdown";
 import { PageHero } from "@/components/CmsViews";
 import { CONTACT_TOPICS, getSiteSettings, publicEntry } from "@/lib/cms";
 import ContactForm from "./ContactForm";
+import { contactTopicFor } from "@/lib/platform";
 
 export const metadata = {
   title: "Contact",
@@ -10,13 +11,16 @@ export const metadata = {
   alternates: { canonical: "/contact" },
 };
 
-export default async function ContactPage() {
+export default async function ContactPage({ searchParams }) {
+  // Links from the InnovaCare Software pages say what the visitor is interested in.
+  const about = String((await searchParams)?.about || "").trim().slice(0, 80);
+  const topic = contactTopicFor(about);
   const [page, site] = await Promise.all([publicEntry("PAGE", "contact"), getSiteSettings()]);
   return (
     <main className="section container" style={{ paddingTop: 48 }}>
       <PageHero eyebrow="Contact" title={page?.title || "Get in touch"} summary={page?.summary || "Send us a message and we'll get back to you."} />
       <div className="grid-main" style={{ alignItems: "start" }}>
-        <ContactForm topics={CONTACT_TOPICS} />
+        <ContactForm topics={CONTACT_TOPICS} initialTopic={topic} initialMessage={about ? `About: ${about}\n\n` : ""} />
         <aside className="stack">
           {(site.phone || site.email || site.address || site.hours) && (
             <div className="card stack-sm">

@@ -81,4 +81,15 @@ export const SERVICE_CATEGORIES = [
   { q: "auto", label: "Auto repair", icon: "car" },
 ];
 
+// The contact topic for a link's ?about= value, so each message says what it is about.
+export function contactTopicFor(about) {
+  const a = String(about || "").toLowerCase();
+  if (!a) return null;
+  if (a.includes("training") && !a.includes("compliance")) return "InnovaCare Training";
+  if (a.includes("compliance")) return "Compliance training";
+  if (a.includes("clinic") || a.includes("camerohealth") || a.includes("health record")) return "Health records (EHR)";
+  if (a.includes("business")) return "List my business";
+  return "Software project";
+}
+
 export const isExternal = (href) => /^https?:\/\//i.test(String(href || ""));

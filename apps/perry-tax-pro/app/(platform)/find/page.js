@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import { notFound } from "next/navigation";
 import { publishedBusinesses } from "@/lib/business-booking";
 import { mediaUrl } from "@/lib/business-display";
 import { SERVICE_CATEGORIES } from "@/lib/platform";
@@ -23,6 +24,8 @@ export default async function FindPage({ searchParams }) {
   const q = String((await searchParams)?.q || "").trim().slice(0, 60);
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const all = await publishedBusinesses();
+  // Hidden until the first provider is published, so visitors never land on an empty list.
+  if (all.length === 0) notFound();
   const shown = words.length ? all.filter((b) => matches(b, words)) : all;
   return (
     <main>
