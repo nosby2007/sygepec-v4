@@ -23,8 +23,8 @@ as custom domains and create the DNS records Firebase gives you. Then set `TAX_S
 | Variable | Card | Without it |
 | --- | --- | --- |
 | `TAX_SITE_URL` | InnovaTax, e.g. `https://tax.<domain>` | `/tax` |
-| `TRAINING_URL` | InnovaCare Training | Coming soon, contact form |
-| `COMPLIANCE_URL` | Compliance | Coming soon, contact form |
+| `TRAINING_URL` | Button on /training (InnovaCare Training, exam review) | Contact form |
+| `COMPLIANCE_URL` | Button on /compliance (compliance training platform) | Contact form |
 | `CLINIC_URL` | InnovaSoftware Clinic | Coming soon, contact form |
 | `CAMEROHEALTH_URL` | CameroHealth | Coming soon, contact form |
 

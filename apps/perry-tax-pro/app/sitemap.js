@@ -20,6 +20,8 @@ export default async function sitemap() {
     { path: "/tax", changeFrequency: "weekly", priority: 0.9, images: image("/photos/consult.jpg") },
     { path: "/ehr", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/cloud.jpg") },
     { path: "/find", changeFrequency: "weekly", priority: 0.8, images: image("/photos/shop.jpg") },
+    { path: "/training", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/training.jpg") },
+    { path: "/compliance", changeFrequency: "monthly", priority: 0.8, images: image("/photos/software/compliance.jpg") },
     { path: "/software", changeFrequency: "monthly", priority: 0.9, images: image("/photos/software/hero.jpg") },
     ...SOFTWARE_SERVICES.map((service) => ({ path: `/software/${service.slug}`, changeFrequency: "monthly", priority: 0.8, images: image(service.image) })),
     { path: "/services", changeFrequency: "monthly", priority: 0.9, images: image("/photos/family.jpg") },

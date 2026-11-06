@@ -18,8 +18,8 @@ function PlatformLogo() {
 
 const nav = () => [
   [taxUrl(), "InnovaTax"],
-  ["/#education", "Training"],
-  ["/#compliance", "Compliance"],
+  ["/training", "Training"],
+  ["/compliance", "Compliance"],
   ["/ehr", "EHR"],
   ["/software", "Software"],
   ["/find", "Find a service"],
@@ -53,6 +53,8 @@ export default function PlatformLayout({ children }) {
             <div>
               <h4>Products</h4>
               <Link href={taxUrl()}>InnovaTax</Link>
+              <Link href="/training">InnovaCare Training</Link>
+              <Link href="/compliance">Compliance training</Link>
               <Link href="/ehr">Health records</Link>
               <Link href="/software">Software services</Link>
               <Link href="/find">Find a service</Link>
