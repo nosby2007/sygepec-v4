@@ -95,3 +95,11 @@ test("reading consent is versioned in the answers", () => {
   assert.equal(sanitizeIntake({ documentReading: { version: "old", at: "2026-11-11T00:00:00Z" } }).documentReading, null);
   assert.equal(sanitizeIntake({ documentReading: { version: READING_CONSENT, at: "2026-11-11T00:00:00Z" } }).documentReading.version, READING_CONSENT);
 });
+
+test("a withholding that repeats the payment is left blank with a note", () => {
+  const r = cleanReading("1099INT", { interest: "312.44", fedWithheld: "312.44", issuer: "Bank", issuerIdLast4: "", isThisForm: true, note: "" });
+  assert.equal(r.values.interest, "312.44");
+  assert.equal(r.values.fedWithheld, "");
+  assert.match(r.note, /Federal income tax withheld/);
+  assert.equal(cleanReading("W2", { wages: "1000", fedWithheld: "100", isThisForm: true }).values.fedWithheld, "100");
+});

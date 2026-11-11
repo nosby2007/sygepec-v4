@@ -200,11 +200,82 @@ function FormUpload({ type, returnId, reader, consent, onConsent, onUploaded, on
   );
 }
 
-function FormEditor({ type, forms, documents, onChange, disabled, spouseAllowed, returnId, reader, consent, onConsent, onUploaded }) {
+// Several documents at once: each is uploaded, recognised (W-2, 1099...) and turned into a
+// pre-filled form entry to check. Without a reader, files go to the preparer.
+function BulkUpload({ returnId, reader, consent, onConsent, onUploaded, onForm, disabled }) {
+  const input = useRef(null);
+  const [rows, setRows] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const setRow = (i, patch) => setRows((list) => list.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  const run = async (files) => {
+    const list = [...(files || [])].slice(0, 15);
+    if (!list.length) return;
+    setBusy(true);
+    const start = rows.length;
+    setRows((r) => [...r, ...list.map((f) => ({ name: f.name, text: "Waiting…" }))]);
+    for (const [n, file] of list.entries()) {
+      const i = start + n;
+      setRow(i, { text: "Uploading…" });
+      const body = new FormData();
+      body.append("returnId", returnId);
+      body.append("type", "OTHER");
+      body.append("file", file);
+      const res = await fetch("/api/documents", { method: "POST", body }).catch(() => null);
+      const data = await res?.json().catch(() => ({}));
+      if (!res?.ok) { setRow(i, { text: data?.error || "Not uploaded. Please try again.", bad: true }); continue; }
+      if (!reader || !consent) {
+        onUploaded({ id: data.id, type: "OTHER", filename: file.name });
+        setRow(i, { text: "Saved for your preparer.", ok: true });
+        continue;
+      }
+      setRow(i, { text: "Reading…" });
+      const r = await fetch(`/api/returns/${returnId}/read-document`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: data.id, consent: true }) }).catch(() => null);
+      const result = await r?.json().catch(() => ({}));
+      onUploaded({ id: data.id, type: result?.docType || "OTHER", filename: file.name });
+      if (!r?.ok) { setRow(i, { text: `${result?.error || "Not read."} Saved for your preparer.`, bad: true }); continue; }
+      if (result.formType === "UNKNOWN") { setRow(i, { text: "Not recognised as a tax form. Saved for your preparer.", warn: true }); continue; }
+      onForm(result);
+      const label = FORM_TYPES[result.formType]?.label || result.formType;
+      setRow(i, { text: `${label}${result.values.issuer ? ` from ${result.values.issuer}` : ""}: ${result.filled} box${result.filled === 1 ? "" : "es"} filled. Check it on its screen.`, ok: true });
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="ix-upload">
+      <div className="ix-upload-head">
+        <span className="ix-card-icon"><Icon name="upload" size={20} /></span>
+        <div>
+          <b>Upload your tax documents</b>
+          <small>{reader ? "W-2, 1099-NEC, 1099-K, 1099-INT, 1099-DIV, 1099-B, 1099-G, 1099-R, SSA-1099, 1098, 1095-A, K-1. Several at once." : "PDF or photos, several at once. They go to your preparer."}</small>
+        </div>
+        <button type="button" id="bulk-upload" className="btn btn-primary btn-sm" onClick={() => input.current?.click()} disabled={disabled || busy}>{busy ? "Working…" : "Choose files"}</button>
+        <input ref={input} type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp,image/heic" hidden onChange={(e) => { run(e.target.files); e.target.value = ""; }} />
+      </div>
+      {reader && (
+        <Check
+          label={`Let ${reader} read my uploaded tax forms to fill the boxes`}
+          hint={`Each file is sent to ${reader} only to read it. Your Social Security number is never asked for or kept. You can type the amounts instead.`}
+          checked={Boolean(consent)} onChange={onConsent} disabled={disabled}
+        />
+      )}
+      {rows.length > 0 && (
+        <ul className="ix-upload-list" aria-live="polite">
+          {rows.map((r, k) => (
+            <li key={k} className={r.bad ? "bad" : r.warn ? "warn" : r.ok ? "ok" : ""}>
+              <Icon name={r.bad || r.warn ? "alert" : r.ok ? "check" : "clock"} size={14} />
+              <span><b>{r.name}</b> {r.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function FormEditor({ type, forms, documents, onChange, disabled, spouseAllowed, returnId, reader, consent, onConsent, onUploaded, toCheck, setToCheck }) {
   const def = FORM_TYPES[type];
   const mine = forms.filter((f) => f.type === type);
   const docs = (documents || []).filter((d) => d.type === FORM_DOC[type]);
-  const [toCheck, setToCheck] = useState({});
   const update = (id, key, value) => onChange((all) => all.map((f) => (f.id === id ? { ...f, [key]: value } : f)));
   const add = () => onChange((all) => [...all, { id: newFormId(), type, owner: "taxpayer", issuer: "", state: "" }]);
   const remove = (id) => onChange((all) => all.filter((f) => f.id !== id));
@@ -288,6 +359,7 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
   const router = useRouter();
   const [d, setD] = useState(initial);
   const [documents, setDocuments] = useState(initialDocuments || []);
+  const [toCheck, setToCheck] = useState({});
   const readOnly = Boolean(locked || frozenReason);
   const hasPrior = Boolean(prior);
   const steps = useMemo(() => buildSteps(d, { hasPrior }), [d, hasPrior]);
@@ -426,6 +498,31 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
   const dismiss = (code) => set(["diagnostics", "dismissed"], [...new Set([...(d.diagnostics?.dismissed || []), code])]);
   const formsFor = (type) => d.forms.filter((f) => f.type === type);
   const suggestion = suggestStatus(d);
+
+  // A recognised document becomes a form entry to check, and ticks the matching topic so
+  // its screen and the double-check follow.
+  const TOPIC_FOR = { "1098E": ["expenses", "EDUCATION"], "1098T": ["expenses", "EDUCATION"] };
+  const addReadForm = (result) => {
+    if (readOnly) return;
+    const id = newFormId();
+    setToCheck((t) => ({ ...t, [id]: { isThisForm: result.isThisForm, note: result.note } }));
+    setD((prev) => {
+      const next = { ...prev, forms: [...prev.forms, { id, type: result.formType, owner: "taxpayer", issuer: "", state: "", ...result.values, documentId: result.documentId }] };
+      const found = TOPIC_FOR[result.formType] || Object.entries(TOPICS).flatMap(([g, list]) => list.filter((t) => t.form === result.formType).map((t) => [g, t.key]))[0];
+      if (found && !prev.topics[found[0]].includes(found[1])) next.topics = { ...prev.topics, [found[0]]: [...prev.topics[found[0]], found[1]] };
+      if (result.formType === "1095A") next.other = { ...prev.other, marketplace: "yes" };
+      return next;
+    });
+    schedule();
+  };
+  const bulk = !readOnly && (
+    <BulkUpload
+      returnId={returnId} reader={reader} consent={Boolean(d.documentReading)} disabled={readOnly}
+      onConsent={(v) => set(["documentReading"], v ? { version: READING_CONSENT, at: new Date().toISOString() } : null)}
+      onUploaded={(doc) => setDocuments((list) => [...list, doc])}
+      onForm={addReadForm}
+    />
+  );
 
   let title = "", lead = "", body = null, primary = null;
   switch (step.id) {
@@ -584,8 +681,10 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
       break;
     case "income-intro":
       title = "Now, your income";
-      lead = "First you pick what applies, then you enter each form. Approximate is fine if you do not have a form yet.";
-      body = <div className="ix-facts"><div><Icon name="file" size={18} /><span><b>One entry per form</b><small>Two W-2s? Add both. Totals are calculated for you.</small></span></div></div>;
+      lead = reader
+        ? "Upload your W-2s, 1099s and other income documents: we recognise each one and fill its boxes for you to check. Or pick what applies and type it on the next screens."
+        : "Upload your W-2s, 1099s and other documents for your preparer, then pick what applies and enter each form.";
+      body = <div className="stack">{bulk}<div className="ix-facts"><div><Icon name="file" size={18} /><span><b>One entry per form</b><small>Two W-2s? Add both. Totals are calculated for you.</small></span></div></div></div>;
       break;
     case "topics-income": case "topics-additional": case "topics-investments": case "topics-expenses": {
       const g = TOPIC_GROUPS.find((x) => x.key === step.group);
@@ -618,7 +717,7 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
     case "deductions-intro":
       title = "Let's look at deductions and credits";
       lead = "Some expenses lower your taxable income. We compare them with the standard deduction for you.";
-      body = <div className="ix-facts"><div><Icon name="home" size={18} /><span><b>Standard deduction for you: {money(estimate.standardDeduction)}</b><small>Most people take it. Itemizing helps only when your deductible expenses are larger.</small></span></div></div>;
+      body = <div className="stack"><div className="ix-facts"><div><Icon name="home" size={18} /><span><b>Standard deduction for you: {money(estimate.standardDeduction)}</b><small>Most people take it. Itemizing helps only when your deductible expenses are larger.</small></span></div></div>{bulk}</div>;
       break;
     case "expense-amounts": {
       const ex = new Set(d.topics.expenses);
@@ -872,6 +971,7 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
             returnId={returnId} reader={reader} consent={Boolean(d.documentReading)}
             onConsent={(v) => set(["documentReading"], v ? { version: READING_CONSENT, at: new Date().toISOString() } : null)}
             onUploaded={(doc) => setDocuments((list) => [...list, doc])}
+            toCheck={toCheck} setToCheck={setToCheck}
           />
         );
       }

@@ -40,7 +40,8 @@ export function readingPrompt(type) {
   const def = FORM_TYPES[type];
   return [
     `You read a U.S. tax document that should be Form ${def.label} (${def.title}) for tax year 2026 or the year shown.`,
-    "Copy the requested boxes exactly as printed. Do not compute, guess or round. Leave a value empty when the box is blank or unreadable.",
+    "Copy the requested boxes exactly as printed. Do not compute, guess or round.",
+    "Each value must be the amount printed inside that box, next to its box number. If a box has no amount printed in it, its value is an empty string. Never repeat an amount from another box.",
     "Never return a Social Security number, a full employer identification number, an account number or a name of the employee.",
     "If the document has several copies of the same form (Copy B, C, 2), read one copy only.",
     "Answer only with the JSON object.",
@@ -61,8 +62,19 @@ export function cleanReading(type, raw) {
     const st = text(source.state, 2).toUpperCase();
     values.state = /^[A-Z]{2}$/.test(st) ? st : "";
   }
+  // Withholding never equals the whole payment on a real form: a reader that repeats the
+  // main amount in a withholding box misread the layout. Leave it for the client to type.
+  const notes = [text(source.note, 200)].filter(Boolean);
+  const main = def.main && Number(values[def.main]);
+  for (const k of ["fedWithheld", "stateWithheld"]) {
+    if (main > 0 && k in values && Number(values[k]) === main) {
+      const label = def.fields.find(([f]) => f === k)?.[1] || k;
+      values[k] = "";
+      notes.push(`Check "${label}": it could not be read reliably.`);
+    }
+  }
   const filled = def.fields.filter(([k]) => values[k] !== "").length;
-  return { values, isThisForm: source.isThisForm === true, note: text(source.note, 200), filled };
+  return { values, isThisForm: source.isThisForm === true, note: notes.join(" ").slice(0, 300), filled };
 }
 
 // JSON can arrive wrapped in a code fence from some models.
@@ -70,3 +82,30 @@ export function parseJsonAnswer(textValue) {
   const s = String(textValue || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
   try { return JSON.parse(s); } catch { return null; }
 }
+
+// Forms the reader can recognise from a file dropped anywhere in the questionnaire.
+export const DETECTABLE_TYPES = ["W2", "1099NEC", "1099K", "1099INT", "1099DIV", "1099B", "1099G", "1099R", "SSA1099", "1098", "1098E", "1098T", "1095A", "K1", "UNKNOWN"];
+
+export function classifySchema() {
+  return {
+    type: "object",
+    properties: {
+      formType: { type: "string", enum: DETECTABLE_TYPES, description: "The IRS form this document is. UNKNOWN if none of the list or unreadable." },
+    },
+    required: ["formType"],
+    additionalProperties: false,
+  };
+}
+
+export function classifyPrompt() {
+  return [
+    "Which U.S. tax form is this document? Look at the form number printed on it.",
+    "W2 = Form W-2. 1099NEC, 1099K, 1099INT, 1099DIV, 1099B, 1099G, 1099R = those Forms 1099. SSA1099 = Social Security benefit statement.",
+    "1098 = mortgage interest, 1098E = student loan interest, 1098T = tuition, 1095A = Health Insurance Marketplace statement, K1 = Schedule K-1.",
+    "A consolidated brokerage statement with dividends, interest and sales: choose 1099B. Anything else: UNKNOWN.",
+    "Answer only with the JSON object.",
+  ].join("\n");
+}
+
+// Document type (upload list) for each form type.
+export const FORM_DOC_TYPE = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL" };
