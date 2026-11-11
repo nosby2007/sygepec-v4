@@ -4,7 +4,7 @@
 // The reader returns only the boxes of that form type. Identity numbers are never asked
 // for: no SSN, and only the last 4 digits of the payer's EIN. Every value is cleaned like
 // a typed value, and the client checks each box before keeping it.
-import { FORM_TYPES, moneyText, text } from "@/lib/intake-schema";
+import { FORM_TYPES, formAmounts, moneyText, text } from "@/lib/intake-schema";
 
 export { READING_CONSENT as READING_CONSENT_VERSION } from "@/lib/intake-schema";
 // Formats every reader accepts. HEIC photos are stored but filled by hand.
@@ -18,7 +18,7 @@ export function readableFields(type) {
     ["issuer", def.issuerLabel],
     ["issuerIdLast4", "Last 4 digits of the payer's federal identification number (EIN), digits only, or empty"],
     ...(def.state ? [["state", "Two-letter U.S. state code shown on the form for state wages or withholding, or empty"]] : []),
-    ...def.fields.map(([k, label]) => [k, `${label}. Amount in U.S. dollars, digits and a decimal point only, no $ or commas, empty if blank`]),
+    ...formAmounts(def).map(([k, label]) => [k, `${label}. Amount in U.S. dollars, digits and a decimal point only, no $ or commas, empty if blank`]),
     ...(def.text || []).map(([k, label]) => [k, label]),
   ];
 }
@@ -54,7 +54,7 @@ export function cleanReading(type, raw) {
   const def = FORM_TYPES[type];
   const source = raw && typeof raw === "object" ? raw : {};
   const values = {};
-  for (const [k] of def.fields) values[k] = moneyText(source[k]);
+  for (const [k] of formAmounts(def)) values[k] = moneyText(source[k]);
   for (const [k, , max] of def.text || []) values[k] = text(source[k], max);
   values.issuer = text(source.issuer, 100);
   values.issuerIdLast4 = String(source.issuerIdLast4 ?? "").replace(/\D/g, "").slice(-4);
@@ -84,7 +84,7 @@ export function parseJsonAnswer(textValue) {
 }
 
 // Forms the reader can recognise from a file dropped anywhere in the questionnaire.
-export const DETECTABLE_TYPES = ["W2", "1099NEC", "1099K", "1099INT", "1099DIV", "1099B", "1099G", "1099R", "SSA1099", "1098", "1098E", "1098T", "1095A", "K1", "UNKNOWN"];
+export const DETECTABLE_TYPES = ["W2", "1099NEC", "1099K", "1099INT", "1099DIV", "1099B", "1099G", "1099R", "SSA1099", "1098", "1098E", "1098T", "1095A", "K1", "1099MISC", "UNKNOWN"];
 
 export function classifySchema() {
   return {
@@ -101,11 +101,11 @@ export function classifyPrompt() {
   return [
     "Which U.S. tax form is this document? Look at the form number printed on it.",
     "W2 = Form W-2. 1099NEC, 1099K, 1099INT, 1099DIV, 1099B, 1099G, 1099R = those Forms 1099. SSA1099 = Social Security benefit statement.",
-    "1098 = mortgage interest, 1098E = student loan interest, 1098T = tuition, 1095A = Health Insurance Marketplace statement, K1 = Schedule K-1.",
+    "1098 = mortgage interest, 1098E = student loan interest, 1098T = tuition, 1095A = Health Insurance Marketplace statement, K1 = Schedule K-1, 1099MISC = Form 1099-MISC.",
     "A consolidated brokerage statement with dividends, interest and sales: choose 1099B. Anything else: UNKNOWN.",
     "Answer only with the JSON object.",
   ].join("\n");
 }
 
 // Document type (upload list) for each form type.
-export const FORM_DOC_TYPE = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL" };
+export const FORM_DOC_TYPE = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL", "1099MISC": "1099MISC" };

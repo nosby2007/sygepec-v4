@@ -11,7 +11,7 @@ import { US_STATES } from "@/lib/tax-rules";
 import { buildChecklist, intakeToEstimate } from "@/lib/tax";
 
 const SAVE_DELAY = 1200;
-const FORM_DOC = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL" };
+const FORM_DOC = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL", "1099MISC": "1099MISC" };
 const RELATIONSHIPS = ["Son", "Daughter", "Stepchild", "Foster child", "Grandchild", "Brother or sister", "Niece or nephew", "Parent", "Other relative", "Other household member"];
 const sectionLabel = (key) => SECTIONS.find((s) => s.key === key)?.label || key;
 
@@ -320,6 +320,13 @@ function FormEditor({ type, forms, documents, onChange, disabled, spouseAllowed,
             {def.fields.map(([k, label]) => <MoneyField key={k} label={label} value={f[k]} onChange={(v) => update(f.id, k, v)} disabled={disabled} />)}
             {def.state && <StateSelect label="State on the form (if any)" value={f.state} onChange={(v) => update(f.id, "state", v)} disabled={disabled} />}
           </div>
+          {def.more?.length > 0 && (
+            <details className="ix-details" open={def.more.some(([k]) => f[k])}>
+              <summary>More boxes on this form</summary>
+              <p className="small muted">Fill these when your form shows them. They can lower your tax or move part of it to the right line.</p>
+              <div className="grid-2">{def.more.map(([k, label]) => <MoneyField key={k} label={label} value={f[k]} onChange={(v) => update(f.id, k, v)} disabled={disabled} />)}</div>
+            </details>
+          )}
           {(def.flags || []).map(([k, label]) => <Check key={k} label={label} checked={f[k]} onChange={(v) => update(f.id, k, v)} disabled={disabled} />)}
           <div className="row between ix-form-foot">
             {docs.length > 0 ? (

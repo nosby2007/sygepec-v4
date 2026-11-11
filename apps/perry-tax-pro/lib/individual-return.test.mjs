@@ -12,7 +12,7 @@ const R = federalRules(2026);
 
 test("2026 rule set names its source and status", () => {
   assert.equal(R.id, "US-FED-2026");
-  assert.equal(R.status, "ESTIMATE");
+  assert.equal(R.status, "TESTED");
   assert.match(R.sources[0].url, /rp-25-32\.pdf$/);
   assert.equal(federalRules(2019), null);
 });
