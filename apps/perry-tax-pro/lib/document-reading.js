@@ -56,7 +56,7 @@ async function askOpenAI({ prompt, schema, mime, base64, filename }, { fetcher }
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ReadingError(`OpenAI refused the request (${response.status}).`, 502);
+  if (!response.ok) throw new ReadingError(`The reading service refused the request (${response.status}).`, 502);
   const out = (data.output || []).flatMap((o) => o.content || []).find((c) => c.type === "output_text");
   return parseJsonAnswer(out?.text);
 }
@@ -82,7 +82,7 @@ async function askGemini(input, { fetcher }) {
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ReadingError(`Google Gemini refused the request (${response.status}).`, 502);
+  if (!response.ok) throw new ReadingError(`The reading service refused the request (${response.status}).`, 502);
   return geminiText(data);
 }
 
@@ -97,8 +97,8 @@ async function askVertex(input, { fetcher, token }) {
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
-  if (response.status === 403) throw new ReadingError("Automatic reading is not allowed yet on Google Cloud (Vertex AI access missing). Please type the amounts.", 503);
-  if (!response.ok) throw new ReadingError(`Google Cloud refused the request (${response.status}).`, 502);
+  if (response.status === 403) throw new ReadingError("Automatic reading is not available right now. Please type the amounts.", 503);
+  if (!response.ok) throw new ReadingError(`The reading service refused the request (${response.status}).`, 502);
   return geminiText(data);
 }
 

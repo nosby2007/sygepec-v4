@@ -186,8 +186,8 @@ function FormUpload({ type, returnId, reader, consent, onConsent, onUploaded, on
       </div>
       {reader && (
         <Check
-          label={`Let ${reader} read my uploaded tax forms to fill the boxes`}
-          hint={`The file is sent to ${reader} only to read it. Your Social Security number is never asked for or kept. You can type the amounts instead.`}
+          label="Read my uploaded tax forms automatically to fill the boxes"
+          hint="The file is read by a secure automated service only to fill the boxes. Your Social Security number is never asked for or kept. You can type the amounts instead."
           checked={Boolean(consent)} onChange={onConsent} disabled={disabled}
         />
       )}
@@ -253,8 +253,8 @@ function BulkUpload({ returnId, reader, consent, onConsent, onUploaded, onForm, 
       </div>
       {reader && (
         <Check
-          label={`Let ${reader} read my uploaded tax forms to fill the boxes`}
-          hint={`Each file is sent to ${reader} only to read it. Your Social Security number is never asked for or kept. You can type the amounts instead.`}
+          label="Read my uploaded tax forms automatically to fill the boxes"
+          hint="Each file is read by a secure automated service only to fill the boxes. Your Social Security number is never asked for or kept. You can type the amounts instead."
           checked={Boolean(consent)} onChange={onConsent} disabled={disabled}
         />
       )}
