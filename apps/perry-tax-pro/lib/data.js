@@ -57,6 +57,7 @@ function documentDto(row) {
     size: row.size,
     uploaded_by: row.uploadedBy,
     created_at: row.createdAt,
+    reading: row.reading ? { formType: row.reading.formType, taxYear: row.reading.taxYear || "", confidence: row.reading.confidence || "", values: row.reading.values || {} } : null,
   };
 }
 

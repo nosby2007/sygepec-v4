@@ -21,6 +21,7 @@ const view = (ctx) => ({
   review: ctx.review, issues: ctx.issues, problems: ctx.problems, states: ctx.states, comparison: ctx.comparison,
   estimate: ctx.estimate, reviewChecklist: ctx.reviewChecklist.map(({ key, label }) => ({ key, label })),
   changedSinceApproval: ctx.changedSinceApproval, priorYear: ctx.priorYear,
+  calculation: ctx.calculation, supplement: ctx.supplement, filingBlockers: ctx.filingBlockers.map((i) => i.code),
 });
 
 export async function GET(_req, { params }) {

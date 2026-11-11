@@ -4,11 +4,14 @@ import { audit } from "@/lib/audit";
 import { FROZEN_REVIEW } from "@/lib/constants";
 import { listClientReturns, listDocuments } from "@/lib/data";
 import { getDocument, mergeDocument, setDocument, TAX_TENANT } from "@/lib/firebase";
-import { compareYears, runDiagnostics, stateFilings } from "@/lib/intake-checks";
+import { compareYears } from "@/lib/intake-checks";
 import { sanitizeIntake } from "@/lib/intake-schema";
 import { cleanText } from "@/lib/security";
 import { serviceToken } from "@/lib/service-identity";
 import { buildChecklist, intakeToEstimate } from "@/lib/tax";
+import { doubleCheck, filingBlockers } from "@/lib/tax-engine/checks";
+import { computeReturn, estimateFromReturn } from "@/lib/tax-engine/index";
+import { sanitizeSupplement } from "@/lib/tax-engine/model";
 import { answersFingerprintSource, approvalProblems, checklistFor, transitionError } from "@/lib/review-rules";
 
 // Preparer review of an individual return.
@@ -47,10 +50,13 @@ export async function reviewContext(r) {
   ]);
   const priorReturn = history.find((x) => Number(x.tax_year) === taxYear - 1) || null;
   const prior = priorReturn ? sanitizeIntake(priorReturn.intake) : null;
-  const estimate = intakeToEstimate(intake, taxYear);
+  // Facts only a preparer adds (carryovers, allocations between states...).
+  const supplement = sanitizeSupplement(stored?.supplement);
+  const result = computeReturn(intake, taxYear, supplement);
+  const estimate = estimateFromReturn(result);
   const comparison = prior ? compareYears(intake, prior, { currentEstimate: estimate, priorEstimate: intakeToEstimate(prior, taxYear - 1) }) : null;
   const checklist = buildChecklist(intake);
-  const issues = runDiagnostics(intake, { estimate, documents, checklist, comparison, taxYear });
+  const issues = doubleCheck(intake, { result, estimate, documents, checklist, comparison, taxYear });
   const review = {
     status: r.review_status || "NOT_STARTED",
     checklist: stored?.checklist || {},
@@ -62,7 +68,14 @@ export async function reviewContext(r) {
   const changedSinceApproval = review.snapshot && FROZEN_REVIEW.includes(review.status) ? review.snapshot.fingerprint !== fingerprint(intake) : false;
   return {
     intake, taxYear, estimate, comparison, issues, documents, checklist, review, changedSinceApproval,
-    states: stateFilings(intake, taxYear),
+    states: result.states,
+    supplement,
+    calculation: {
+      federal: { ruleSet: result.federal.ruleSet, lines: result.federal.lines, trace: result.federal.trace, forms: result.federal.forms, unsupported: result.federal.unsupported, notes: result.federal.notes, summary: result.federal.summary, carryovers: result.federal.carryovers },
+      modules: result.modules,
+      readiness: result.readiness,
+    },
+    filingBlockers: filingBlockers(issues, review.resolved),
     reviewChecklist: checklistFor(intake),
     problems: approvalProblems({ intake, issues, resolved: review.resolved, checklist: review.checklist }),
     priorYear: priorReturn ? priorReturn.tax_year : null,
@@ -81,6 +94,7 @@ export async function updateReview(session, r, body) {
     notes: [...(stored.notes || [])],
     history: [...(stored.history || [])].slice(-200),
     snapshot: stored.snapshot || null,
+    supplement: stored.supplement || {},
   };
   const action = String(body?.action || "");
   const target = `taxReturns/${r.id}`;
@@ -100,6 +114,12 @@ export async function updateReview(session, r, body) {
     next.notes = next.notes.slice(-100);
     await saveReview(r.id, next);
     await audit(session, "REVIEW_UPDATED", { target, details: { note: true } });
+  } else if (action === "supplement") {
+    if (FROZEN_REVIEW.includes(ctx.review.status)) throw new ReviewError("Reopen the review to change the preparer entries: the figures are frozen.", 409);
+    next.supplement = sanitizeSupplement(body.supplement);
+    next.history.push(event(session, "SUPPLEMENT", { fields: Object.keys(next.supplement) }));
+    await saveReview(r.id, next);
+    await audit(session, "REVIEW_UPDATED", { target, details: { supplement: Object.keys(next.supplement) } });
   } else if (action === "resolve") {
     const code = cleanText(body.code, 80);
     if (!ctx.issues.some((i) => i.code === code)) throw new ReviewError("This item is no longer raised.");
@@ -127,6 +147,13 @@ export async function updateReview(session, r, body) {
       next.snapshot = {
         fingerprint: fingerprint(ctx.intake), rev: ctx.intake.rev, ruleSet: e.ruleSet, at: now, by: session.uid, byName: session.name || "Preparer",
         figures: { agi: e.agi, deduction: e.deduction, taxable: e.taxable, totalTax: e.totalTax, credits: e.credits, payments: e.payments, refund: e.refund },
+        // The whole calculation as approved: never recomputed, even when rules change later.
+        calculation: {
+          status: ctx.calculation.readiness.calculationStatus,
+          supplement: ctx.supplement,
+          federal: { ruleSet: ctx.calculation.federal.ruleSet, forms: ctx.calculation.federal.forms, lines: ctx.calculation.federal.lines },
+          states: ctx.states.filter((s) => s.calculation === "AVAILABLE").map((s) => ({ code: s.code, kind: s.kind, form: s.form, ruleSet: s.ruleSet, lines: s.lines })),
+        },
       };
     }
     next.history.push(event(session, "STATUS", { from, to, reason: reason || null }));

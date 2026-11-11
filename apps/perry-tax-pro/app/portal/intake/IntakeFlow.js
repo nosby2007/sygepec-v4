@@ -9,6 +9,8 @@ import { SECTIONS, buildSteps, firstStepOf, progressFor, stepIndex } from "@/lib
 import { LEVEL_LABEL, DISMISSIBLE, blockers, compareYears, openIssues, runDiagnostics, stateFilings } from "@/lib/intake-checks";
 import { US_STATES } from "@/lib/tax-rules";
 import { buildChecklist, intakeToEstimate } from "@/lib/tax";
+import { computeReturn, estimateFromReturn } from "@/lib/tax-engine/index";
+import { doubleCheck } from "@/lib/tax-engine/checks";
 
 const SAVE_DELAY = 1200;
 const FORM_DOC = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL", "1099MISC": "1099MISC" };
@@ -378,12 +380,13 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
 
   const step = steps[stepIndex(steps, stepId)];
   const progress = progressFor(steps, step.id);
-  const estimate = useMemo(() => intakeToEstimate(d, taxYear), [d, taxYear]);
+  const result = useMemo(() => computeReturn(d, taxYear), [d, taxYear]);
+  const estimate = useMemo(() => estimateFromReturn(result), [result]);
   const comparison = useMemo(() => (prior ? compareYears(d, prior, { currentEstimate: estimate, priorEstimate: intakeToEstimate(prior, taxYear - 1) }) : null), [d, prior, estimate, taxYear]);
   const checklist = useMemo(() => buildChecklist(d), [d]);
-  const issues = useMemo(() => runDiagnostics(d, { estimate, documents, checklist, comparison, taxYear }), [d, estimate, documents, checklist, comparison, taxYear]);
+  const issues = useMemo(() => doubleCheck(d, { result, estimate, documents, checklist, comparison, taxYear }), [d, result, estimate, documents, checklist, comparison, taxYear]);
   const visibleIssues = openIssues(issues, d.diagnostics?.dismissed);
-  const states = useMemo(() => stateFilings(d, taxYear), [d, taxYear]);
+  const states = result.states;
   const totals = incomeTotals(d);
 
   // ---- Saving: one request at a time, newest answers win, never out of order ------------
@@ -834,7 +837,25 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
               <div className="row between"><b>{s.name}</b><span className="badge s-DOCS_PENDING">{s.kind === "RESIDENT" ? "Resident" : s.kind === "PART_YEAR" ? "Part-year resident" : "Nonresident"}</span></div>
               <ul className="small">{s.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
               <div className="small muted">State withholding on your forms: {money(s.withheld)}</div>
-              <div className="ix-pending"><Icon name="info" size={14} /> State calculation pending validated rules. Your preparer prepares this return; no state amount is estimated here.</div>
+              {s.calculation === "AVAILABLE" ? (
+                <>
+                  <Breakdown rows={[
+                    ["Federal adjusted gross income", money(s.summary.federalAgi)],
+                    s.summary.adjustments !== 0 && [`${s.name} adjustments`, `${s.summary.adjustments < 0 ? "− " : "+ "}${money(Math.abs(s.summary.adjustments))}`, { sub: true }],
+                    s.kind !== "RESIDENT" && [`Income taxable to ${s.name}`, `${money(s.summary.georgiaIncome)} (${Math.round(s.summary.ratio * 100)}%)`],
+                    [`${s.summary.deductionType} deduction and exemptions`, `− ${money(s.kind === "RESIDENT" ? s.summary.deduction + s.summary.exemptions : s.lines["S3.13"])}`, { sub: true }],
+                    [`${s.name} taxable income`, money(s.summary.taxable), { total: true }],
+                    [`${s.name} tax`, money(s.summary.tax)],
+                    s.summary.credits > 0 && ["Credits", `− ${money(s.summary.credits)}`, { sub: true }],
+                    ["State tax withheld and paid", money(s.summary.payments)],
+                    [s.summary.refund >= 0 ? "Estimated state refund" : "Estimated state balance due", money(Math.abs(s.summary.refund)), { total: true }],
+                  ]} />
+                  <div className="small muted">{s.form}. Rules {s.ruleSet.id} v{s.ruleSet.version}. A preliminary figure: your preparer confirms it before anything is filed.</div>
+                  {s.unsupported.map((u) => <div key={u.code} className="ix-pending"><Icon name="info" size={14} /> {u.message}</div>)}
+                </>
+              ) : (
+                <div className="ix-pending"><Icon name="info" size={14} /> This state is not calculated here. Your preparer prepares this return; no state amount is estimated.</div>
+              )}
             </div>
           ))}
         </div>
@@ -853,7 +874,11 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
             [`${e.deductionType} deduction`, `− ${money(e.deduction)}`, { sub: true, go: () => go("deduction-choice") }],
             ["Taxable income", money(e.taxable), { total: true }],
             ["Income tax", money(e.incomeTax)],
+            e.lines["1040.13b"] > 0 && ["Tips, overtime, car loan and senior deductions", `− ${money(e.lines["1040.13b"])}`, { sub: true }],
+            e.lines["1040.13a"] > 0 && ["Qualified business income deduction", `− ${money(e.lines["1040.13a"])}`, { sub: true }],
+            e.lines["S2.1"] + e.lines["S2.2"] > 0 && ["Alternative minimum tax and credit repayment", money(e.lines["S2.1"] + e.lines["S2.2"])],
             e.seTax > 0 && ["Self-employment tax", money(e.seTax)],
+            e.lines["1040.23"] - e.seTax > 0 && ["Other taxes", money(e.lines["1040.23"] - e.seTax)],
             ["Nonrefundable credits", `− ${money(e.nonRefundableCredits)}`, { sub: true, go: () => go(d.supportsOthers === "yes" ? "dependents" : "supports") }],
             ["Total tax", money(e.totalTax), { total: true }],
             ["Tax withheld", money(e.withholding), { go: () => go("income-summary") }],
@@ -868,7 +893,8 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
           </div>
           <details className="ix-details">
             <summary>What this estimate includes and leaves out</summary>
-            <p className="small">Rules: <b>{e.ruleSet.id} v{e.ruleSet.version}</b> ({e.ruleSet.status.toLowerCase()}), figures from {e.ruleSet.sources[0].title}, published {e.ruleSet.sourceDate}.</p>
+            <p className="small">Rules: <b>{e.ruleSet.id} v{e.ruleSet.version}</b> ({e.ruleSet.status.toLowerCase()}), figures from {e.ruleSet.sources[0].title}, published {e.ruleSet.sourceDate}. Forms in this calculation: {e.forms.join(", ")}.</p>
+            <p className="small">The calculation follows Form 1040 line by line, but the final {taxYear} forms are not all published and it is not approved for filing. Your preparer files the return.</p>
             <ul className="small">{[...e.assumptions, ...e.notComputed].map((x) => <li key={x}>{x}</li>)}</ul>
           </details>
         </div>
@@ -890,7 +916,7 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
               <ul className="ix-issues">
                 {list.map((x) => (
                   <li key={x.code} className={`lvl-${level}`}>
-                    <div><b>{x.message}</b><small>{x.why}</small></div>
+                    <div><b>{x.message}</b><small>{x.why}{x.action ? ` ${x.action}` : ""}</small><small className="muted">{[x.layerLabel, x.form, x.source].filter(Boolean).join(" · ")}</small></div>
                     <div className="row nowrap">
                       {steps.some((s) => s.id === x.step) && x.step !== "double-check" && <button type="button" className="btn btn-light btn-sm" onClick={() => go(x.step)}>Fix</button>}
                       {DISMISSIBLE.has(level) && !readOnly && <button type="button" className="ix-link" onClick={() => dismiss(x.code)}>Set aside</button>}

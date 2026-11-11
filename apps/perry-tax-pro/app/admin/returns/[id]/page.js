@@ -49,6 +49,7 @@ export default async function Page({ params }) {
     review: review.review, issues: review.issues, problems: review.problems, states: review.states, comparison: review.comparison,
     estimate: review.estimate, reviewChecklist: review.reviewChecklist.map(({ key, label }) => ({ key, label })),
     changedSinceApproval: review.changedSinceApproval, priorYear: review.priorYear,
+    calculation: review.calculation, supplement: review.supplement, filingBlockers: review.filingBlockers.map((x) => x.code),
   };
   const inc = i.income || {}, ded = i.deductions || {};
   const row = (l, v) => <div><span>{l}</span><b>{v || "—"}</b></div>;

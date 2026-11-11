@@ -153,6 +153,12 @@ export async function readReturnDocument(session, r, { documentId, formType, con
     docType = FORM_DOC_TYPE[type];
     await mergeDocument(`taxDocuments/${id}`, { type: docType }, await serviceToken()).catch(() => { docType = doc.type; });
   }
+  // Keep what was read with the document, so a later difference between the document and
+  // the typed answer can be reported. The answer itself is never changed from here.
+  if (result) {
+    const reading = { formType: type, taxYear: result.taxYear, confidence: result.confidence, values: result.values, matched: result.isThisForm, at: new Date().toISOString() };
+    await mergeDocument(`taxDocuments/${id}`, { reading }, await serviceToken()).catch(() => {});
+  }
   // Loaded here so the reader itself can be tested outside Next.
   const { audit } = await import("@/lib/audit");
   await audit(session, "DOCUMENT_READ", { target: `taxReturns/${r.id}`, details: { documentId: id, formType: type, detected: !formType, provider, filled: result?.filled ?? 0, matched: result?.isThisForm ?? false } });

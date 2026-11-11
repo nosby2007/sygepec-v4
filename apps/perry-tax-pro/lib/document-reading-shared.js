@@ -31,6 +31,8 @@ export function readingSchema(type) {
   const properties = {
     isThisForm: { type: "boolean", description: `True only if the document is a Form ${FORM_TYPES[type].label}` },
     note: { type: "string", description: "Short note if a box was unreadable, or empty" },
+    taxYear: { type: "string", description: "Tax year printed on the form, four digits, or empty if not printed" },
+    confidence: { type: "string", enum: ["high", "medium", "low"], description: "How legible the document is: high (clear print), medium, low (blurry, cut off or handwritten)" },
   };
   for (const [k, description] of fields) properties[k] = { type: "string", description };
   return { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
@@ -74,7 +76,12 @@ export function cleanReading(type, raw) {
     }
   }
   const filled = def.fields.filter(([k]) => values[k] !== "").length;
-  return { values, isThisForm: source.isThisForm === true, note: notes.join(" ").slice(0, 300), filled };
+  const year = String(source.taxYear ?? "").trim();
+  return {
+    values, isThisForm: source.isThisForm === true, note: notes.join(" ").slice(0, 300), filled,
+    taxYear: /^20\d{2}$/.test(year) ? year : "",
+    confidence: ["high", "medium", "low"].includes(source.confidence) ? source.confidence : "",
+  };
 }
 
 // JSON can arrive wrapped in a code fence from some models.
