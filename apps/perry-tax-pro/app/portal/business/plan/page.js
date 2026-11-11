@@ -1,0 +1,67 @@
+import { requireBusinessClient, appMode } from "@/lib/auth";
+import { ACTIVE_SUBSCRIPTION, BUSINESS_PLANS, money } from "@/lib/billing";
+import { chargeView, getBilling, listClientCharges, paymentsReady } from "@/lib/payments";
+import { getDocument } from "@/lib/firebase";
+import { serviceToken } from "@/lib/service-identity";
+import { stripeConfigured } from "@/lib/stripe";
+import { PageHead } from "@/components/ui";
+import Icon from "@/components/Icon";
+import PayCard from "@/components/PayCard";
+import PlanPicker from "./PlanPicker";
+import { getEntitlement } from "@/lib/entitlements";
+import { FEATURES, PLAN_HIGHLIGHTS, planName } from "@/lib/plans";
+import { PayoutCard, ReserveCard } from "./PayoutPanels";
+import { getPayout, reserveSummary, syncConnect } from "@/lib/connect";
+
+export const metadata = { title: "Plan & payments" };
+
+export default async function Page({ searchParams }) {
+  const s = await requireBusinessClient();
+  const ready = await paymentsReady();
+  const [billing, charges] = ready ? await Promise.all([getBilling(s.uid).catch(() => null), listClientCharges(s.uid).catch(() => [])]) : [null, []];
+  const token = ready ? await serviceToken() : null;
+  const fees = [];
+  for (const c of charges.filter((x) => x.kind === "BUSINESS_RETURN")) {
+    const ret = await getDocument(`taxBusinessReturns/${c.refId}`, token).catch(() => null);
+    fees.push(chargeView(c, ret?.status || "PREPARING"));
+  }
+  const params = await searchParams;
+  const notice = params?.payment;
+  // Coming back from Stripe onboarding: read the account's new status from Stripe.
+  // Stripe returns to the browser, so in the apps the account status is read fresh here.
+  const payout = ready ? await (params?.connect || await appMode() ? syncConnect(s.uid) : getPayout(s.uid)).catch(() => null) : null;
+  const reserve = ready ? await reserveSummary(s.uid).catch(() => null) : null;
+  const ent = await getEntitlement(s.uid);
+  const locked = FEATURES[params?.upgrade];
+  const trialEnds = ent.trialEndsAt ? new Date(ent.trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
+  const active = billing && ACTIVE_SUBSCRIPTION.has(billing.status) ? billing : null;
+
+  return (
+    <>
+      <PageHead kicker="Business workspace" icon="receipt" title="Plan & payments" desc="Get paid online, keep money aside for taxes, and manage your workspace plan." />
+      {locked && <div className="alert alert-info" style={{ marginBottom: 16 }}><Icon name="lock" size={16} /><span><b>{locked.label}</b> {params.upgrade === "WORKSPACE" ? "needs an active plan. Your data is safe: you can still view and export your books under Accounting." : `is part of the ${planName(locked.plan)} plan. Choose it below to unlock it right away.`}</span></div>}
+      {ent.trial && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="sparkle" size={16} /><span>You are on a free trial with every Premium feature until <b>{trialEnds}</b>. Choose a plan any time; you will not lose anything you set up.</span></div>}
+      {!ent.active && !locked && <div className="alert alert-error" style={{ marginBottom: 16 }}><Icon name="alert" size={16} /><span>Your free trial ended on {trialEnds}. Choose a plan to keep using your workspace. Your books stay available to view and export.</span></div>}
+      {notice === "paid" && <div className="alert alert-success" style={{ marginBottom: 16 }}><Icon name="check" size={16} />Payment received. Thank you.</div>}
+      {notice === "cancelled" && <div className="alert alert-info" style={{ marginBottom: 16 }}><Icon name="info" size={16} />Payment cancelled. Nothing was charged.</div>}
+      {!ready || !stripeConfigured() ? (
+        <div className="card"><p className="small muted" style={{ margin: 0 }}>Online payments are being set up. Your preparer will contact you about your plan.</p></div>
+      ) : (
+        <>
+          <div className="grid-2" style={{ marginBottom: 16, alignItems: "start" }}>
+            <PayoutCard payout={payout ? { stripeAccountId: payout.stripeAccountId, chargesEnabled: payout.chargesEnabled, payoutsEnabled: payout.payoutsEnabled, detailsSubmitted: payout.detailsSubmitted, requirementsDue: payout.requirementsDue || 0 } : null} />
+            {reserve && <ReserveCard reserve={{ ...reserve, serviceRates: payout?.serviceRates || {} }} />}
+          </div>
+          {fees.filter((f) => f.due).map((f) => <div key={f.refId} style={{ marginBottom: 16 }}><PayCard charge={f} notice={notice} /></div>)}
+          <PlanPicker
+            plans={Object.entries(BUSINESS_PLANS).map(([key, p]) => ({ key, name: p.name, price: money(p.cents), highlights: PLAN_HIGHLIGHTS[key], suggested: locked?.plan === key }))}
+            current={active ? { plan: active.plan, status: active.status, cancelAtPeriodEnd: active.cancelAtPeriodEnd, periodEnd: active.currentPeriodEnd } : null}
+          />
+          {fees.filter((f) => !f.due && f.status !== "UNPAID").map((f) => (
+            <div key={f.refId} className="card mt small"><b>{f.description}</b>: {f.amount}, {f.status === "PAID" ? `paid${f.paidAt ? ` ${f.paidAt.slice(0, 10)}` : ""}` : f.status.toLowerCase()}</div>
+          ))}
+        </>
+      )}
+    </>
+  );
+}

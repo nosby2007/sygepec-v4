@@ -1,0 +1,28 @@
+{
+  "appId": "com.innovacaretax.client",
+  "appName": "InnovaCare",
+  "webDir": "www",
+  "server": {
+    "url": "https://perry-tax-pro-sygepec-v4.web.app/m/client",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "perry-tax-pro-sygepec-v4.web.app"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0b1f3a"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0b1f3a",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#ffffff",
+      "overlaysWebView": false
+    }
+  }
+}

@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+.env*
+data
+uploads
+firebase
+firebase-debug.log*
+npm-debug.log*
+README.md
+AGENTS.md
+
+# Local scripts, which can hold test credentials
+*.ps1

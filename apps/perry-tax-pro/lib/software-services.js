@@ -1,0 +1,118 @@
+// InnovaCare Software services: what we build for clients. Each entry has its own page
+// at /software/<slug>. Photos are free Unsplash images in public/photos/software
+// (credits in docs/PHOTOS.md).
+
+const photo = (name) => `/photos/software/${name}.jpg`;
+
+export const SOFTWARE_SERVICES = [
+  {
+    slug: "websites", name: "Website design & development", icon: "image", image: photo("websites"),
+    alt: "An iMac on a desk showing a website",
+    short: "Fast, modern websites that bring in customers and are easy to update.",
+    intro: "From a one-page site for a new business to a full marketing site with booking, payments and a blog, we design and build websites that look good on every screen and load quickly.",
+    offers: ["Business and marketing websites", "Online booking, forms and payments", "Content you can edit yourself", "Search engine basics: speed, titles, sitemaps", "Hosting, domain and email setup", "Redesign of an existing site"],
+    useCases: ["A clinic that wants patients to book online", "A salon or braiding studio showing its work and prices", "A service company collecting quote requests"],
+    faq: [["How long does a website take?", "A simple site usually takes two to four weeks. Larger sites with booking or payments take longer; we give you a plan before we start."], ["Can I change the text myself?", "Yes. We set up an editor so you can change text, photos and posts without calling us."]],
+  },
+  {
+    slug: "saas", name: "SaaS product development", icon: "layers", image: photo("saas"),
+    alt: "A dashboard showing charts and key numbers",
+    short: "Turn your idea into a subscription software product, from first version to scale.",
+    intro: "We help you plan, build and launch software sold as a service: accounts, subscriptions, an admin area and the features that make your product worth paying for.",
+    offers: ["Product planning and first version (MVP)", "Sign-up, sign-in and team accounts", "Subscriptions and billing with Stripe", "Admin dashboards and reports", "Several customers on one platform, kept apart", "Roadmap, releases and growth"],
+    useCases: ["A practice management tool sold to clinics", "A booking platform for small businesses", "An internal tool you want to sell to others"],
+    faq: [["Do I own the code?", "Yes. The product and its code belong to you."], ["Can you start from what we already have?", "Yes. We review your current product first and tell you what to keep, fix or rebuild."]],
+  },
+  {
+    slug: "cloud", name: "Cloud computing & DevOps", icon: "bolt", image: photo("cloud"),
+    alt: "A server room aisle with equipment racks",
+    short: "Move to the cloud, cut downtime and pay only for what you use.",
+    intro: "We set up and run your systems on Google Cloud, AWS or Azure: hosting, databases, backups and automatic deployments, with costs you can see and control.",
+    offers: ["Cloud migration from servers or old hosting", "Hosting for apps, websites and databases", "Automatic builds and deployments (CI/CD)", "Backups, monitoring and alerts", "Cost review and savings", "Firebase and serverless setups"],
+    useCases: ["An office still running on one old server", "An app that slows down when traffic grows", "A team deploying by hand and fearing every release"],
+    faq: [["Which cloud should I use?", "It depends on your tools and budget. We compare options and recommend one, with the reasons."], ["Will my site go down during the move?", "We plan migrations to avoid downtime and test everything before switching."]],
+  },
+  {
+    slug: "ai-agents", name: "AI agents & assistants", icon: "sparkle", image: photo("ai-agents"),
+    alt: "A robot hand and a human hand reaching toward each other",
+    short: "Assistants that answer questions, fill forms and help your team, around the clock.",
+    intro: "We build AI assistants trained on your own documents and connected to your tools, so they can answer customers, help staff find information and prepare work for review.",
+    offers: ["Website and messaging chat assistants", "Answers based on your own documents", "Assistants for staff: search, drafts, summaries", "Voice and phone assistants", "Human hand-off when the AI is unsure", "Usage, cost and quality tracking"],
+    useCases: ["Answering patient or client questions after hours", "Helping staff find a policy or procedure in seconds", "Summarising long documents and calls"],
+    faq: [["Is our data safe?", "We keep your data in your own systems where possible and limit what the assistant can see and do."], ["Will it make things up?", "We ground answers in your documents, show sources and send unclear questions to a person."]],
+  },
+  {
+    slug: "agentic-automation", name: "Agentic automation", icon: "refresh", image: photo("agentic"),
+    alt: "A tablet showing a task board on a desk",
+    short: "AI agents that carry out multi-step work across your tools, with you in control.",
+    intro: "Agentic systems go further than chat: they plan steps, use your software, check results and hand work back for approval. We design them with clear limits, logs and human sign-off.",
+    offers: ["Multi-step workflows run by AI agents", "Connections to email, calendars, CRMs and databases", "Approval steps before anything is sent or paid", "Document intake: read, sort, extract, file", "Logs of every action for review", "Gradual rollout, starting with one task"],
+    useCases: ["Reading incoming documents and preparing a file", "Following up on unpaid invoices or missing paperwork", "Scheduling, reminders and status updates"],
+    faq: [["What is the difference with a chatbot?", "A chatbot answers. An agent acts: it can look things up, fill in systems and prepare tasks, within limits you set."], ["Can it make mistakes?", "Yes, so we add checks, approvals and logs, and start with low-risk tasks."]],
+  },
+  {
+    slug: "mobile-apps", name: "Mobile apps", icon: "phone", image: photo("mobile"),
+    alt: "A smartphone held in a hand",
+    short: "iPhone and Android apps your customers and staff will actually use.",
+    intro: "We build mobile apps for customers and field teams: booking, payments, notifications, photos and offline work, published on the App Store and Google Play.",
+    offers: ["iPhone and Android apps", "App Store and Google Play publishing", "Push notifications and reminders", "Camera, documents and signatures", "Works with your website and accounts", "Updates and maintenance"],
+    useCases: ["A client app to upload documents and book visits", "A field app for home visits and photos", "A loyalty or ordering app for a shop"],
+    faq: [["Do I need two apps?", "No. We usually build one app that runs on both iPhone and Android."], ["Who publishes the app?", "We handle the store submission under your developer account."]],
+  },
+  {
+    slug: "custom-software", name: "Custom software & web apps", icon: "clipboard", image: photo("custom"),
+    alt: "Two people working on code at their monitors",
+    short: "Software shaped around how your business really works.",
+    intro: "When off-the-shelf tools do not fit, we build the system you need: portals, internal tools and workflows that replace spreadsheets and paper.",
+    offers: ["Client and staff portals", "Internal tools to replace spreadsheets", "Workflows, approvals and roles", "Document storage and e-signatures", "Reports and exports", "Modernising old systems"],
+    useCases: ["A portal where clients upload documents and follow their case", "A scheduling and tracking tool for a care team", "Replacing a shared spreadsheet that has grown too big"],
+    faq: [["How do you price custom work?", "After a short discovery we give a fixed quote for a first version, then work in clear phases."], ["Can it grow later?", "Yes. We build in modules so new features can be added without starting over."]],
+  },
+  {
+    slug: "data-analytics", name: "Data & analytics", icon: "chart", image: photo("data"),
+    alt: "Charts and analytics on a laptop screen",
+    short: "Dashboards and reports that show what is working, in real time.",
+    intro: "We bring your numbers together from your apps, payments and spreadsheets into clear dashboards, so you can decide with facts instead of guesses.",
+    offers: ["Dashboards for owners and managers", "Data from several tools in one place", "Automatic weekly and monthly reports", "Data cleanup and organisation", "Forecasts and trends", "Exports for your accountant"],
+    useCases: ["Seeing revenue, bookings and no-shows on one screen", "Tracking team workload and case progress", "Understanding which services bring the most clients"],
+    faq: [["Which tools can you connect?", "Most tools with an export or an API: payment systems, CRMs, booking tools, spreadsheets and databases."], ["Do I need a data team?", "No. We build dashboards your current team can read and use."]],
+  },
+  {
+    slug: "integrations", name: "APIs & integrations", icon: "link", image: photo("integrations"),
+    alt: "Network cables connected together",
+    short: "Make your tools talk to each other and stop typing the same data twice.",
+    intro: "We connect your software: payments, calendars, accounting, messaging and health or business systems, so information flows on its own and stays in sync.",
+    offers: ["Connections between your existing tools", "Payment, calendar and accounting integrations", "Webhooks and real-time updates", "APIs for your own product", "Data imports and migrations", "Monitoring so failures are noticed"],
+    useCases: ["New bookings creating invoices automatically", "Syncing clients between a CRM and a portal", "Sending text or email reminders from your system"],
+    faq: [["What if a tool has no API?", "We look for exports, email or file-based options, and tell you honestly what is possible."], ["Who keeps it running?", "We can monitor and maintain the integrations for you."]],
+  },
+  {
+    slug: "security", name: "Cybersecurity & compliance", icon: "shield", image: photo("security"),
+    alt: "A glowing teal panel of lights",
+    short: "Protect your data and your clients, and be ready for audits.",
+    intro: "We review and strengthen the security of your systems: access, passwords and two-step sign-in, backups, logging and the controls that regulated work requires.",
+    offers: ["Security review of your apps and accounts", "Two-step sign-in and access rules", "Encryption, backups and recovery plans", "Activity logs and audit trails", "Support for HIPAA and privacy obligations", "Staff awareness and policies"],
+    useCases: ["A clinic handling patient records", "A tax or finance office storing sensitive documents", "A business preparing for a client's security questionnaire"],
+    faq: [["Do you certify compliance?", "We help you put the technical safeguards in place and document them; formal certification is done by an auditor."], ["Where do we start?", "With a short review that lists the most important risks and the fixes, in order."]],
+  },
+  {
+    slug: "ecommerce", name: "E-commerce & online payments", icon: "card", image: photo("ecommerce"),
+    alt: "A person paying online with a card and a laptop",
+    short: "Sell products and services online with secure, simple checkout.",
+    intro: "We set up online stores and payment flows: product catalogues, deposits, subscriptions and invoices, using trusted payment providers so card details never touch your servers.",
+    offers: ["Online stores and catalogues", "Secure checkout with Stripe", "Deposits, subscriptions and invoices", "Orders, stock and delivery options", "Discount codes and gift cards", "Sales reports"],
+    useCases: ["A beauty business selling products and booking deposits", "A trainer selling courses or memberships", "A service company sending payable invoices"],
+    faq: [["Which payment providers do you use?", "Mostly Stripe, and others when your business needs them."], ["Can I sell services, not just products?", "Yes: bookings, deposits, memberships and invoices all work."]],
+  },
+  {
+    slug: "support", name: "IT support & maintenance", icon: "help", image: photo("support"),
+    alt: "A person working at a computer with an external keyboard",
+    short: "Updates, fixes and help when you need it, so your software keeps running.",
+    intro: "Software needs care after launch. We keep your apps updated and secure, fix problems quickly and help your team with questions.",
+    offers: ["Monthly updates and security patches", "Bug fixes and small improvements", "Uptime monitoring and alerts", "Backups checked regularly", "Help desk for your team", "Monthly report of what was done"],
+    useCases: ["A website nobody has updated in years", "An app built by someone who is no longer available", "A team that needs a reliable person to call"],
+    faq: [["Can you support software you did not build?", "Yes. We start with a review to understand it, then take over its care."], ["How fast do you respond?", "Response times are set in your support plan, with faster handling for urgent problems."]],
+  },
+];
+
+export const findSoftwareService = (slug) => SOFTWARE_SERVICES.find((s) => s.slug === slug) || null;
