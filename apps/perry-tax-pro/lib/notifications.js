@@ -11,8 +11,8 @@ const first = (name) => String(name || "").trim().split(/\s+/)[0] || "there";
 const TAX_STAGES = {
   IN_REVIEW: ["Your return is being prepared", "Your preparer has started working on your return. We will let you know if anything else is needed."],
   READY_TO_SIGN: ["Your return is ready to review and sign", "Your return is ready. Please log in to review it and sign Form 8879 so we can e-file."],
-  FILED: ["Your return was e-filed", "Your return has been sent to the IRS. We will let you know when it is accepted, usually within 48 hours."],
-  ACCEPTED: ["The IRS accepted your return", "Good news: the IRS accepted your return. You can download your copies from your portal."],
+  FILED: ["Your return was submitted", "Your preparer recorded your return as submitted through their e-file software. We will let you know when the IRS acknowledgement is recorded."],
+  ACCEPTED: ["The IRS accepted your return", "Good news: your preparer recorded the IRS acceptance of your return. You can download your copies from your portal."],
 };
 
 const BUSINESS_STAGES = {

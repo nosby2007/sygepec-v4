@@ -3,8 +3,8 @@ export const STATUSES = [
   { key: "DOCS_PENDING", label: "Documents", desc: "Upload your tax documents" },
   { key: "IN_REVIEW", label: "In Review", desc: "Your preparer is working on your return" },
   { key: "READY_TO_SIGN", label: "Ready to Sign", desc: "Review and sign Form 8879" },
-  { key: "FILED", label: "Filed", desc: "Submitted to the IRS" },
-  { key: "ACCEPTED", label: "Accepted", desc: "IRS accepted your return" },
+  { key: "FILED", label: "Filed", desc: "Recorded as submitted by your preparer" },
+  { key: "ACCEPTED", label: "Accepted", desc: "IRS acceptance recorded by your preparer" },
 ];
 
 export const statusLabel = (k) => STATUSES.find((s) => s.key === k)?.label || k;
@@ -25,11 +25,22 @@ export const SIGNATURE_METHODS = [
 
 export const SUBMISSION_STATUSES = [
   { key: "NOT_READY", label: "Not ready" },
-  { key: "READY", label: "Ready to e-file" },
-  { key: "SUBMITTED", label: "Submitted" },
-  { key: "ACCEPTED", label: "Accepted" },
+  { key: "READY", label: "Ready to transmit" },
+  { key: "SUBMITTED", label: "Recorded as submitted" },
+  { key: "ACCEPTED", label: "Acceptance recorded" },
   { key: "REJECTED", label: "Rejected / action needed" },
 ];
+
+export const REVIEW_STATUSES = [
+  { key: "NOT_STARTED", label: "Not started" },
+  { key: "IN_PROGRESS", label: "In progress" },
+  { key: "CHANGES_REQUESTED", label: "Changes requested" },
+  { key: "READY_TO_SIGN", label: "Ready to sign" },
+  { key: "APPROVED", label: "Approved" },
+];
+
+// Review states that freeze the client's answers.
+export const FROZEN_REVIEW = ["READY_TO_SIGN", "APPROVED"];
 
 export const workflowLabel = (items, key) => items.find((item) => item.key === key)?.label || key;
 
@@ -48,6 +59,12 @@ export const DOC_TYPES = {
   "1099NEC": "1099-NEC / 1099-K (Self-Employment)",
   "1099INT": "1099-INT (Interest)",
   "1099DIV": "1099-DIV (Dividends)",
+  "1099B": "1099-B (Sales of Stocks or Digital Assets)",
+  SSA1099: "SSA-1099 (Social Security Benefits)",
+  "1098T": "1098-T (Tuition Statement)",
+  "1095A": "1095-A (Marketplace Health Insurance)",
+  K1: "Schedule K-1",
+  RENTAL: "Rental or Royalty Records",
   "1099G": "1099-G (Unemployment)",
   "1099R": "1099-R (Retirement / Pension)",
   "1098": "1098 (Mortgage Interest)",
