@@ -2,8 +2,10 @@ import { audit } from "@/lib/audit";
 import { getFirebaseSession } from "@/lib/auth";
 import { getReturnForSession } from "@/lib/data";
 import { getDocument, mergeDocument } from "@/lib/firebase";
-import { SIGNATURE_METHODS, SIGNATURE_STATUSES, STATUSES, SUBMISSION_STATUSES } from "@/lib/constants";
-import { cleanText, mutationGuard, privateHeaders, sanitizeIntake } from "@/lib/security";
+import { FROZEN_REVIEW, SIGNATURE_METHODS, SIGNATURE_STATUSES, STATUSES, SUBMISSION_STATUSES } from "@/lib/constants";
+import { cleanText, mutationGuard, privateHeaders } from "@/lib/security";
+import { SCHEMA_VERSION } from "@/lib/intake-schema";
+import { prepareClientSave } from "@/lib/intake-save";
 import { paymentGate } from "@/lib/payments";
 import { notifyStatusChange } from "@/lib/notifications";
 import { editRefused, isGeneralAdmin, mayEditReturn } from "@/lib/staff";
@@ -23,24 +25,22 @@ export async function PUT(req, { params }) {
   const body = await req.json().catch(() => ({}));
 
   if (session.role === "CLIENT") {
-    if (["FILED", "ACCEPTED"].includes(r.status))
-      return Response.json({ error: "This return has already been filed." }, { status: 400 });
-    // Once Form 8879 is out for signature the signed figures must not change underneath it.
-    if (r.status === "READY_TO_SIGN")
-      return Response.json({ error: "Your return is ready to sign. Message your preparer to request changes." }, { status: 409 });
-    const intake = sanitizeIntake(body.intake);
-    const status = intake.submitted && r.status === "INTAKE" ? "DOCS_PENDING" : r.status;
+    const save = prepareClientSave({ returnStatus: r.status, reviewStatus: r.review_status, storedIntake: r.intake, body, taxYear: Number(r.tax_year) || 2026 });
+    if (!save.ok) return Response.json(save.body, { status: save.status, headers: privateHeaders });
+    const { intake, submitting, status } = save;
+    const savedAt = new Date().toISOString();
     try {
       await mergeDocument(`taxReturns/${r.id}`, {
         intake,
         filingStatus: cleanText(intake.filingStatus, 10) || null,
         status,
-        updatedAt: new Date().toISOString(),
+        updatedAt: savedAt,
       }, session.idToken);
     } catch {
       return Response.json({ error: "Your answers could not be saved. Please try again." }, { status: 503, headers: privateHeaders });
     }
-    return Response.json({ ok: true, status }, { headers: privateHeaders });
+    if (submitting) await audit(session, "INTAKE_SUBMITTED", { target: `taxReturns/${r.id}`, details: { schemaVersion: SCHEMA_VERSION, attestation: intake.attestation.version } }).catch(() => {});
+    return Response.json({ ok: true, status, rev: intake.rev, savedAt, submitted: intake.submitted }, { headers: privateHeaders });
   }
 
   // Preparer updates: the assigned preparer or the general admin. Only the admin assigns.
@@ -63,6 +63,9 @@ export async function PUT(req, { params }) {
     return Response.json({ error: "The client must submit the questionnaire before signature can be requested." }, { status: 400 });
   if (["REQUESTED", "SIGNED"].includes(effectiveSignatureStatus) && !requestedPreparerId)
     return Response.json({ error: "Assign a preparer before starting the signature workflow." }, { status: 400 });
+  // Returns using the step-by-step questionnaire go through the structured review first.
+  if (body.signatureStatus === "REQUESTED" && r.signature_status !== "REQUESTED" && r.intake?.schemaVersion === SCHEMA_VERSION && !FROZEN_REVIEW.includes(r.review_status))
+    return Response.json({ error: "Approve the review (Ready to sign) before requesting the signature." }, { status: 400 });
   if (["READY", "SUBMITTED", "ACCEPTED"].includes(effectiveSubmissionStatus) && effectiveSignatureStatus !== "SIGNED")
     return Response.json({ error: "A verified Form 8879 signature is required before e-file submission." }, { status: 400 });
   // Payment gate: only steps that move forward are checked, so a return can always go back.
@@ -120,6 +123,11 @@ export async function PUT(req, { params }) {
       changes.submittedAt = r.submitted_at || now;
       changes.acceptedAt = null;
       changes.status = "IN_REVIEW";
+      // A rejected return goes back to correction and a new review.
+      if (r.submission_status !== "REJECTED") {
+        changes.reviewStatus = "CHANGES_REQUESTED";
+        changes.reviewUpdatedAt = now;
+      }
     }
   }
   if (Object.prototype.hasOwnProperty.call(body, "submissionReference"))

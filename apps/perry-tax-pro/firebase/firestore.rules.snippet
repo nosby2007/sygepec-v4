@@ -132,10 +132,12 @@ match /taxReturns/{returnId} {
           request.resource.data.status == resource.data.status
           || (resource.data.status == 'INTAKE' && request.resource.data.status == 'DOCS_PENDING')
         )
-        // Answers are frozen once Form 8879 is out for signature or the return is filed.
+        // Answers are frozen once Form 8879 is out for signature or the return is filed,
+        // and while the preparer's review has them approved.
         && (
           !request.resource.data.diff(resource.data).changedKeys().hasAny(['intake', 'filingStatus'])
-          || resource.data.status in ['INTAKE', 'DOCS_PENDING', 'IN_REVIEW']
+          || (resource.data.status in ['INTAKE', 'DOCS_PENDING', 'IN_REVIEW']
+            && !(resource.data.get('reviewStatus', 'NOT_STARTED') in ['READY_TO_SIGN', 'APPROVED']))
         )
       )
     );

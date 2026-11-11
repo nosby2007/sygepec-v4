@@ -38,6 +38,8 @@ function returnDto(row) {
     carry_forward_from_return_id: row.carryForwardFromReturnId || null,
     carry_forward_from_tax_year: row.carryForwardFromTaxYear || null,
     intake: row.intake || {},
+    review_status: row.reviewStatus || "NOT_STARTED",
+    review_updated_at: row.reviewUpdatedAt || null,
     doc_count: Number(row.docCount || 0),
     created_at: row.createdAt,
     updated_at: row.updatedAt,

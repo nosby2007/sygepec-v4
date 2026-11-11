@@ -1,16 +1,8 @@
 import { getFirebaseSession } from "@/lib/auth";
 import { listClientReturns } from "@/lib/data";
 import { setDocument, TAX_TENANT } from "@/lib/firebase";
-import { mutationGuard, privateHeaders, sanitizeIntake } from "@/lib/security";
-
-const blankMoney = {
-  w2Wages: "", w2Withheld: "", selfEmployment: "", interest: "",
-  dividends: "", unemployment: "", retirement: "", other: "",
-};
-
-const blankDeductions = {
-  mortgageInterest: "", propertyTax: "", charity: "", studentLoan: "", childcare: "",
-};
+import { mutationGuard, privateHeaders } from "@/lib/security";
+import { carryForward } from "@/lib/intake-schema";
 
 export async function POST(req) {
   const blocked = mutationGuard(req);
@@ -28,18 +20,10 @@ export async function POST(req) {
 
   const nextYear = Number(source.tax_year) + 1;
   const returnId = `${session.uid}_${nextYear}`;
-  const prior = sanitizeIntake(source.intake);
+  // Who the client is carries over; amounts, forms and topics never do.
+  const intake = carryForward(source.intake);
+  const prior = intake;
   const now = new Date().toISOString();
-  const intake = {
-    personal: prior.personal,
-    filingStatus: prior.filingStatus,
-    spouse: prior.spouse,
-    dependents: prior.dependents,
-    income: blankMoney,
-    deductions: blankDeductions,
-    refund: { method: prior.refund.method, accountLast4: "" },
-    submitted: false,
-  };
 
   try {
     await setDocument(`taxReturns/${returnId}`, {

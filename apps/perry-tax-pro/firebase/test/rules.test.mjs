@@ -79,6 +79,7 @@ before(async () => {
   await seed("taxUsers/bizB", user("bizB", { accountType: "BUSINESS" }));
   await seed("taxBusinessEntries/adminReviewEntry", { tenantId: T, clientId: "bizA", taxYear: 2026, kind: "income", category: "Services", amountCents: 50000, date: "2026-10-01", description: "Review", createdAt: now });
   await seed("taxBusinessYearEnd/handoff1", { tenantId: T, clientId: "bizA", taxYear: 2026, status: "SUBMITTED_FOR_REVIEW", report: { entryCount: 1 }, createdAt: now });
+  await seed("taxReturns/alice_approved", newReturn("alice", 2024, { status: "IN_REVIEW", docCount: 1, reviewStatus: "READY_TO_SIGN" }));
   for (const [id, status] of [["review", "IN_REVIEW"], ["sign", "READY_TO_SIGN"], ["filed", "FILED"], ["docs", "DOCS_PENDING"]]) {
     await seed(`taxReturns/alice_${id}`, newReturn("alice", 2025, { status, docCount: 1 }));
   }
@@ -135,6 +136,11 @@ describe("taxReturns", () => {
     ok(await write("alice", "taxReturns/alice_review", newReturn("alice", 2025, { status: "IN_REVIEW", docCount: 1, intake: { note: "fix" }, updatedAt: "2026-10-25T00:00:00.000Z" })));
     denied(await write("alice", "taxReturns/alice_sign", newReturn("alice", 2025, { status: "READY_TO_SIGN", docCount: 1, intake: { note: "fix" } })));
     ok(await write("alice", "taxReturns/alice_sign", newReturn("alice", 2025, { status: "READY_TO_SIGN", docCount: 1, updatedAt: "2026-10-25T00:00:00.000Z" })));
+  });
+  test("answers approved by the preparer review are frozen for the client", async () => {
+    denied(await write("alice", "taxReturns/alice_approved", newReturn("alice", 2024, { status: "IN_REVIEW", docCount: 1, reviewStatus: "READY_TO_SIGN", intake: { note: "sneaky" } })));
+    denied(await write("alice", "taxReturns/alice_approved", newReturn("alice", 2024, { status: "IN_REVIEW", docCount: 1, reviewStatus: "IN_PROGRESS" })));
+    denied(await write("alice", "taxReturns/alice_review", newReturn("alice", 2025, { status: "IN_REVIEW", docCount: 1, reviewStatus: "APPROVED" })));
   });
   test("a client can move docCount by one either way, never below zero or on a filed return", async () => {
     ok(await increment("alice", "taxReturns/alice_docs", 1));

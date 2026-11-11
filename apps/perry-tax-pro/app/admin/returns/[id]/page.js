@@ -8,6 +8,8 @@ import { Timeline, StatusBadge, statusProgress } from "@/components/Status";
 import Messages from "@/components/Messages";
 import DocumentCenter from "@/components/DocumentCenter";
 import ReturnControls from "./ReturnControls";
+import ReviewPanel from "./ReviewPanel";
+import { reviewContext } from "@/lib/return-review";
 import FeeControls from "@/components/FeeControls";
 import ESignPanel from "@/components/ESignPanel";
 import BankDetailsStaff from "@/components/BankDetailsStaff";
@@ -41,7 +43,13 @@ export default async function Page({ params }) {
   const sensitiveOpen = r.preparer_id === s.uid || await hasFreshGrant(session, r.client_id);
   const i = r.intake;
   const p = i.personal || {};
-  const est = intakeToEstimate(i);
+  const est = intakeToEstimate(i, Number(r.tax_year) || 2026);
+  const review = await reviewContext(r).catch(() => null);
+  const reviewView = review && {
+    review: review.review, issues: review.issues, problems: review.problems, states: review.states, comparison: review.comparison,
+    estimate: review.estimate, reviewChecklist: review.reviewChecklist.map(({ key, label }) => ({ key, label })),
+    changedSinceApproval: review.changedSinceApproval, priorYear: review.priorYear,
+  };
   const inc = i.income || {}, ded = i.deductions || {};
   const row = (l, v) => <div><span>{l}</span><b>{v || "—"}</b></div>;
   const n = (v) => Number(v) || 0;
@@ -89,6 +97,7 @@ export default async function Page({ params }) {
       <div className="card"><Timeline status={r.status} /></div>
       {!canEdit && <div className="alert alert-info mt"><Icon name="info" size={16} />View only: {r.preparer_name ? `this return is assigned to ${r.preparer_name}` : "this return has no preparer yet"}. Only the assigned preparer or the general admin can change it.</div>}
       {canEdit && <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} canAssign={isAdmin} />}
+      {canEdit && reviewView && <ReviewPanel returnId={r.id} initial={reviewView} taxYear={Number(r.tax_year) || 2026} />}
       {canEdit && <div className="mt"><ESignPanel returnId={r.id} signature={signatureView(signature)} available={esignConfigured() && payments} jointReturn={r.filing_status === "MFJ" || r.intake?.personal?.filingStatus === "MFJ"} /></div>}
       {sensitiveOpen && <div className="mt"><BankDetailsStaff returnId={r.id} status={bank} /></div>}
       {canEdit && <div className="mt"><FeeControls kind="TAX_RETURN" refId={r.id} charge={chargeView(charge, r.status)} available={payments} defaultAmount="149" /></div>}
