@@ -1140,3 +1140,26 @@ tr.muted td { color: var(--faint); }
 .ix-upload-list li.ok .icon { color: var(--teal-2); }
 .ix-upload-list li.warn .icon { color: var(--gold-ink); }
 .ix-upload-list li.bad .icon { color: var(--rose); }
+
+/* ---- Guided tour ------------------------------------------------------------------- */
+.tour-btn { cursor: pointer; font: inherit; font-size: 0.82rem; color: var(--text); }
+.tour-btn:hover { border-color: rgba(30, 99, 214, .35); }
+.tour-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(30, 99, 214, .35); }
+.tour { position: fixed; inset: 0; z-index: 200; }
+.tour-shade { position: fixed; inset: 0; background: rgba(7, 16, 31, .55); }
+.tour-spot { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(7, 16, 31, .55), 0 0 0 3px rgba(20, 184, 166, .9); pointer-events: none; transition: top .3s var(--ease), left .3s var(--ease), width .3s var(--ease), height .3s var(--ease); }
+.tour-pop { position: fixed; background: var(--surface); color: var(--text); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 18px 18px 14px; display: grid; gap: 8px; outline: none; animation: ix-in .25s var(--ease); max-height: calc(100vh - 32px); overflow: auto; }
+.tour-pop:focus-visible { box-shadow: var(--shadow-lg), 0 0 0 3px rgba(30, 99, 214, .35); }
+.tour-pop h3 { margin: 0; font-family: var(--font-display); font-size: 1.15rem; }
+.tour-pop p { margin: 0; color: var(--muted); font-size: .92rem; line-height: 1.5; }
+.tour-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.tour-x { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.tour-x:hover { background: var(--surface-3); }
+.tour-dots { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; }
+.tour-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--track); }
+.tour-dots span.on { background: var(--teal); width: 16px; border-radius: 999px; }
+.tour-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot { transition: none; }
+  .tour-pop { animation: none; }
+}

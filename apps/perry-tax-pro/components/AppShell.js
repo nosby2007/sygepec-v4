@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import Icon from "@/components/Icon";
 import IdleGuard from "@/components/IdleGuard";
 import AppBar from "@/components/AppBar";
+import GuidedTour, { GuideButton } from "@/components/GuidedTour";
 import { appHome } from "@/lib/app-mode";
 
 // app: "client" or "business" inside the native apps (see lib/app-mode.js), where the
@@ -22,6 +23,7 @@ export default function AppShell({ links, user, app = null, children }) {
   const isSupport = user.role === "SUPPORT";
   const isPreparer = user.role === "PREPARER" || isSupport;
   const isBusiness = user.accountType === "BUSINESS";
+  const isClient = user.role === "CLIENT";
   const area = isSupport ? "Support Operations" : isPreparer ? "Preparer workspace" : isBusiness ? "Business workspace" : "Client portal";
   const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   // On phones the sidebar is a drawer behind a menu button. It closes when a page is
@@ -110,12 +112,14 @@ export default function AppShell({ links, user, app = null, children }) {
             <b>{current.label}</b>
           </div>
           <div className="topbar-actions">
+            {isClient && <GuideButton />}
             <span className="topbar-chip hide-sm" suppressHydrationWarning><Icon name="calendar" size={15} />{today}</span>
             <span className="topbar-chip"><span className="live-dot" />Secure session</span>
           </div>
         </div>
         <div className="fade-in" key={path}>{children}</div>
       </main>
+      {isClient && <GuidedTour accountType={user.accountType} />}
     </div>
   );
 }

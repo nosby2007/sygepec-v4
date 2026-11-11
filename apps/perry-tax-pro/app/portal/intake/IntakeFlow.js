@@ -536,6 +536,7 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
             <div><Icon name="shield" size={18} /><span><b>Reviewed by your preparer</b><small>Figures here are estimates. Your preparer checks everything before you sign.</small></span></div>
             <div><Icon name="lock" size={18} /><span><b>Sensitive numbers stay out</b><small>Only the last 4 digits of SSNs are asked. Your preparer verifies the rest.</small></span></div>
           </div>
+          <button type="button" id="intake-how" className="btn btn-light btn-sm" style={{ justifySelf: "start" }} onClick={() => window.dispatchEvent(new CustomEvent("ix-tour", { detail: "intake" }))}><Icon name="help" size={15} /> How this works</button>
           <p className="small muted">Filing for a partnership, corporation or trust? Ask your preparer about a business return; this questionnaire is for individual returns.</p>
         </div>
       );
