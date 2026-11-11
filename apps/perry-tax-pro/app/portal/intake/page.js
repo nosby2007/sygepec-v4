@@ -2,6 +2,7 @@ import { requireTaxClient } from "@/lib/auth";
 import { getClientReturn, listClientReturns, listDocuments } from "@/lib/data";
 import { FROZEN_REVIEW } from "@/lib/constants";
 import { sanitizeIntake } from "@/lib/intake-schema";
+import { READER_LABEL, readerProvider } from "@/lib/document-reading";
 import IntakeFlow from "./IntakeFlow";
 import { PageHead } from "@/components/ui";
 
@@ -29,6 +30,7 @@ export default async function Page() {
         frozenReason={frozenReason}
         prior={priorReturn ? sanitizeIntake(priorReturn.intake) : null}
         documents={documents.map((d) => ({ id: d.id, type: d.type, filename: d.filename }))}
+        reader={readerProvider() ? READER_LABEL[readerProvider()] : null}
       />
     </>
   );

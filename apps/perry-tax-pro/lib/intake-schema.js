@@ -7,6 +7,7 @@
 
 export const SCHEMA_VERSION = 2;
 export const ATTESTATION_VERSION = "2026-1";
+export const READING_CONSENT = "2026-1";
 
 export const MARITAL = [
   { key: "SINGLE", label: "Single, never married" },
@@ -284,6 +285,8 @@ export function sanitizeIntake(value) {
     },
     diagnostics: { dismissed: (Array.isArray(obj(s.diagnostics).dismissed) ? s.diagnostics.dismissed : []).map((c) => text(c, 80)).filter(Boolean).slice(0, 100) },
     attestation: att.version === ATTESTATION_VERSION && isoDate(String(att.at || "").slice(0, 10)) ? { version: ATTESTATION_VERSION, at: text(att.at, 30) } : null,
+    // Agreement to let the configured AI reader fill boxes from uploaded forms.
+    documentReading: obj(s.documentReading).version === READING_CONSENT && isoDate(String(s.documentReading.at || "").slice(0, 10)) ? { version: READING_CONSENT, at: text(s.documentReading.at, 30) } : null,
     income: cleanMoney(s.income, LEGACY_INCOME),
     deductions: cleanMoney(s.deductions, MONEY_DEDUCTIONS.map(([k]) => k)),
     refund: {

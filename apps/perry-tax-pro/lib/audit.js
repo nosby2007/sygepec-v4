@@ -33,6 +33,7 @@ export const AUDIT_LABELS = {
   REVIEW_APPROVED: "Approved a return review",
   REVIEW_REOPENED: "Reopened an approved review",
   DIAGNOSTIC_RESOLVED: "Resolved a double-check item",
+  DOCUMENT_READ: "Read a tax form automatically",
   FEE_CHANGED: "Changed a fee or payment",
   PAYMENT_CONFIRMED: "Payment confirmed by Stripe",
   SUBSCRIPTION_CHANGED: "Plan changed by Stripe",

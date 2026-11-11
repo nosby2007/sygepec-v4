@@ -1124,3 +1124,13 @@ tr.muted td { color: var(--faint); }
   .ix-panel, .ix-reveal { animation: none; }
   .ix-progress span, .ix-card, .ix-sections button, .ix-radio { transition: none; }
 }
+
+/* Upload a tax form on its step */
+.ix-upload { display: grid; gap: 6px; padding: 16px 18px; border-radius: var(--radius-sm); border: 1.5px dashed rgba(30, 99, 214, .35); background: rgba(30, 99, 214, .03); }
+.ix-upload-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ix-upload-head > div { display: grid; gap: 2px; flex: 1; min-width: 180px; }
+.ix-upload-head small { color: var(--muted); font-size: .84rem; }
+.ix-upload .ix-check { padding: 6px 0; }
+.ix-form.to-check { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20, 184, 166, .12); }
+.ix-form .ix-callout { margin-bottom: 4px; }
+@media (max-width: 640px) { .ix-upload-head .btn { width: 100%; justify-content: center; } }

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import BankDetailsForm from "@/components/BankDetailsForm";
 import { DOC_TYPES, FILING_STATUSES, money } from "@/lib/constants";
-import { ATTESTATION_VERSION, FORM_TYPES, MARITAL, TOPICS, TOPIC_GROUPS, incomeTotals, topicByKey } from "@/lib/intake-schema";
+import { ATTESTATION_VERSION, READING_CONSENT, FORM_TYPES, MARITAL, TOPICS, TOPIC_GROUPS, incomeTotals, topicByKey } from "@/lib/intake-schema";
 import { SECTIONS, buildSteps, firstStepOf, progressFor, stepIndex } from "@/lib/intake-flow";
 import { LEVEL_LABEL, DISMISSIBLE, blockers, compareYears, openIssues, runDiagnostics, stateFilings } from "@/lib/intake-checks";
 import { US_STATES } from "@/lib/tax-rules";
@@ -136,19 +136,101 @@ function SaveState({ state, savedAt, onRetry }) {
 
 // ---- Structured forms ------------------------------------------------------------------
 
-function FormEditor({ type, forms, documents, onChange, disabled, spouseAllowed }) {
+const newFormId = () => `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+// Upload the paper form right on its step. With a reader set up (and the client's
+// agreement), the boxes are filled from the file; the client checks each one.
+function FormUpload({ type, returnId, reader, consent, onConsent, onUploaded, onRead, disabled }) {
+  const def = FORM_TYPES[type];
+  const input = useRef(null);
+  const [state, setState] = useState({});
+  const pick = () => input.current?.click();
+  const upload = async (file) => {
+    if (!file) return;
+    setState({ busy: "upload" });
+    const body = new FormData();
+    body.append("returnId", returnId);
+    body.append("type", FORM_DOC[type] || "OTHER");
+    body.append("file", file);
+    const res = await fetch("/api/documents", { method: "POST", body }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    if (!res?.ok) return setState({ error: data?.error || "The file could not be uploaded. Please try again." });
+    const doc = { id: data.id, type: FORM_DOC[type] || "OTHER", filename: file.name };
+    onUploaded(doc);
+    if (!reader || !consent) {
+      onRead({ documentId: doc.id, values: {}, manual: true });
+      return setState({ done: reader ? "Uploaded. Type the amounts below, or agree to automatic reading next time." : "Uploaded. Type the amounts from your document below." });
+    }
+    setState({ busy: "read" });
+    const r = await fetch(`/api/returns/${returnId}/read-document`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: doc.id, formType: type, consent: true }) }).catch(() => null);
+    const result = await r?.json().catch(() => ({}));
+    if (!r?.ok) {
+      onRead({ documentId: doc.id, values: {}, manual: true });
+      return setState({ error: `${result?.error || "The document could not be read."} The file is saved; type the amounts below.` });
+    }
+    onRead({ documentId: doc.id, values: result.values, isThisForm: result.isThisForm, note: result.note });
+    setState({ done: result.isThisForm ? `${result.filled} box${result.filled === 1 ? "" : "es"} filled from your document. Check each one below.` : `This file does not look like a ${def.label}. Check the boxes below carefully.`, warn: !result.isThisForm });
+  };
+  return (
+    <div className="ix-upload">
+      <div className="ix-upload-head">
+        <span className="ix-card-icon"><Icon name="upload" size={20} /></span>
+        <div>
+          <b>Upload your {def.label}</b>
+          <small>{reader ? "PDF or photo. We read the boxes for you, then you check them." : "PDF or photo. It goes to your preparer with your return."}</small>
+        </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={pick} disabled={disabled || Boolean(state.busy)}>
+          {state.busy === "upload" ? "Uploading…" : state.busy === "read" ? "Reading…" : `Choose a file`}
+        </button>
+        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ""; }} />
+      </div>
+      {reader && (
+        <Check
+          label={`Let ${reader} read my uploaded tax forms to fill the boxes`}
+          hint={`The file is sent to ${reader} only to read it. Your Social Security number is never asked for or kept. You can type the amounts instead.`}
+          checked={Boolean(consent)} onChange={onConsent} disabled={disabled}
+        />
+      )}
+      <div role="status" aria-live="polite" className="small">
+        {state.busy === "read" && <span className="ix-save">Reading your {def.label}…</span>}
+        {state.done && <span className={state.warn ? "ix-pending" : "ix-save saved"}><Icon name={state.warn ? "alert" : "check"} size={14} /> {state.done}</span>}
+        {state.error && <span className="ix-save error"><Icon name="alert" size={14} /> {state.error}</span>}
+      </div>
+    </div>
+  );
+}
+
+function FormEditor({ type, forms, documents, onChange, disabled, spouseAllowed, returnId, reader, consent, onConsent, onUploaded }) {
   const def = FORM_TYPES[type];
   const mine = forms.filter((f) => f.type === type);
   const docs = (documents || []).filter((d) => d.type === FORM_DOC[type]);
-  const update = (id, key, value) => onChange(forms.map((f) => (f.id === id ? { ...f, [key]: value } : f)));
-  const add = () => onChange([...forms, { id: `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, type, owner: "taxpayer", issuer: "", state: "" }]);
-  const remove = (id) => onChange(forms.filter((f) => f.id !== id));
+  const [toCheck, setToCheck] = useState({});
+  const update = (id, key, value) => onChange((all) => all.map((f) => (f.id === id ? { ...f, [key]: value } : f)));
+  const add = () => onChange((all) => [...all, { id: newFormId(), type, owner: "taxpayer", issuer: "", state: "" }]);
+  const remove = (id) => onChange((all) => all.filter((f) => f.id !== id));
+  // A file just uploaded fills the empty form it belongs to, or a new one.
+  const fromDocument = ({ documentId, values, manual, isThisForm, note }) => {
+    const blank = forms.find((f) => f.type === type && !f.documentId && !def.fields.some(([k]) => f[k]));
+    const target = blank?.id || newFormId();
+    setToCheck((t) => ({ ...t, [target]: manual ? null : { isThisForm, note } }));
+    onChange((all) => (all.some((f) => f.id === target)
+      ? all.map((f) => (f.id === target ? { ...f, ...values, documentId } : f))
+      : [...all, { id: target, type, owner: "taxpayer", issuer: "", state: "", ...values, documentId }]));
+  };
   return (
     <div className="stack">
-      {mine.length === 0 && <p className="small muted">No {def.label} entered yet.</p>}
+      {!disabled && <FormUpload type={type} returnId={returnId} reader={reader} consent={consent} onConsent={onConsent} onUploaded={onUploaded} onRead={fromDocument} disabled={disabled} />}
+      {mine.length === 0 && <p className="small muted">No {def.label} entered yet. Upload it above or add it by hand.</p>}
       {mine.map((f, i) => (
-        <fieldset key={f.id} className="ix-form">
+        <fieldset key={f.id} className={`ix-form${toCheck[f.id] ? " to-check" : ""}`}>
           <legend>{def.label} {mine.length > 1 ? `#${i + 1}` : ""}{f.issuer ? ` · ${f.issuer}` : ""}</legend>
+          {toCheck[f.id] && (
+            <div className="ix-callout">
+              <Icon name="eye" size={18} />
+              <span><b>Filled from your document: check every box</b><small>{toCheck[f.id].note || "Compare each amount with your form before you continue. Correct anything that differs."}</small></span>
+              {!disabled && <button type="button" className="btn btn-light btn-sm" onClick={() => setToCheck((t) => ({ ...t, [f.id]: null }))}>Checked</button>}
+            </div>
+          )}
           <div className="grid-2">
             <Field label={def.issuerLabel} value={f.issuer} onChange={(v) => update(f.id, "issuer", v)} disabled={disabled} maxLength={100} />
             {["W2", "1099NEC", "1099K", "1099R", "1099INT", "1099DIV", "1099B", "1099G", "K1"].includes(type) && (
@@ -171,18 +253,18 @@ function FormEditor({ type, forms, documents, onChange, disabled, spouseAllowed 
           <div className="row between ix-form-foot">
             {docs.length > 0 ? (
               <div className="field" style={{ minWidth: 220 }}>
-                <label htmlFor={`${f.id}-doc`}>Matching uploaded document</label>
+                <label htmlFor={`${f.id}-doc`}>Uploaded document</label>
                 <select id={`${f.id}-doc`} className="select" value={f.documentId || ""} onChange={(e) => update(f.id, "documentId", e.target.value)} disabled={disabled}>
                   <option value="">Not linked</option>
                   {docs.map((d) => <option key={d.id} value={d.id}>{d.filename}</option>)}
                 </select>
               </div>
-            ) : <span className="hint">Upload the {def.label} under Documents. Amounts are typed here; nothing is read from the file automatically.</span>}
+            ) : <span className="hint">No file linked yet.</span>}
             {!disabled && <button type="button" className="btn btn-ghost btn-sm" onClick={() => remove(f.id)}><Icon name="trash" size={14} /> Remove</button>}
           </div>
         </fieldset>
       ))}
-      {!disabled && <button type="button" className="btn btn-light" onClick={add}><Icon name="plus" size={16} /> Add {mine.length ? "another " : "a "}{def.label}</button>}
+      {!disabled && <button type="button" className="btn btn-light" onClick={add}><Icon name="plus" size={16} /> Add {mine.length ? "another " : "a "}{def.label} by hand</button>}
     </div>
   );
 }
@@ -202,9 +284,10 @@ function suggestStatus(d) {
 
 // ---- Main ------------------------------------------------------------------------------
 
-export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenReason, prior, documents }) {
+export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenReason, prior, documents: initialDocuments, reader = null }) {
   const router = useRouter();
   const [d, setD] = useState(initial);
+  const [documents, setDocuments] = useState(initialDocuments || []);
   const readOnly = Boolean(locked || frozenReason);
   const hasPrior = Boolean(prior);
   const steps = useMemo(() => buildSteps(d, { hasPrior }), [d, hasPrior]);
@@ -779,8 +862,18 @@ export default function IntakeFlow({ returnId, taxYear, initial, locked, frozenR
       if (step.kind === "forms") {
         const def = FORM_TYPES[step.formType];
         title = `Your ${def.label} ${formsFor(step.formType).length > 1 ? "forms" : "form"}`;
-        lead = `${def.title}. Copy the amounts from each form; leave a box blank if it is empty.`;
-        body = <FormEditor type={step.formType} forms={d.forms} documents={documents} onChange={(v) => set(["forms"], v)} disabled={readOnly} spouseAllowed={joint} />;
+        lead = reader
+          ? `${def.title}. Upload each form and we fill the boxes for you to check, or type them yourself.`
+          : `${def.title}. Upload each form for your preparer and type its amounts; leave a box blank if it is empty.`;
+        body = (
+          <FormEditor
+            type={step.formType} forms={d.forms} documents={documents} disabled={readOnly} spouseAllowed={joint}
+            onChange={(fn) => { if (readOnly) return; setD((prev) => ({ ...prev, forms: fn(prev.forms) })); schedule(); }}
+            returnId={returnId} reader={reader} consent={Boolean(d.documentReading)}
+            onConsent={(v) => set(["documentReading"], v ? { version: READING_CONSENT, at: new Date().toISOString() } : null)}
+            onUploaded={(doc) => setDocuments((list) => [...list, doc])}
+          />
+        );
       }
   }
 
