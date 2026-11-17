@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Pages depend on the user's session cookie, so render at request time.
+  experimental: { agentUpgrade: "security" },
   turbopack: { root: import.meta.dirname },
   output: "standalone",
   poweredByHeader: false,
