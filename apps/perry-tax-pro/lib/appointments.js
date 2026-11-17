@@ -17,7 +17,7 @@ import { ensureVideoRoom, maskPhone, sendSms, toE164, twilioSmsConfigured, twili
 export const SETTINGS_PATH = "taxSettings/booking";
 const DAY = 86_400_000;
 const MINUTE = 60_000;
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 
 // How a preparer says they passed the meeting link on. These are records of something
 // a person did outside the app.

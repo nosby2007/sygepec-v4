@@ -2,12 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
 import { ServiceArticle } from "@/components/CmsViews";
+import { mediaUrl } from "@/lib/business-display";
 import { publicEntry } from "@/lib/cms";
 
 export async function generateMetadata({ params }) {
   const entry = await publicEntry("SERVICE", (await params).slug);
   if (!entry) return { title: "Service not found", robots: { index: false } };
-  return { title: entry.title, description: entry.summary, alternates: { canonical: `/services/${entry.slug}` }, openGraph: { title: entry.title, description: entry.summary, type: "article" } };
+  const cover = entry.imagePath ? mediaUrl(entry.imagePath) : "/photos/family.jpg";
+  return {
+    title: entry.title,
+    description: entry.summary,
+    alternates: { canonical: `/services/${entry.slug}` },
+    openGraph: { title: entry.title, description: entry.summary, url: `/services/${entry.slug}`, type: "article", images: [{ url: cover, alt: entry.title }] },
+    twitter: { card: "summary_large_image", title: entry.title, description: entry.summary, images: [cover] },
+  };
 }
 
 export default async function ServicePage({ params }) {

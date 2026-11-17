@@ -9,11 +9,11 @@ const nextConfig = {
     const development = process.env.NODE_ENV !== "production";
     const policy = (connect) => [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}`,
+      `script-src 'self' 'unsafe-inline' https://bzrcdn.openai.com${development ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://bzr.openai.com",
       "font-src 'self' data:",
-      `connect-src 'self'${connect}`,
+      `connect-src 'self' https://bzr.openai.com https://bzrcdn.openai.com${connect}`,
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

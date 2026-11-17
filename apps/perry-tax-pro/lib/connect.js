@@ -14,7 +14,7 @@ import { DEFAULT_SET_ASIDE_PERCENT, clampPercent, periodOf, reserveFor, setAside
 //   taxPayouts/{uid}            connected account, payout status, tax set-aside rates
 //   taxBizPayments/{sessionId}  one online invoice payment and its tax set-aside
 // Both are server-only (no security rules); every function checks the session first.
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 
 export class ConnectError extends Error {
   constructor(message, status = 400) {

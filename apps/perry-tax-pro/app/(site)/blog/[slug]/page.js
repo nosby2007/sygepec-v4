@@ -2,18 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
 import { PostArticle } from "@/components/CmsViews";
+import { mediaUrl } from "@/lib/business-display";
 import { publicEntry } from "@/lib/cms";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 
 export async function generateMetadata({ params }) {
   const entry = await publicEntry("POST", (await params).slug);
   if (!entry) return { title: "Article not found", robots: { index: false } };
+  const cover = entry.imagePath ? mediaUrl(entry.imagePath) : "/photos/paperwork.jpg";
   return {
     title: entry.title,
     description: entry.summary,
     alternates: { canonical: `/blog/${entry.slug}` },
-    openGraph: { title: entry.title, description: entry.summary, type: "article", publishedTime: entry.publishedAt || undefined },
+    openGraph: { title: entry.title, description: entry.summary, url: `/blog/${entry.slug}`, type: "article", publishedTime: entry.publishedAt || undefined, images: [{ url: cover, alt: entry.title }] },
+    twitter: { card: "summary_large_image", title: entry.title, description: entry.summary, images: [cover] },
   };
 }
 
@@ -28,6 +31,8 @@ export default async function PostPage({ params }) {
     datePublished: entry.publishedAt || new Date(entry.visibleFrom).toISOString(),
     dateModified: entry.updatedAt,
     url: new URL(`/blog/${entry.slug}`, SITE).toString(),
+    image: new URL(entry.imagePath ? mediaUrl(entry.imagePath) : "/photos/paperwork.jpg", SITE).toString(),
+    publisher: { "@type": "Organization", name: "InnovaCare Software", url: SITE },
     ...(entry.fields?.author ? { author: { "@type": "Person", name: entry.fields.author } } : {}),
   };
   return (

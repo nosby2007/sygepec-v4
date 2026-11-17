@@ -11,5 +11,5 @@ export async function GET(req) {
   const target = result?.kind === "BUSINESS_PLAN" ? "/portal/business/plan"
     : result?.kind === "BUSINESS_RETURN" ? "/portal/business/plan" : "/portal";
   const flag = result?.paid ? "paid" : "pending";
-  return Response.redirect(new URL(APP_SCHEMES[app] ? appReturn(app, flag) : `${target}?payment=${flag}`, process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app"), 303);
+  return Response.redirect(new URL(APP_SCHEMES[app] ? appReturn(app, flag) : `${target}?payment=${flag}`, process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com"), 303);
 }

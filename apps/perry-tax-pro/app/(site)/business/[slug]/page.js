@@ -8,7 +8,7 @@ import { publicFeedback } from "@/lib/business-growth";
 import { listPortfolio } from "@/lib/portfolio";
 import { addressLine, mediaUrl, money, weeklySummary } from "@/lib/business-display";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 
 export async function generateMetadata({ params }) {
   const profile = await resolveBusiness((await params).slug);

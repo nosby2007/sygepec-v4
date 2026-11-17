@@ -1,7 +1,7 @@
 import "server-only";
 
 // Optional transactional/marketing email through Resend's HTTP API. Off unless both
-// RESEND_API_KEY and MAIL_FROM (a verified sender, e.g. "InnovaCare <contact@innovacarereview.com>")
+// RESEND_API_KEY and MAIL_FROM (a verified sender, e.g. "InnovaCare <contact@innovacaresoftware.com>")
 // are set in the server environment. Without them, owners copy messages and send them themselves.
 export function mailerConfigured() {
   return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);

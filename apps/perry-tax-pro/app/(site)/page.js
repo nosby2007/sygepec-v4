@@ -3,6 +3,8 @@ import Image from "next/image";
 import Icon from "@/components/Icon";
 import { getSiteSettings } from "@/lib/cms";
 
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
+
 // Photos are free-licence Unsplash images stored under /public/photos (see docs/PHOTOS.md).
 // Replace them with photos of the real office and team when available.
 
@@ -33,6 +35,16 @@ const bring = [
 
 export default async function Home() {
   const site = await getSiteSettings().catch(() => ({}));
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": ["Organization", "ProfessionalService"],
+    name: "InnovaCare Tax",
+    url: SITE,
+    image: new URL("/photos/consult.jpg", SITE).toString(),
+    description: "Individual, self-employed and small business tax preparation with a secure client portal.",
+    ...(site.phone ? { telephone: site.phone } : {}),
+    ...(site.email ? { email: site.email } : {}),
+  };
   const contact = [
     site.phone && { label: "Call us", value: site.phone, href: `tel:${site.phone.replace(/[^\d+]/g, "")}` },
     site.email && { label: "Email", value: site.email, href: `mailto:${site.email}` },
@@ -42,6 +54,7 @@ export default async function Home() {
 
   return (
     <main>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <section className="pub-hero">
         <Image src="/photos/consult.jpg" alt="A tax preparer going over a return with a client at a table" fill priority sizes="100vw" style={{ objectFit: "cover", objectPosition: "70% 40%" }} />
         <div className="container">
