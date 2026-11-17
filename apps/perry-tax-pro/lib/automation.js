@@ -122,7 +122,7 @@ const RUNNERS = {
       const list = missing.slice(0, 6).map((t) => `- ${DOC_TYPES[t] || t}`).join("\n");
       results.push(await deliver(ctx, {
         email: { to: r.clientEmail, name: r.clientName, subject: "Documents still needed for your tax return", text: `We are still waiting for ${missing.length} document${missing.length === 1 ? "" : "s"}:\n${list}\n\nYou can upload them from your phone in the portal.`, link: "/portal/documents" },
-        text: { to: r.clientPhone, text: `we still need ${missing.length} document${missing.length === 1 ? "" : "s"} for your return. Upload them in your portal: ${process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app"}/portal/documents` },
+        text: { to: r.clientPhone, text: `we still need ${missing.length} document${missing.length === 1 ? "" : "s"} for your return. Upload them in your portal: ${process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com"}/portal/documents` },
         mark: { path: `taxReturns/${r.id}`, fields: { lastDocReminderAt: new Date(ctx.nowMs).toISOString() } },
       }));
     }

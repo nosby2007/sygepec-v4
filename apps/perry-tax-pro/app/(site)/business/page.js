@@ -7,6 +7,8 @@ import { PLAN_HIGHLIGHTS, TRIAL_DAYS } from "@/lib/plans";
 export const metadata = {
   title: "InnovaCare Business",
   description: "A separate workspace for small businesses: bookkeeping, customers, online booking, reminders, invoices and a tax-ready year end.",
+  alternates: { canonical: "/business" },
+  openGraph: { images: [{ url: "/photos/shop.jpg", alt: "A small business owner serving a customer" }] },
 };
 
 const features = [

@@ -18,7 +18,7 @@ import { cleanEmail, cleanText, safeId } from "@/lib/security";
 // When everyone has signed, the signed PDF and DocuSeal's audit trail are saved to the
 // return's documents and the return is marked signed.
 const API = "https://api.docuseal.com";
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
 
 export class SignError extends Error {

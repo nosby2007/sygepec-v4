@@ -4,7 +4,7 @@ import { appMode } from "@/lib/auth";
 import { appHome } from "@/lib/app-mode";
 import { safeNext } from "@/lib/idle";
 
-export const metadata = { title: "Log In", description: "Log in to your InnovaCare Tax client portal." };
+export const metadata = { title: "Log In", description: "Log in to your InnovaCare Tax client portal.", robots: { index: false, follow: false } };
 
 export default async function Page({ searchParams }) {
   const next = safeNext((await searchParams)?.next);

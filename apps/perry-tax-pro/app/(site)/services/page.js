@@ -8,6 +8,7 @@ export const metadata = {
   title: "Services",
   description: "Tax preparation and planning services from InnovaCare Tax.",
   alternates: { canonical: "/services" },
+  openGraph: { images: [{ url: "/photos/family.jpg", alt: "A family reviewing information together" }] },
 };
 
 export default async function ServicesPage() {

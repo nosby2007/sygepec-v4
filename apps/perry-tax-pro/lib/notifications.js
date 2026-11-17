@@ -4,7 +4,7 @@ import { sendSms, toE164, twilioSmsConfigured } from "@/lib/twilio";
 
 // Messages the app sends to clients on its own. Every message points to the portal
 // rather than carrying tax details, since email and text are not private channels.
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 const FROM = "InnovaCare Tax";
 const first = (name) => String(name || "").trim().split(/\s+/)[0] || "there";
 

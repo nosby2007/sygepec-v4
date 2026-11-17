@@ -15,7 +15,7 @@ import { cleanText, safeId } from "@/lib/security";
 //   taxBilling/{uid}            a business workspace subscription
 // Neither collection has security rules, so only the server (service identity) can read
 // or write them; every function here checks the caller's session first.
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 
 export class PaymentError extends Error {
   constructor(message, status = 400) {

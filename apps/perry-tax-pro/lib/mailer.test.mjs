@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { fromHeader, sendEmail } from "./mailer.js";
 
 test("the business name shows as sender on the verified address", () => {
-  const from = "InnovaCare <contact@innovacarereview.com>";
-  assert.equal(fromHeader("Maple Studio", from), '"Maple Studio via InnovaCare" <contact@innovacarereview.com>');
-  assert.equal(fromHeader('Evil" <x@y.z>\r\nBcc: a', from), '"Evil x@y.zBcc: a via InnovaCare" <contact@innovacarereview.com>');
+  const from = "InnovaCare <contact@innovacaresoftware.com>";
+  assert.equal(fromHeader("Maple Studio", from), '"Maple Studio via InnovaCare" <contact@innovacaresoftware.com>');
+  assert.equal(fromHeader('Evil" <x@y.z>\r\nBcc: a', from), '"Evil x@y.zBcc: a via InnovaCare" <contact@innovacaresoftware.com>');
   assert.equal(fromHeader("", from), from);
-  assert.equal(fromHeader("Solo", "contact@innovacarereview.com"), '"Solo" <contact@innovacarereview.com>');
+  assert.equal(fromHeader("Solo", "contact@innovacaresoftware.com"), '"Solo" <contact@innovacaresoftware.com>');
 });
 
 test("messages carry reply-to, unsubscribe and no header injection", async () => {
-  Object.assign(process.env, { RESEND_API_KEY: "test-key", MAIL_FROM: "InnovaCare <contact@innovacarereview.com>" });
+  Object.assign(process.env, { RESEND_API_KEY: "test-key", MAIL_FROM: "InnovaCare <contact@innovacaresoftware.com>" });
   let sent;
   await sendEmail({ to: "a@example.test", subject: "Hi\r\nBcc: x", text: "Body", unsubscribeUrl: "https://u", oneClickUrl: "https://o", replyTo: "shop@example.test", fromName: "Maple" },
     async (url, init) => { sent = { url, init }; return new Response("{}", { status: 200 }); });
