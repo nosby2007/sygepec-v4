@@ -11,6 +11,7 @@
 // chain can be exercised and tested without pretending to speak MeF.
 import crypto from "node:crypto";
 import { EfileError } from "@/lib/efile/states";
+import { GEORGIA_RULES, georgiaSandboxAdapter, georgiaSchemaStatus, georgiaStepForLine, officialGeorgiaAdapter } from "@/lib/efile/georgia";
 
 const sha256 = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -26,6 +27,7 @@ export function sandboxAdapter(taxYear = 2026) {
   const name = (id) => `Line_${String(id).replace(/[^A-Za-z0-9]/g, "_")}`;
   return {
     id: `INNOVATAX-SANDBOX-${taxYear}`,
+    jurisdiction: "US",
     taxYear,
     official: false,
     namespace: `${SANDBOX_NS}:${taxYear}`,
@@ -39,9 +41,18 @@ export function sandboxAdapter(taxYear = 2026) {
 // obtain the package from e-Services, add an adapter built from its XSD files, and
 // register it here with the exact package version. Until then this returns null.
 const OFFICIAL_ADAPTERS = {};
-export const officialAdapter = (taxYear) => OFFICIAL_ADAPTERS[Number(taxYear)] || null;
+// Each jurisdiction has its own schema: Georgia's lives in lib/efile/georgia.js.
+export const officialAdapter = (taxYear, jurisdiction = "US") => (jurisdiction === "GA" ? officialGeorgiaAdapter(taxYear) : jurisdiction === "US" ? OFFICIAL_ADAPTERS[Number(taxYear)] || null : null);
 
-export function schemaPackageStatus(taxYear = 2026) {
+// The sandbox adapter of a jurisdiction. A jurisdiction without one cannot be packaged.
+export function sandboxAdapterFor(jurisdiction = "US", taxYear = 2026) {
+  if (jurisdiction === "US") return sandboxAdapter(taxYear);
+  if (jurisdiction === "GA") return georgiaSandboxAdapter(taxYear);
+  throw new EfileError(`Electronic filing for ${jurisdiction} is not supported.`, 409, "EFILE_NO_ADAPTER");
+}
+
+export function schemaPackageStatus(taxYear = 2026, jurisdiction = "US") {
+  if (jurisdiction === "GA") return georgiaSchemaStatus(taxYear);
   const adapter = officialAdapter(taxYear);
   return {
     installed: Boolean(adapter),
@@ -56,7 +67,7 @@ export function schemaPackageStatus(taxYear = 2026) {
 const FORM_OF_PREFIX = { 1040: "Form 1040", S1: "Schedule 1", S2: "Schedule 2", S3: "Schedule 3", A: "Schedule A", D: "Schedule D", E: "Schedule E", "1A": "Schedule 1-A", 8962: "Form 8962", 500: "Georgia Form 500" };
 
 // Neutral description of the return, built only from the frozen calculation.
-export function buildReturnData({ returnId, taxYear, intake = {}, calculation, fingerprint, jurisdiction = "US" }) {
+export function buildReturnData({ returnId, taxYear, intake = {}, calculation, fingerprint, jurisdiction = "US", linkedFederalRef = "" }) {
   if (!calculation?.federal?.lines) throw new EfileError("There is no approved calculation to package.", 409, "EFILE_NO_CALCULATION");
   const source = jurisdiction === "US" ? calculation.federal : (calculation.states || []).find((s) => s.code === jurisdiction);
   if (!source) throw new EfileError(`There is no approved ${jurisdiction} calculation to package.`, 409, "EFILE_NO_CALCULATION");
@@ -75,6 +86,9 @@ export function buildReturnData({ returnId, taxYear, intake = {}, calculation, f
       ruleSet: `${source.ruleSet?.id || ""}@${source.ruleSet?.version || ""}`,
       filingStatus: intake.filingStatus || "",
       fingerprint: fingerprint || "",
+      // A state return names the federal submission it is linked to and repeats the
+      // federal figure it starts from.
+      ...(jurisdiction === "US" ? {} : { linkedFederalRef, federalAgi: Math.round(calculation.federal.lines["1040.11"] || 0) }),
       // Full identification numbers are never stored by this application. A real
       // transmission takes them from a secure store at send time.
       filer: { firstName: p.firstName || "", lastName: p.lastName || "", idLast4: p.ssnLast4 || "", state: p.state || "", zip: p.zip || "" },
@@ -94,6 +108,7 @@ export function renderXml(data, adapter) {
   out.push("  <Header>");
   for (const k of ["returnId", "taxYear", "jurisdiction", "returnType", "ruleSet", "filingStatus", "fingerprint"]) out.push(`    <${k}>${esc(h[k])}</${k}>`);
   out.push(`    <Filer firstName="${esc(h.filer.firstName)}" lastName="${esc(h.filer.lastName)}" idLast4="${esc(h.filer.idLast4)}" state="${esc(h.filer.state)}" zip="${esc(h.filer.zip)}"/>`);
+  if (h.linkedFederalRef !== undefined) out.push(`    <LinkedFederal ref="${esc(h.linkedFederalRef)}" federalAgi="${esc(h.federalAgi)}"/>`);
   if (h.spouse) out.push(`    <Spouse name="${esc(h.spouse.name)}" idLast4="${esc(h.spouse.idLast4)}"/>`);
   for (const d of h.dependents) out.push(`    <Dependent name="${esc(d.name)}" relationship="${esc(d.relationship)}" idLast4="${esc(d.idLast4)}"/>`);
   out.push("  </Header>");
@@ -151,6 +166,7 @@ export function validateXml(xml, adapter) {
   else if (root.attrs.xmlns !== adapter.namespace) err("SCHEMA_NAMESPACE", `The namespace must be ${adapter.namespace}.`);
   const find = (path) => nodes.filter((x) => x.path === path);
   for (const k of ["returnId", "taxYear", "jurisdiction", "returnType", "filingStatus", "fingerprint"]) if (find(`${adapter.root}/Header/${k}`).length !== 1) err("SCHEMA_REQUIRED", `Header element <${k}> must appear once.`, `Header/${k}`);
+  if (adapter.jurisdiction && adapter.jurisdiction !== "US" && find(`${adapter.root}/Header/LinkedFederal`).length !== 1) err("SCHEMA_REQUIRED", "Header element <LinkedFederal> must appear once.", "Header/LinkedFederal");
   if (find(`${adapter.root}/Header/Filer`).length !== 1) err("SCHEMA_REQUIRED", "Header element <Filer> must appear once.", "Header/Filer");
   if (!find(`${adapter.root}/Form`).length) err("SCHEMA_REQUIRED", "At least one <Form> is required.", "Form");
   const seen = new Set();
@@ -187,12 +203,13 @@ const RULES = [
 
 export function runBusinessRules(data) {
   const errors = [];
-  for (const [rule, message, ok, path, step] of RULES) {
+  const rules = data.header.jurisdiction === "GA" ? [...RULES, ...GEORGIA_RULES] : RULES;
+  for (const [rule, message, ok, path, step] of rules) {
     let passed = false;
     try { passed = Boolean(ok(data)); } catch { passed = false; }
     if (!passed) errors.push({ code: rule, message, path, lineId: /^\d|^[SADE]\d?\./.test(path) ? path : "", step });
   }
-  return { ok: errors.length === 0, errors, rulesRun: RULES.length };
+  return { ok: errors.length === 0, errors, rulesRun: rules.length };
 }
 
 // ---- Package and identity ----------------------------------------------------------------
@@ -204,15 +221,27 @@ export function idempotencyKey({ returnId, taxYear, jurisdiction = "US", fingerp
   return sha256(["innovatax-efile", returnId, taxYear, jurisdiction, fingerprint].join("|"));
 }
 
-export function buildPackage(input, adapter = sandboxAdapter(input.taxYear)) {
-  const data = buildReturnData(input);
+// The submission reference of a package, from its key.
+const refOf = (key, official) => `${official ? "" : "SBX-"}${key.slice(0, 20)}`;
+
+export function buildPackage(input, chosen = null) {
+  const jurisdiction = input.jurisdiction || "US";
+  // A missing calculation is the clearer error, so it is checked before the adapter.
+  if (!chosen) buildReturnData(input);
+  const adapter = chosen || sandboxAdapterFor(jurisdiction, input.taxYear);
+  if ((adapter.jurisdiction || "US") !== jurisdiction) throw new EfileError(`Schema ${adapter.id} is not for ${jurisdiction}.`, 409, "EFILE_ADAPTER_MISMATCH");
+  // A state package is linked to the federal submission for the same approved figures,
+  // whose reference is known before it is built.
+  const linkedFederalRef = jurisdiction === "US" ? undefined : refOf(idempotencyKey({ returnId: input.returnId, taxYear: input.taxYear, jurisdiction: "US", fingerprint: input.fingerprint }), adapter.official);
+  const data = buildReturnData({ ...input, ...(linkedFederalRef ? { linkedFederalRef } : {}) });
   const xml = renderXml(data, adapter);
   const schema = validateXml(xml, adapter);
   const rules = runBusinessRules(data);
   const key = idempotencyKey({ returnId: input.returnId, taxYear: input.taxYear, jurisdiction: data.header.jurisdiction, fingerprint: input.fingerprint });
   return {
     key,
-    submissionRef: `${adapter.official ? "" : "SBX-"}${key.slice(0, 20)}`,
+    submissionRef: refOf(key, adapter.official),
+    linkedFederalRef: linkedFederalRef || null,
     adapterId: adapter.id,
     official: adapter.official,
     jurisdiction: data.header.jurisdiction,
@@ -244,9 +273,10 @@ export function parseAcknowledgement(raw, { expected, adapter, authoritative = f
   if (root.attrs.packageHash && root.attrs.packageHash !== expected.hash) return fail("The acknowledgement does not match the package that was sent.");
   const status = root.attrs.status === "Accepted" ? "ACCEPTED" : root.attrs.status === "Rejected" ? "REJECTED" : null;
   if (!status) return fail("The acknowledgement has no acceptance status.");
+  const stepFor = adapter.jurisdiction === "GA" ? georgiaStepForLine : stepForLine;
   const list = nodes.filter((x) => x.name === "Error").map((x) => {
     const lineId = x.attrs.path ? adapter.lineFor(x.attrs.path.split("/").pop()) || "" : "";
-    return { code: x.attrs.code || "UNKNOWN", category: x.attrs.category || "", message: x.text || x.attrs.message || "", path: x.attrs.path || "", lineId, step: stepForLine(lineId) || x.attrs.step || "" };
+    return { code: x.attrs.code || "UNKNOWN", category: x.attrs.category || "", message: x.text || x.attrs.message || "", path: x.attrs.path || "", lineId, step: stepFor(lineId) || x.attrs.step || "" };
   });
   if (status === "REJECTED" && !list.length) return fail("A rejection must name at least one error.");
   return { verified: true, authoritative, status, receivedAt: root.attrs.timestamp || "", errors: list };

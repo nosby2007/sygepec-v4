@@ -65,7 +65,9 @@ test("onboarding: nothing is ready until every step for that gate is done", () =
   assert.ok(recordedOnly.steps.filter((s) => s.derived).every((s) => s.status === "NOT_STARTED"));
   // A recorded step whose server setting is missing is flagged.
   assert.ok(recordedOnly.steps.find((s) => s.id === "EFIN").warning.includes("MEF_EFIN"));
-  const all = onboardingView(done, { schema: true, transport: true, gaTransport: true, reference: true }, { MEF_EFIN: true, MEF_ETIN: true, MEF_A2A_CERT_SECRET: true, EFILE_PRODUCTION_AUTHORIZED: true });
+  const all = onboardingView(done, { schema: true, transport: true, gaSchema: true, gaTransport: true, reference: true }, { MEF_EFIN: true, MEF_ETIN: true, MEF_A2A_CERT_SECRET: true, EFILE_PRODUCTION_AUTHORIZED: true, GA_EFILE_AUTHORIZED: true });
+  // Federal settings without Georgia's: Georgia is flagged.
+  assert.ok(onboardingView(done, {}, { EFILE_PRODUCTION_AUTHORIZED: true }).steps.find((s) => s.id === "GA_APPROVAL").warning.includes("GA_EFILE_AUTHORIZED"));
   assert.equal(all.readyForGeorgia, true);
   assert.ok(all.steps.every((s) => !s.warning));
 });

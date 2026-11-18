@@ -287,3 +287,64 @@ Developer, Transmitter) -> suitability -> ETIN in test status -> download the sc
 A2A specifications -> engineering builds the official adapter and transport -> enter the
 Pub. 1436 scenarios -> ATS -> communication test -> production status -> security sign-off
 (Pub. 4557, Pub. 1345) -> production switch. Georgia follows with its own approval.
+
+## 9. Georgia e-file adapter, phase 7
+
+**What Georgia publishes** (checked November 2026; confirm every year with Georgia DOR):
+
+- Georgia takes individual income tax returns (Form 500) through the Fed/State
+  Modernized e-File program. Its developer guide is the "Fed/State MeF Individual Income
+  Tax Electronic Filing Guidelines & Information for Software Developers". The newest
+  edition found online was for tax year 2017. Ask Georgia for the current one.
+- Each tax year, a software developer sends Georgia a Letter of Intent and registers its
+  product before testing. Georgia then runs its own testing and approves the product.
+  Georgia sets its deadlines every year.
+- Vendor contact: GA.Vendors@dor.ga.gov.
+- **IRS approval does not include Georgia.** Georgia needs the whole federal path (e-file
+  application, ATS, production status) plus its own approval on top.
+
+**What is built:**
+
+- `lib/efile/georgia.js` has:
+  - the Georgia sandbox schema adapter (`INNOVATAX-GA-SANDBOX-<year>`, with its own
+    namespace, separate from the federal one);
+  - the InnovaTax Georgia checks (IX-GA-001 to 009). These are not Georgia's business
+    rules.
+- **Link to the federal return.** Every Georgia package is linked to the federal
+  submission for the same approved figures (`<LinkedFederal>`). That reference is known
+  before either package is built. A Georgia submission:
+  - can be built at any time;
+  - waits while the federal return has not been sent;
+  - is blocked if the federal return was rejected, or was filed through other software.
+    Georgia-only submissions are not supported.
+- **Separate Georgia sandbox receiver** (`INNOVATAX-GA-SANDBOX`). It rejects a Georgia
+  return whose federal submission never arrived (GA-SBX-LINK-1) or was rejected
+  (GA-SBX-LINK-2). A Georgia rejection points to the screen that fixes it.
+- **Separate production gate.**
+  - `GA_EFILE_AUTHORIZED=true` records Georgia's approval. It is never implied by the
+    federal settings.
+  - Every federal gap is also a Georgia gap.
+  - No Georgia transport or schema adapter is installed, so Georgia production is always
+    refused.
+- **On the return**, Georgia's state is stored apart from the federal one (`efileGa`). It
+  never changes the return's federal filing status. Clients see it only for real (not
+  sandbox) submissions.
+- **Onboarding** now lists these Georgia steps: Letter of Intent, product registration,
+  Georgia schema, Georgia schema adapter (read from the code), Georgia testing, Georgia
+  approval (checked against `GA_EFILE_AUTHORIZED`), and the official transport.
+
+**Not supported yet:**
+
+- correcting a rejected Georgia return after the federal return was accepted (that needs
+  a Georgia-only resubmission);
+- Form 500X;
+- Forms IND-CR and 500-NOL.
+
+**To finish (owner):**
+
+1. Letter of Intent and product registration with Georgia DOR.
+2. Get Georgia's current guide, schema and test cases.
+3. Engineering builds the official Georgia adapter and transport from them.
+4. Georgia testing.
+5. Georgia approval letter.
+6. Set `GA_EFILE_AUTHORIZED=true`. This happens only after the federal production status.

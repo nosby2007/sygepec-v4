@@ -55,6 +55,14 @@ export default async function TaxYearsPage() {
                     </span>
                   </div>
                 )}
+                {item.efile_ga?.state && !item.efile_ga.sandbox && <div className="row between"><span className="muted">Georgia transmission</span><b>{EFILE_LABEL[item.efile_ga.state] || item.efile_ga.state}</b></div>}
+                {item.efile_ga?.state === "REJECTED" && !item.efile_ga.sandbox && item.efile_ga.rejections.length > 0 && (
+                  <div className="alert alert-error small">
+                    <span>Georgia rejected the state return. Your preparer is correcting it.
+                      {item.efile_ga.rejections.map((e) => <span key={e.code} style={{ display: "block" }}>{e.message}</span>)}
+                    </span>
+                  </div>
+                )}
                 <div className="row between"><span className="muted">Updated</span><b>{fmtDate(item.updated_at)}</b></div>
                 {item.carry_forward_from_tax_year && <p className="hint"><Icon name="refresh" size={12} /> Started from your {item.carry_forward_from_tax_year} return.</p>}
               </div>

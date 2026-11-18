@@ -4,6 +4,8 @@ import { canTransition, EFILE_STATES, EfileError, transition } from "./states.js
 import { buildPackage, idempotencyKey, parseAcknowledgement, renderXml, runBusinessRules, sandboxAdapter, schemaPackageStatus, validateXml, buildReturnData } from "./package.js";
 import { afterAck, afterSend, applyEvent, newRecord, readinessIssues, recordView, refreshRecord, returnStatusFor, signatureMatches } from "./submission.js";
 import { efileConfig, memoryStore, productionGaps, sandboxTransport, transportFor } from "./transport.js";
+import { federalLinkIssue, GEORGIA_PROGRAM, georgiaSandboxAdapter } from "./georgia.js";
+import { sandboxAdapterFor } from "./package.js";
 import { computeReturn } from "../tax-engine/index.js";
 import { sanitizeIntake } from "../intake-schema.js";
 
@@ -158,7 +160,7 @@ test("records follow signatures and readiness until they are sent", () => {
 
 async function send(record, transport) {
   const sending = applyEvent(record, "SEND_STARTED", opts);
-  const res = await transport.send({ submissionRef: record.submissionRef, hash: record.hash, valid: !record.validationErrors.length, errors: record.validationErrors });
+  const res = await transport.send({ submissionRef: record.submissionRef, linkedFederalRef: record.linkedFederalRef, hash: record.hash, valid: !record.validationErrors.length, errors: record.validationErrors });
   return afterSend(sending, res, transport, opts);
 }
 
@@ -269,7 +271,119 @@ test("production transmission is refused until it really exists and is authorize
   assert.throws(() => transportFor({ config: all }), (e) => e.code === "EFILE_NOT_AUTHORIZED" && e.status === 403);
   assert.deepEqual(productionGaps(all).length, 1);
   assert.match(productionGaps(all, "GA")[0], /own approval/);
+  assert.ok(productionGaps(all, "GA").some((g) => g.startsWith("Federal: ")), "every federal gap is also a Georgia gap");
   // An EFIN alone is far from enough.
   assert.ok(productionGaps(efileConfig({ EFILE_MODE: "production", MEF_EFIN: "x" })).length >= 4);
   assert.deepEqual(efileConfig({ EFILE_TRANSMITTER_UIDS: " a, b ,," }).transmitters, ["a", "b"]);
+});
+
+// ---- Georgia ---------------------------------------------------------------------------------
+
+const gaRecord = (pkg = buildPackage(input({ jurisdiction: "GA" }))) => newRecord({ pkg, returnId: "ret1", clientId: "c1", fingerprint: FP, signaturesComplete: true, blocking: false, ...opts, tenantId: "t" });
+
+test("Georgia package: its own format, its own checks, linked to the federal submission", () => {
+  const us = buildPackage(input());
+  const ga = buildPackage(input({ jurisdiction: "GA" }));
+  assert.equal(ga.valid, true, JSON.stringify(ga.errors));
+  assert.equal(ga.adapterId, "INNOVATAX-GA-SANDBOX-2026");
+  assert.match(ga.xml, /<SandboxGeorgiaReturn xmlns="urn:innovatax:sandbox:ga-return:2026"/);
+  assert.doesNotMatch(ga.xml, /Line_1040/, "no federal lines in the Georgia package");
+  // Linked to the federal submission for the same approved figures, known in advance.
+  assert.equal(ga.linkedFederalRef, us.submissionRef);
+  assert.equal(us.linkedFederalRef, null);
+  assert.match(ga.xml, new RegExp(`<LinkedFederal ref="${us.submissionRef}" federalAgi="${calculation.federal.lines["1040.11"]}"/>`));
+  // The adapters never mix.
+  assert.throws(() => buildPackage(input({ jurisdiction: "GA" }), sandboxAdapter(2026)), (e) => e.code === "EFILE_ADAPTER_MISMATCH");
+  assert.throws(() => buildPackage(input(), georgiaSandboxAdapter(2026)), (e) => e.code === "EFILE_ADAPTER_MISMATCH");
+  assert.throws(() => sandboxAdapterFor("AL"), (e) => e.code === "EFILE_NO_ADAPTER");
+  // Schema: the link is required.
+  const adapter = georgiaSandboxAdapter(2026);
+  assert.equal(validateXml(ga.xml, adapter).ok, true);
+  assert.ok(validateXml(ga.xml.replace(/\s*<LinkedFederal[^>]*\/>/, ""), adapter).errors.some((e) => e.path === "Header/LinkedFederal"));
+  // Georgia checks run on Georgia packages only.
+  const data = buildReturnData({ ...input({ jurisdiction: "GA" }), linkedFederalRef: ga.linkedFederalRef });
+  assert.equal(runBusinessRules(data).ok, true, JSON.stringify(runBusinessRules(data).errors));
+  assert.ok(runBusinessRules(data).rulesRun > runBusinessRules(buildReturnData(input())).rulesRun);
+  const bump = (id, by) => ({ ...data, forms: data.forms.map((f) => ({ ...f, lines: f.lines.map((l) => (l.id === id ? { ...l, value: l.value + by } : l)) })) });
+  const codes = (d) => runBusinessRules(d).errors.map((e) => e.code);
+  assert.ok(codes(bump("500.8", 100)).includes("IX-GA-003"), "Georgia must start from the federal AGI");
+  assert.ok(codes(bump("500.28", 100)).includes("IX-GA-007"));
+  assert.ok(codes(bump("500.overpaid", 5)).includes("IX-GA-009"));
+  assert.ok(codes({ ...data, header: { ...data.header, linkedFederalRef: "" } }).includes("IX-GA-002"));
+  const err = runBusinessRules(bump("500.28", 100)).errors.find((e) => e.code === "IX-GA-007");
+  assert.equal(err.step, "forms-W2");
+  assert.ok(GEORGIA_PROGRAM.notes.some((n) => /does not authorize Georgia/.test(n)));
+});
+
+test("the Georgia sandbox waits for the federal return and falls with it", async () => {
+  // Federal sent and accepted: Georgia is accepted, by the Georgia sandbox.
+  const store = memoryStore();
+  const us = sandboxTransport({ store });
+  const ga = sandboxTransport({ store, jurisdiction: "GA" });
+  assert.equal(ga.id, "INNOVATAX-GA-SANDBOX");
+  assert.notEqual(ga.id, us.id);
+  await send(readyRecord(), us);
+  const gaSent = await send(gaRecord(), ga);
+  assert.equal(gaSent.state, "ACK_PENDING");
+  const { record, ack } = afterAck(gaSent, await ga.fetchAck({ submissionRef: gaSent.submissionRef }), ga, georgiaSandboxAdapter(2026), opts);
+  assert.equal(record.state, "ACCEPTED", JSON.stringify(ack));
+  assert.equal(returnStatusFor(record), null, "a sandbox acceptance is not a Georgia filing");
+
+  // Federal never received: Georgia is rejected on the link.
+  const lonely = sandboxTransport({ store: memoryStore(), jurisdiction: "GA" });
+  const orphan = await send(gaRecord(), lonely);
+  const r1 = afterAck(orphan, await lonely.fetchAck({ submissionRef: orphan.submissionRef }), lonely, georgiaSandboxAdapter(2026), opts).record;
+  assert.equal(r1.state, "REJECTED");
+  assert.equal(r1.ack.errors[0].code, "GA-SBX-LINK-1");
+
+  // Federal rejected: Georgia falls with it.
+  const store3 = memoryStore();
+  await send(readyRecord(), sandboxTransport({ store: store3, scenario: "REJECT" }));
+  const ga3 = sandboxTransport({ store: store3, jurisdiction: "GA" });
+  const sent3 = await send(gaRecord(), ga3);
+  const r3 = afterAck(sent3, await ga3.fetchAck({ submissionRef: sent3.submissionRef }), ga3, georgiaSandboxAdapter(2026), opts).record;
+  assert.equal(r3.ack.errors[0].code, "GA-SBX-LINK-2");
+
+  // A Georgia-specific rejection maps to the Georgia screen.
+  const store4 = memoryStore();
+  await send(readyRecord(), sandboxTransport({ store: store4 }));
+  const ga4 = sandboxTransport({ store: store4, jurisdiction: "GA", scenario: "REJECT" });
+  const sent4 = await send(gaRecord(), ga4);
+  const r4 = afterAck(sent4, await ga4.fetchAck({ submissionRef: sent4.submissionRef }), ga4, georgiaSandboxAdapter(2026), opts).record;
+  assert.equal(r4.ack.errors[0].lineId, "500.23");
+  assert.equal(r4.ack.errors[0].step, "forms-W2");
+  assert.equal(recordView(r4).linkedFederalRef, gaRecord().linkedFederalRef);
+});
+
+test("the federal link decides when a Georgia return may be sent", () => {
+  const fed = (state) => ({ state, submissionRef: "SBX-x" });
+  assert.equal(federalLinkIssue({ federal: null }).blocking, false, "waits for the federal return");
+  assert.equal(federalLinkIssue({ federal: null }).code, "EFILE_GA_FEDERAL_NOT_SENT");
+  assert.equal(federalLinkIssue({ federal: null, federalFiledElsewhere: true }).blocking, true);
+  for (const s of ["NOT_READY", "SIGNATURE_PENDING", "READY_TO_TRANSMIT", "FAILED_RETRYABLE"]) assert.equal(federalLinkIssue({ federal: fed(s) }).blocking, false, s);
+  assert.equal(federalLinkIssue({ federal: fed("INDETERMINATE") }).code, "EFILE_GA_FEDERAL_UNKNOWN");
+  assert.equal(federalLinkIssue({ federal: fed("REJECTED") }).blocking, true);
+  for (const s of ["TRANSMITTED", "ACK_PENDING", "ACCEPTED"]) assert.equal(federalLinkIssue({ federal: fed(s) }), null, s);
+  // As a readiness item: waiting is shown but does not block the package.
+  const issues = readinessIssues({ reviewStatus: "APPROVED", snapshot, signatureStatus: "SIGNED", signedAt: "2027-02-03T00:00:00.000Z", jurisdiction: "GA", federalLink: federalLinkIssue({ federal: null }) });
+  const link = issues.find((i) => i.code === "EFILE_GA_FEDERAL_NOT_SENT");
+  assert.equal(link.blocking, false);
+  assert.equal(link.waitsFor, "FEDERAL");
+  assert.equal(readinessIssues({ reviewStatus: "APPROVED", snapshot, jurisdiction: "US", federalLink: federalLinkIssue({ federal: null }) }).some((i) => i.code.startsWith("EFILE_GA_")), false);
+});
+
+test("Georgia production needs Georgia's own approval on top of every federal item", () => {
+  const federalAll = { EFILE_MODE: "production", EFILE_PRODUCTION_AUTHORIZED: "true", MEF_ETIN: "x", MEF_EFIN: "x", MEF_A2A_CERT_SECRET: "x" };
+  const gaps = productionGaps(efileConfig(federalAll), "GA");
+  assert.ok(gaps.some((g) => /GA_EFILE_AUTHORIZED/.test(g)), "federal settings never imply Georgia");
+  assert.ok(gaps.some((g) => /Georgia state submission transport/.test(g)));
+  const withGa = productionGaps(efileConfig({ ...federalAll, GA_EFILE_AUTHORIZED: "true" }), "GA");
+  assert.ok(!withGa.some((g) => /GA_EFILE_AUTHORIZED/.test(g)));
+  assert.ok(withGa.length >= 2, "still no Georgia or IRS transport");
+  // Georgia approval alone opens nothing federal.
+  assert.equal(productionGaps(efileConfig({ EFILE_MODE: "production", GA_EFILE_AUTHORIZED: "true" }), "US").length, 5);
+  assert.throws(() => transportFor({ jurisdiction: "GA", config: efileConfig({ ...federalAll, GA_EFILE_AUTHORIZED: "true" }) }), (e) => e.code === "EFILE_NOT_AUTHORIZED");
+  assert.equal(transportFor({ jurisdiction: "GA", config: efileConfig({ EFILE_MODE: "sandbox" }) }).id, "INNOVATAX-GA-SANDBOX");
+  assert.match(productionGaps(efileConfig({}), "AL")[0], /not supported/);
+  assert.throws(() => sandboxTransport({ jurisdiction: "AL" }), (e) => e.code === "EFILE_NO_TRANSPORT");
 });

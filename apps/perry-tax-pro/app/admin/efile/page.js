@@ -1,6 +1,7 @@
 import { requireRole, getFirebaseSession } from "@/lib/auth";
 import { getOnboarding } from "@/lib/efile/onboarding-store";
 import { schemaPackageStatus } from "@/lib/efile/package";
+import { GEORGIA_PROGRAM } from "@/lib/efile/georgia";
 import { efileConfig, productionGaps } from "@/lib/efile/transport";
 import { isGeneralAdmin } from "@/lib/staff";
 import { moduleStatuses } from "@/lib/tax-engine/registry";
@@ -19,6 +20,7 @@ export default async function Page() {
   const [onboarding, isAdmin] = await Promise.all([getOnboarding(2026), isGeneralAdmin(session)]);
   const config = efileConfig();
   const schema = schemaPackageStatus(2026);
+  const gaSchema = schemaPackageStatus(2026, "GA");
   const modules = moduleStatuses(2026);
   const gaps = { US: productionGaps(config, "US"), GA: productionGaps(config, "GA") };
   const { reference } = onboarding;
@@ -45,13 +47,17 @@ export default async function Page() {
       <div className="grid-main mt">
         <div className="card">
           <div className="card-title"><h3>Before real transmission</h3></div>
-          {Object.entries(gaps).map(([code, list]) => (
-            <div key={code} className="stack-sm">
-              <b className="small">{NAME[code]}</b>
-              <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{list.map((g) => <li key={g}>{g}</li>)}{!list.length && <li>Nothing missing.</li>}</ul>
-            </div>
-          ))}
+          {Object.entries(gaps).map(([code, list]) => {
+            const own = code === "US" ? list : list.filter((g) => !g.startsWith("Federal: "));
+            return (
+              <div key={code} className="stack-sm">
+                <b className="small">{NAME[code]}{code !== "US" ? ", on top of every federal item" : ""}</b>
+                <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{own.map((g) => <li key={g}>{g}</li>)}{!list.length && <li>Nothing missing.</li>}</ul>
+              </div>
+            );
+          })}
           <p className="hint mt">IRS schema package: {schema.installed ? schema.adapterId : schema.note}</p>
+          <p className="hint">Georgia schema package: {gaSchema.installed ? gaSchema.adapterId : gaSchema.note}</p>
         </div>
         <div className="card">
           <div className="card-title"><div><h3>Reference test run</h3><div className="sub">Run with <code>npm run ats</code> to get the full package</div></div></div>
@@ -62,6 +68,12 @@ export default async function Page() {
           </div>
           {reference.results.some((r) => !r.ok) && <div className="alert alert-error small mt">{reference.results.flatMap((r) => r.jurisdictions.flatMap((j) => [j.error, ...j.mismatches.map((m) => `${r.id} ${m.line}: expected ${m.expected}, got ${m.actual}`)])).filter(Boolean).join(" · ")}</div>}
         </div>
+      </div>
+
+      <div className="card mt">
+        <div className="card-title"><div><h3>Georgia electronic filing</h3><div className="sub">{GEORGIA_PROGRAM.program}</div></div></div>
+        <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{GEORGIA_PROGRAM.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+        <p className="hint mt">Contact: {GEORGIA_PROGRAM.contact}. Sources: {GEORGIA_PROGRAM.sources.map((s, i) => <span key={s.url}>{i ? "; " : ""}<a href={s.url} target="_blank" rel="noreferrer">{s.title}</a></span>)}</p>
       </div>
 
       <div className="card mt">

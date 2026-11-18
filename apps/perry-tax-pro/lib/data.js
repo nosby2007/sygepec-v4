@@ -40,6 +40,7 @@ function returnDto(row) {
     efile_sandbox: row.efileSandbox !== false,
     efile_updated_at: row.efileUpdatedAt || null,
     efile_rejections: Array.isArray(row.efileRejections) ? row.efileRejections : [],
+    efile_ga: row.efileGa && typeof row.efileGa === "object" ? { state: row.efileGa.state || null, sandbox: row.efileGa.sandbox !== false, status: row.efileGa.status || "", updated_at: row.efileGa.updatedAt || null, rejections: Array.isArray(row.efileGa.rejections) ? row.efileGa.rejections : [] } : null,
     carry_forward_from_return_id: row.carryForwardFromReturnId || null,
     carry_forward_from_tax_year: row.carryForwardFromTaxYear || null,
     intake: row.intake || {},

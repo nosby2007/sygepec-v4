@@ -14,7 +14,7 @@
 //
 // Scenario: { id, source, title, taxYear, intake, supplement?, jurisdictions: ["US", "GA"],
 //             expected: { US: { "1040.15": 43900, ... }, GA: { ... } }, notes? }
-import { buildPackage, sandboxAdapter } from "@/lib/efile/package";
+import { buildPackage } from "@/lib/efile/package";
 import { computeReturn } from "@/lib/tax-engine/index";
 import { sanitizeIntake } from "@/lib/intake-schema";
 
@@ -86,7 +86,7 @@ export function runScenario(s) {
     if (!lines) return { code: j, ok: false, error: `No ${j} calculation for this scenario.`, mismatches: [], packageErrors: [] };
     let pkg;
     try {
-      pkg = buildPackage({ returnId: `ATS-${s.id}`, taxYear: s.taxYear, intake, calculation, fingerprint: TEST_FINGERPRINT, jurisdiction: j }, sandboxAdapter(s.taxYear));
+      pkg = buildPackage({ returnId: `ATS-${s.id}`, taxYear: s.taxYear, intake, calculation, fingerprint: TEST_FINGERPRINT, jurisdiction: j });
     } catch (e) {
       return { code: j, ok: false, error: e.message, mismatches: [], packageErrors: [] };
     }

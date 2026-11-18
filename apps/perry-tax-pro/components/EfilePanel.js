@@ -83,7 +83,7 @@ export default function EfilePanel({ returnId }) {
                 <Icon name="layers" size={14} /> {busy(`prepare:${j.code}`) ? "Building…" : "Build package"}
               </button>
             </div>
-            {j.code !== "US" && <p className="hint">Georgia participates in the IRS Fed/State program, but federal approval does not authorize Georgia filing. Georgia needs its own approval and testing.</p>}
+            {j.code !== "US" && <p className="hint">Georgia takes returns through the Fed/State program, linked to the federal return: it is sent after the federal return and falls with it if the federal return is rejected. Federal approval does not authorize Georgia filing; Georgia needs its own approval and testing.{j.schema && !j.schema.installed ? ` ${j.schema.note}` : ""}</p>}
             {j.issues.length > 0 && (
               <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
                 {j.issues.map((i) => (
@@ -94,14 +94,14 @@ export default function EfilePanel({ returnId }) {
                 ))}
               </ul>
             )}
-            {!blocking.length && <p className="small" style={{ color: "var(--green)" }}><Icon name="check" size={13} /> Ready checks pass{j.signaturesComplete ? "" : ", except signatures"}.</p>}
+            {!blocking.length && <p className="small" style={{ color: "var(--green)" }}><Icon name="check" size={13} /> Ready checks pass{j.signaturesComplete ? "" : ", except signatures"}{j.waitingForFederal ? "; it waits for the federal return to be sent" : ""}.</p>}
             {subs.map((s) => (
               <article key={s.key} className="workflow-row" style={{ display: "block" }}>
                 <div className="row between">
                   <b className="small">{s.submissionRef}{s.sandbox && <span className="pill" style={{ marginLeft: 6 }}>sandbox</span>}</b>
                   <span className={`badge ${TONE[s.state] || ""}`}>{s.stateLabel}</span>
                 </div>
-                <div className="hint">Built {when(s.createdAt)} · {s.forms.length} forms · {s.adapterId}{s.attempts ? ` · ${s.attempts} attempt${s.attempts > 1 ? "s" : ""}` : ""}{s.receiptId ? ` · receipt ${s.receiptId}` : ""}{s.supersedes ? " · corrects a rejected submission" : ""}</div>
+                <div className="hint">Built {when(s.createdAt)} · {s.forms.length} forms · {s.adapterId}{s.attempts ? ` · ${s.attempts} attempt${s.attempts > 1 ? "s" : ""}` : ""}{s.receiptId ? ` · receipt ${s.receiptId}` : ""}{s.supersedes ? " · corrects a rejected submission" : ""}{s.linkedFederalRef ? ` · linked to federal ${s.linkedFederalRef}` : ""}</div>
                 {s.validationErrors.length > 0 && (
                   <ul className="small" style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                     {s.validationErrors.map((e) => <li key={e.code + e.path}>{e.code}: {e.message}{e.step && <> · <a href={`/portal/intake?step=${encodeURIComponent(e.step)}`}>screen</a></>}</li>)}
@@ -109,7 +109,7 @@ export default function EfilePanel({ returnId }) {
                 )}
                 {s.ack && (
                   <div className={`alert ${s.ack.status === "ACCEPTED" ? "alert-success" : "alert-error"} small`} style={{ marginTop: 8 }}>
-                    <span>{s.ack.status === "ACCEPTED" ? "Accepted" : "Rejected"} {when(s.ack.receivedAt)}{s.ack.authoritative ? "" : " (sandbox acknowledgement, not the IRS)"}.
+                    <span>{s.ack.status === "ACCEPTED" ? "Accepted" : "Rejected"} {when(s.ack.receivedAt)}{s.ack.authoritative ? "" : s.jurisdiction === "US" ? " (sandbox acknowledgement, not the IRS)" : " (sandbox acknowledgement, not Georgia DOR)"}.
                       {s.ack.errors.map((e) => <span key={e.code} style={{ display: "block" }}>{e.code}: {e.message}{e.step && <> · <a href={`/portal/intake?step=${encodeURIComponent(e.step)}`}>fix</a></>}</span>)}
                     </span>
                   </div>
@@ -122,7 +122,7 @@ export default function EfilePanel({ returnId }) {
                           {Object.entries(data.scenarios).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
                       )}
-                      <button className="btn btn-primary btn-sm" disabled={Boolean(state.busy)} onClick={() => act("transmit", { key: s.key, scenario }, "Sent. Check for the acknowledgement.")}>
+                      <button className="btn btn-primary btn-sm" disabled={Boolean(state.busy) || j.waitingForFederal} title={j.waitingForFederal ? "Send the federal return first" : undefined} onClick={() => act("transmit", { key: s.key, scenario }, "Sent. Check for the acknowledgement.")}>
                         <Icon name="send" size={14} /> {busy(`transmit:${s.key}`) ? "Sending…" : s.state === "FAILED_RETRYABLE" ? "Retry" : "Transmit"}
                       </button>
                     </>
@@ -140,7 +140,10 @@ export default function EfilePanel({ returnId }) {
       {data.mode !== "production" && (
         <details className="small">
           <summary>Before real transmission</summary>
-          <ul style={{ paddingLeft: 18 }}>{[...data.production.federal, ...data.production.georgia.filter((g) => !data.production.federal.includes(g))].map((g) => <li key={g}>{g}</li>)}</ul>
+          <b>Federal</b>
+          <ul style={{ paddingLeft: 18 }}>{data.production.federal.map((g) => <li key={g}>{g}</li>)}</ul>
+          <b>Georgia, on top of every federal item</b>
+          <ul style={{ paddingLeft: 18 }}>{data.production.georgia.filter((g) => !g.startsWith("Federal: ")).map((g) => <li key={g}>{g}</li>)}</ul>
         </details>
       )}
       {state.error && <div className="alert alert-error small">{state.error}</div>}

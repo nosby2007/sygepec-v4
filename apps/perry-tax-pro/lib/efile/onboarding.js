@@ -27,11 +27,16 @@ export const ONBOARDING_STEPS = [
   { id: "COMMUNICATION_TEST", owner: "IRS", gate: "PRODUCTION", title: "Communication test passed and production status granted", reference: "Pub. 4164" },
   { id: "SECURITY", owner: "OWNER", gate: "PRODUCTION", title: "Written information security plan and safeguards in place", reference: "Pub. 4557; Pub. 1345", detail: "Implementing controls is not certification. The owner signs off." },
   { id: "PRODUCTION_SWITCH", owner: "OWNER", gate: "PRODUCTION", title: "Production authorization recorded on the server", reference: "EFILE_PRODUCTION_AUTHORIZED", setting: "EFILE_PRODUCTION_AUTHORIZED" },
-  { id: "GA_APPROVAL", owner: "GEORGIA", gate: "GEORGIA", title: "Georgia approval for software and transmitter, with Georgia's own testing", reference: "Georgia DOR e-file program", detail: "Georgia takes state returns through the IRS Fed/State program, but federal approval does not authorize Georgia filing." },
-  { id: "GA_TRANSPORT", owner: "ENGINEERING", gate: "GEORGIA", title: "Georgia state submission adapter built from Georgia's specifications", reference: "lib/efile/transport.js", auto: "gaTransport" },
+  { id: "GA_LETTER_OF_INTENT", owner: "OWNER", gate: "GEORGIA", title: "Letter of Intent for the tax year sent to Georgia DOR", reference: "Georgia DOR Letter of Intent", detail: "Sent every tax year, by the deadline Georgia sets that year." },
+  { id: "GA_PRODUCT_REGISTRATION", owner: "OWNER", gate: "GEORGIA", title: "InnovaTax registered as a product with Georgia DOR", reference: "Georgia DOR Fed/State MeF guidelines", detail: "Registration comes before Georgia testing." },
+  { id: "GA_SCHEMAS", owner: "OWNER", gate: "GEORGIA", title: "Georgia Form 500 schema and business rules for the tax year obtained from Georgia DOR", reference: "Georgia DOR Fed/State MeF guidelines" },
+  { id: "GA_SCHEMA_ADAPTER", owner: "ENGINEERING", gate: "GEORGIA", title: "Georgia schema adapter built from Georgia's schema and registered", reference: "lib/efile/georgia.js", auto: "gaSchema" },
+  { id: "GA_TESTING", owner: "GEORGIA", gate: "GEORGIA", title: "Georgia test returns transmitted and accepted in Georgia's own testing", reference: "Georgia DOR Fed/State MeF guidelines", detail: "Separate from the IRS ATS." },
+  { id: "GA_APPROVAL", owner: "GEORGIA", gate: "GEORGIA", title: "Georgia approval of InnovaTax recorded on the server", reference: "GA_EFILE_AUTHORIZED", setting: "GA_EFILE_AUTHORIZED", detail: "Georgia takes state returns through the IRS Fed/State program, but federal approval does not authorize Georgia filing." },
+  { id: "GA_TRANSPORT", owner: "ENGINEERING", gate: "GEORGIA", title: "Georgia state submissions sent through the official transport", reference: "lib/efile/transport.js", auto: "gaTransport" },
 ];
 
-// facts: { schema, transport, gaTransport, reference } booleans read from the code, and
+// facts: { schema, transport, gaSchema, gaTransport, reference } booleans read from the code, and
 // settings: { MEF_EFIN: true, ... } (whether each server setting is present).
 // recorded: { [stepId]: { status, note, by, byName, at } }.
 export function onboardingView(recorded = {}, facts = {}, settings = {}) {
@@ -62,6 +67,6 @@ export function onboardingChangeError(stepId, status, note) {
   if (step.auto) return "This step is read from the code and cannot be recorded by hand.";
   if (!STEP_STATUSES.includes(status)) return "Choose a status.";
   if (status === "NOT_APPLICABLE" && !String(note || "").trim()) return "Say why this step does not apply.";
-  if (status === "NOT_APPLICABLE" && ["EFILE_APPLICATION", "ATS_TESTING", "EFIN", "ETIN", "PRODUCTION_SWITCH"].includes(step.id)) return "This step is required for direct transmission.";
+  if (status === "NOT_APPLICABLE" && ["EFILE_APPLICATION", "ATS_TESTING", "EFIN", "ETIN", "PRODUCTION_SWITCH", "GA_TESTING", "GA_APPROVAL"].includes(step.id)) return "This step is required for direct transmission.";
   return null;
 }

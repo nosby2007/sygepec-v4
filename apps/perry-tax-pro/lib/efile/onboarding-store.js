@@ -22,8 +22,8 @@ export class OnboardingError extends Error {
 export function onboardingFacts(taxYear = 2026, env = process.env) {
   const reference = runAll(REFERENCE_SCENARIOS);
   return {
-    facts: { schema: Boolean(officialAdapter(taxYear)), transport: transportInstalled("US"), gaTransport: transportInstalled("GA"), reference: reference.failed === 0 },
-    settings: { MEF_EFIN: Boolean(env.MEF_EFIN), MEF_ETIN: Boolean(env.MEF_ETIN), MEF_A2A_CERT_SECRET: Boolean(env.MEF_A2A_CERT_SECRET), EFILE_PRODUCTION_AUTHORIZED: env.EFILE_PRODUCTION_AUTHORIZED === "true" },
+    facts: { schema: Boolean(officialAdapter(taxYear)), transport: transportInstalled("US"), gaSchema: Boolean(officialAdapter(taxYear, "GA")), gaTransport: transportInstalled("GA"), reference: reference.failed === 0 },
+    settings: { MEF_EFIN: Boolean(env.MEF_EFIN), MEF_ETIN: Boolean(env.MEF_ETIN), MEF_A2A_CERT_SECRET: Boolean(env.MEF_A2A_CERT_SECRET), EFILE_PRODUCTION_AUTHORIZED: env.EFILE_PRODUCTION_AUTHORIZED === "true", GA_EFILE_AUTHORIZED: env.GA_EFILE_AUTHORIZED === "true" },
     reference,
     mode: efileConfig(env).mode,
   };

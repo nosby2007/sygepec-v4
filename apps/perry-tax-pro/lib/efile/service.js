@@ -1,7 +1,8 @@
 import "server-only";
 import { audit } from "@/lib/audit";
 import { getSignature } from "@/lib/esign";
-import { buildPackage, sandboxAdapter, officialAdapter, schemaPackageStatus } from "@/lib/efile/package";
+import { federalLinkIssue } from "@/lib/efile/georgia";
+import { buildPackage, sandboxAdapterFor, officialAdapter, schemaPackageStatus } from "@/lib/efile/package";
 import { EfileError, FINAL_STATES, IN_FLIGHT } from "@/lib/efile/states";
 import { afterAck, afterSend, applyEvent, newRecord, readinessIssues, recordView, refreshRecord, returnStatusFor, signatureMatches } from "@/lib/efile/submission";
 import { efileConfig, productionGaps, SANDBOX_SCENARIOS, transportFor } from "@/lib/efile/transport";
@@ -20,6 +21,10 @@ import { isGeneralAdmin } from "@/lib/staff";
 //
 // Reviewing a return and transmitting it are separate permissions: transmitting takes the
 // general admin role or a uid listed in EFILE_TRANSMITTER_UIDS.
+//
+// Georgia (lib/efile/georgia.js) has its own package, its own sandbox receiver and its own
+// production gate. A Georgia submission is linked to the federal submission for the same
+// approved figures and is sent only after that federal submission.
 
 const strip = ({ id: _i, createTime: _c, updateTime: _u, ...data }) => data;
 const now = () => new Date().toISOString();
@@ -40,12 +45,14 @@ export async function mayTransmit(session, config = efileConfig()) {
   return config.transmitters.includes(session.uid) || isGeneralAdmin(session);
 }
 
-function adapterFor(taxYear, config) {
-  if (config.mode !== "production") return sandboxAdapter(taxYear);
-  const official = officialAdapter(taxYear);
-  if (!official) throw new EfileError(`The IRS schema package for ${taxYear} is not installed.`, 409, "EFILE_NO_SCHEMA");
+function adapterFor(taxYear, config, jurisdiction = "US") {
+  if (config.mode !== "production") return sandboxAdapterFor(jurisdiction, taxYear);
+  const official = officialAdapter(taxYear, jurisdiction);
+  if (!official) throw new EfileError(jurisdiction === "GA" ? `The Georgia schema package for ${taxYear} is not installed.` : `The IRS schema package for ${taxYear} is not installed.`, 409, "EFILE_NO_SCHEMA");
   return official;
 }
+
+const adapterOfRecord = (record) => (record.official ? officialAdapter(record.taxYear, record.jurisdiction) : sandboxAdapterFor(record.jurisdiction, record.taxYear));
 
 async function listForReturn(returnId) {
   const rows = await queryCollection("taxSubmissions", await token(), { filters: [["returnId", "EQUAL", returnId]], limit: 50 }).catch(() => []);
@@ -74,6 +81,16 @@ async function saveRecord(previous, next) {
 // The return shows the electronic filing state; the filing status itself moves only on
 // an authoritative acknowledgement, with the same effects as recording it by hand.
 async function reflectOnReturn(r, record) {
+  // Georgia is shown on its own and never moves the return's federal filing status.
+  if (record.jurisdiction !== "US") {
+    const key = `efile${record.jurisdiction === "GA" ? "Ga" : record.jurisdiction}`;
+    const value = {
+      state: record.state, sandbox: !record.official, updatedAt: record.updatedAt, submissionRef: record.submissionRef, status: returnStatusFor(record) || "",
+      rejections: record.state === "REJECTED" ? (record.ack?.errors || []).slice(0, 20).map(({ code, message, step }) => ({ code, message: String(message).slice(0, 300), step: step || "" })) : [],
+    };
+    await patchFields(`taxReturns/${r.id}`, { [key]: value, updatedAt: now() }, await token()).catch(() => null);
+    return;
+  }
   const fields = {
     efileState: record.state, efileJurisdiction: record.jurisdiction, efileSandbox: !record.official, efileUpdatedAt: record.updatedAt,
     efileRejections: record.state === "REJECTED" ? (record.ack?.errors || []).slice(0, 20).map(({ code, message, step }) => ({ code, message: String(message).slice(0, 300), step: step || "" })) : [],
@@ -86,8 +103,15 @@ async function reflectOnReturn(r, record) {
 }
 
 // Everything the readiness checks need, for one jurisdiction.
-async function readiness(r, jurisdiction, ctx) {
+async function readiness(r, jurisdiction, ctx, records = null) {
   const snapshot = ctx.review.snapshot;
+  // The federal submission a state return is linked to: same approved figures.
+  let federalLink = null;
+  if (jurisdiction !== "US" && snapshot) {
+    const rows = records || await listForReturn(r.id);
+    const federal = rows.find((x) => x.jurisdiction === "US" && x.fingerprint === snapshot.fingerprint) || null;
+    federalLink = federalLinkIssue({ federal, federalFiledElsewhere: ["SUBMITTED", "ACCEPTED"].includes(r.submission_status) });
+  }
   const signature = await getSignature(r.id);
   const payment = await paymentGate("TAX_RETURN", r.id, "FILE").catch(() => "");
   const stateCalculated = jurisdiction === "US" || Boolean(snapshot?.calculation?.states?.some((s) => s.code === jurisdiction));
@@ -96,12 +120,14 @@ async function readiness(r, jurisdiction, ctx) {
     signatureStatus: r.signature_status, signedAt: r.signed_at,
     filingBlockers: ctx.filingBlockers.filter((b) => !b.jurisdiction || b.jurisdiction === jurisdiction),
     paymentBlock: payment || "", manualSubmissionStatus: jurisdiction === "US" ? r.submission_status : "", jurisdiction, stateCalculated,
-    production: efileConfig().mode === "production",
+    production: efileConfig().mode === "production", federalLink,
   });
   const signaturesComplete = signatureMatches({ snapshot, signature, signatureStatus: r.signature_status, signedAt: r.signed_at });
   // Missing signatures leave the submission waiting; every other item blocks it.
   const blocking = issues.filter((i) => i.blocking && i.code !== "EFILE_8879_MISSING");
-  return { issues, blocking, signaturesComplete, snapshot };
+  // Waiting for the federal return to be sent: the package stays ready, but is not sent.
+  const waiting = issues.filter((i) => i.waitsFor === "FEDERAL");
+  return { issues, blocking, waiting, signaturesComplete, snapshot };
 }
 
 const jurisdictionsOf = (snapshot) => ["US", ...((snapshot?.calculation?.states || []).map((s) => s.code))];
@@ -114,8 +140,8 @@ export async function efileStatus(session, r) {
   const records = await listForReturn(r.id);
   const jurisdictions = [];
   for (const code of jurisdictionsOf(ctx.review.snapshot)) {
-    const ready = await readiness(r, code, ctx);
-    jurisdictions.push({ code, issues: ready.issues, signaturesComplete: ready.signaturesComplete });
+    const ready = await readiness(r, code, ctx, records);
+    jurisdictions.push({ code, issues: ready.issues, signaturesComplete: ready.signaturesComplete, waitingForFederal: ready.waiting.length > 0, schema: schemaPackageStatus(taxYear, code) });
   }
   return {
     mode: config.mode,
@@ -136,11 +162,12 @@ export async function prepareSubmission(session, r, rawJurisdiction = "US") {
   const snapshot = ctx.review.snapshot;
   const jurisdiction = String(rawJurisdiction || "US").toUpperCase();
   if (!jurisdictionsOf(snapshot).includes(jurisdiction)) throw new EfileError(snapshot ? `There is no approved ${jurisdiction} calculation.` : "Approve the review before preparing a submission.", 409, "EFILE_NO_CALCULATION");
-  const ready = await readiness(r, jurisdiction, ctx);
+  const all = await listForReturn(r.id);
+  const ready = await readiness(r, jurisdiction, ctx, all);
   const taxYear = Number(r.tax_year) || 2026;
-  const pkg = buildPackage({ returnId: r.id, taxYear, intake: ctx.intake, calculation: snapshot.calculation, fingerprint: snapshot.fingerprint, jurisdiction }, adapterFor(taxYear, config));
+  const pkg = buildPackage({ returnId: r.id, taxYear, intake: ctx.intake, calculation: snapshot.calculation, fingerprint: snapshot.fingerprint, jurisdiction }, adapterFor(taxYear, config, jurisdiction));
   const at = now();
-  const existing = (await listForReturn(r.id)).filter((x) => x.jurisdiction === jurisdiction);
+  const existing = all.filter((x) => x.jurisdiction === jurisdiction);
 
   // Same package: same record.
   const same = existing.find((x) => x.key === pkg.key);
@@ -189,6 +216,8 @@ export async function transmitSubmission(session, r, key, { scenario } = {}) {
     await reflectOnReturn(r, next);
     throw new EfileError(`Not transmitted: ${ready.issues.map((i) => i.message).join(" ") || "the approved figures changed."}`, 409, "EFILE_NOT_READY");
   }
+  // A linked state return waits for its federal return; the package stays ready.
+  if (ready.waiting.length) throw new EfileError(`Not transmitted yet: ${ready.waiting.map((i) => `${i.message} ${i.action}`).join(" ")}`, 409, "EFILE_WAITING_FOR_FEDERAL");
   const chosen = config.mode === "sandbox" ? (SANDBOX_SCENARIOS[scenario] ? scenario : "ACCEPT") : null;
   const transport = transportFor({ jurisdiction: record.jurisdiction, config, scenario: chosen || undefined, store: sandboxStore });
   // Claim the record first. If the claim fails, someone else is sending it.
@@ -196,7 +225,7 @@ export async function transmitSubmission(session, r, key, { scenario } = {}) {
   const current = await getRecord(key);
   let result;
   try {
-    result = await transport.send({ submissionRef: record.submissionRef, hash: record.hash, xml: record.xml, valid: record.validationErrors.length === 0, errors: record.validationErrors });
+    result = await transport.send({ submissionRef: record.submissionRef, linkedFederalRef: record.linkedFederalRef || null, hash: record.hash, xml: record.xml, valid: record.validationErrors.length === 0, errors: record.validationErrors });
   } catch (error) {
     result = { outcome: "UNKNOWN", message: `The transport failed during sending: ${String(error?.message || error).slice(0, 200)}` };
   }
@@ -217,7 +246,7 @@ export async function pollAcknowledgement(session, r, key) {
   if (transport.authoritative !== Boolean(record.authoritative)) throw new EfileError("This submission was sent through another transport; its acknowledgement cannot be read here.", 409, "EFILE_TRANSPORT_MISMATCH");
   const raw = await transport.fetchAck({ submissionRef: record.submissionRef, hash: record.hash });
   if (!raw) return { waiting: true, submission: recordView(record, { staff: true }) };
-  const adapter = record.official ? officialAdapter(record.taxYear) : sandboxAdapter(record.taxYear);
+  const adapter = adapterOfRecord(record);
   const { record: next, ack } = afterAck(record, raw, transport, adapter, { by: session.uid, at: now() });
   const saved = await saveRecord(record, next);
   await audit(session, ack.verified ? "EFILE_ACKNOWLEDGED" : "EFILE_ACK_UNVERIFIED", { target: `taxReturns/${r.id}`, outcome: ack.status || "UNVERIFIED", details: { key, jurisdiction: record.jurisdiction, authoritative: String(ack.authoritative || false), errors: (ack.errors || []).map((e) => e.code).join(",") || (ack.reason || "") } });

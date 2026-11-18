@@ -24,7 +24,7 @@ export function signatureMatches({ snapshot, signature, signatureStatus, signedA
 }
 
 // Layer-4 Double-Check items. Each one is blocking unless marked otherwise.
-export function readinessIssues({ reviewStatus, snapshot, changedSinceApproval, signature, signatureStatus, signedAt, filingBlockers = [], paymentBlock = "", manualSubmissionStatus, pkg = null, jurisdiction = "US", stateCalculated = true, production = false }) {
+export function readinessIssues({ reviewStatus, snapshot, changedSinceApproval, signature, signatureStatus, signedAt, filingBlockers = [], paymentBlock = "", manualSubmissionStatus, pkg = null, jurisdiction = "US", stateCalculated = true, production = false, federalLink = null }) {
   const out = [];
   const add = (code, message, action, extra = {}) => out.push({ code, message, action, blocking: true, form: "", field: "", source: "InnovaTax e-file readiness", ...extra });
   if (!["READY_TO_SIGN", "APPROVED"].includes(reviewStatus) || !snapshot) add("EFILE_NOT_APPROVED", "The preparer review has not frozen the figures.", "Preparer: finish the review and mark it Ready to sign.");
@@ -35,6 +35,9 @@ export function readinessIssues({ reviewStatus, snapshot, changedSinceApproval, 
   const calcStatus = snapshot?.calculation?.status || "PENDING";
   if (snapshot && calcStatus !== "FILING_READY") add("EFILE_CALCULATION_NOT_FILING_READY", `The approved figures come from rules that are ${calcStatus.toLowerCase().replace("_", " ")}, not filing-ready.`, production ? "Validate and approve every rule module used before filing." : "Sandbox only: this does not stop a test transmission.", { blocking: production });
   if (jurisdiction !== "US" && !stateCalculated) add("EFILE_STATE_NOT_CALCULATED", `There is no approved ${jurisdiction} calculation.`, "Prepare this state return separately.");
+  // A state return linked to the federal one: blocking when the link is broken, waiting
+  // (not blocking) while the federal return has not been sent.
+  if (jurisdiction !== "US" && federalLink) add(federalLink.code, federalLink.message, federalLink.action, { blocking: federalLink.blocking, waitsFor: federalLink.blocking ? "" : "FEDERAL" });
   for (const b of filingBlockers) add(`EFILE_BLOCKER_${b.code}`, `Unresolved: ${b.message}`, b.action || "Resolve this Double-Check item.", { form: b.form || "", field: b.field || "", step: b.step || "" });
   if (paymentBlock) add("EFILE_PAYMENT", paymentBlock, "Collect or record the payment.");
   if (["SUBMITTED", "ACCEPTED"].includes(manualSubmissionStatus)) add("EFILE_RECORDED_ELSEWHERE", "This return is already recorded as filed through other software.", "Do not file twice. Clear the manual record only if that filing did not happen.");
@@ -59,7 +62,7 @@ export function newRecord({ pkg, returnId, clientId, fingerprint, signaturesComp
   }
   return {
     tenantId, key: pkg.key, returnId, clientId, taxYear: pkg.taxYear, jurisdiction: pkg.jurisdiction, fingerprint,
-    submissionRef: pkg.submissionRef, adapterId: pkg.adapterId, official: pkg.official, hash: pkg.hash, xml: pkg.xml, forms: pkg.forms,
+    submissionRef: pkg.submissionRef, linkedFederalRef: pkg.linkedFederalRef || null, adapterId: pkg.adapterId, official: pkg.official, hash: pkg.hash, xml: pkg.xml, forms: pkg.forms,
     validationErrors: pkg.errors.map(({ code, message, path, kind, step, lineId }) => ({ code, message, path: path || "", kind, step: step || stepForLine(lineId) || "", lineId: lineId || "" })),
     state, attempts: 0, receiptId: null, transportId: null, authoritative: false, scenario: null, ack: null,
     supersedes, createdAt: at, updatedAt: at, history,
@@ -112,7 +115,7 @@ export function recordView(record, { staff = false } = {}) {
   if (!record) return null;
   const view = {
     key: record.key, jurisdiction: record.jurisdiction, taxYear: record.taxYear, state: record.state, stateLabel: EFILE_LABEL[record.state] || record.state,
-    sandbox: !record.official, authoritative: Boolean(record.authoritative), submissionRef: record.submissionRef,
+    sandbox: !record.official, authoritative: Boolean(record.authoritative), submissionRef: record.submissionRef, linkedFederalRef: record.linkedFederalRef || null,
     createdAt: record.createdAt, updatedAt: record.updatedAt, transmittedAt: record.transmittedAt || null,
     ack: record.ack ? { status: record.ack.status, authoritative: record.ack.authoritative, receivedAt: record.ack.receivedAt, errors: record.ack.errors.map(({ code, message, step, lineId }) => ({ code, message, step, lineId })) } : null,
   };
