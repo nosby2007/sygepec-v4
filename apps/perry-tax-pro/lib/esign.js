@@ -112,6 +112,10 @@ export async function sendForSignature(session, rawReturnId, input) {
   if ((spouseEmail && !spouseName) || (!spouseEmail && spouseName)) throw new SignError("Enter both the spouse's name and email, or neither.");
   if (spouseEmail && spouseEmail === String(r.client_email).toLowerCase()) throw new SignError("The spouse needs their own email address.");
 
+  // The approved figures this Form 8879 is for. E-file accepts the signature only while
+  // the approval fingerprint is unchanged (lib/efile/submission.js).
+  const review = await getDocument(`taxReviews/${r.id}`, await serviceToken()).catch(() => null);
+  const approved = review?.snapshot?.fingerprint || null;
   const roles = spouseEmail ? ["Taxpayer", "Spouse"] : ["Taxpayer"];
   const signers = [
     { role: "Taxpayer", name: r.client_name, email: r.client_email },
@@ -132,7 +136,7 @@ export async function sendForSignature(session, rawReturnId, input) {
   const now = new Date().toISOString();
   const record = {
     tenantId: TAX_TENANT, returnId: r.id, clientId: r.client_id, taxYear: r.tax_year, provider: "DocuSeal",
-    submissionId: submission.id, status: "SENT", createdAt: now, createdBy: session.uid, createdByName: session.name,
+    submissionId: submission.id, status: "SENT", fingerprint: approved, createdAt: now, createdBy: session.uid, createdByName: session.name,
     signers: signers.map((s) => ({ ...s, submitterId: byRole[s.role]?.id || null, embedSrc: byRole[s.role]?.embed_src || null, status: byRole[s.role]?.status || "sent", completedAt: null })),
   };
   await setDocument(`taxSignatures/${r.id}`, record, await serviceToken());

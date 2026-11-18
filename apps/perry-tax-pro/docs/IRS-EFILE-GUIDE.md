@@ -191,3 +191,60 @@ Rules to follow:
 
 Publications: 3112 (application), 1345 (ERO rules), 4163 (MeF for providers), 4164 (MeF
 for software developers), 1436 (ATS for individual returns), and Circular 230.
+
+---
+
+## 7. Direct transmission (MeF adapter), phase 5
+
+InnovaTax now contains the engineering for Option B, ready for official testing but
+**not able to reach the IRS**. Production stays disabled until every gap below is closed.
+
+Chain: approved calculation snapshot -> return data -> schema adapter -> XML -> schema
+validation -> InnovaTax consistency rules -> package (SHA-256 hash, idempotency key) ->
+transport -> verified acknowledgement -> submission state.
+
+| Piece | Where | Status |
+| --- | --- | --- |
+| Submission states (NOT_READY ... ACCEPTED / REJECTED, FAILED_RETRYABLE, INDETERMINATE) | `lib/efile/states.js` | Code complete, tested |
+| Package, XML, schema check, consistency rules, acknowledgement parsing | `lib/efile/package.js` | Code complete, tested, **sandbox schema only** |
+| Records, readiness (layer 4), Form 8879 bound to the approved fingerprint | `lib/efile/submission.js` | Code complete, tested |
+| Sandbox transport and production gate | `lib/efile/transport.js` | Sandbox only |
+| Firestore records `taxSubmissions/{key}`, audit, return status | `lib/efile/service.js` | Code complete; not run against Firestore yet |
+| Preparer panel, transmission worklist, client status | `components/EfilePanel.js`, `/admin/submissions`, `/portal/returns` | Code complete; not checked in a browser yet |
+
+Rules the code enforces:
+- A receipt or an HTTP success is never an acceptance. Only a verified acknowledgement
+  (matching submission reference and package hash) moves a submission to ACCEPTED or
+  REJECTED, and only an **authoritative** transport changes the return's filing status.
+  A sandbox acceptance never does.
+- One record per return, year, jurisdiction and approved answers. Building the same
+  package again returns the same record. A record with an unknown outcome cannot be sent
+  again until it is reconciled with the receiver.
+- Form 8879 counts only if it was signed for the approved fingerprint. New answers or
+  a reopened review take the submission back to "not ready".
+- Reviewing and transmitting are separate permissions: transmitting takes the general
+  admin role or a uid in `EFILE_TRANSMITTER_UIDS`.
+- In production, every rule module used must be FILING_READY.
+
+Server settings:
+
+| Variable | Meaning |
+| --- | --- |
+| `EFILE_MODE` | `off` (default), `sandbox` or `production` |
+| `EFILE_TRANSMITTER_UIDS` | Comma-separated preparer uids allowed to transmit, besides the general admin |
+| `EFILE_PRODUCTION_AUTHORIZED`, `MEF_EFIN`, `MEF_ETIN`, `MEF_A2A_CERT_SECRET` | Read by the production gate. Even with all of them set, production is refused while no official transport and schema adapter are installed. |
+
+Still needed from the business owner and the IRS before real transmission:
+1. IRS e-file application with the Software Developer and Transmitter roles (an EFIN
+   alone does not allow transmission), then an ETIN.
+2. The tax-year 1040 MeF schema and business rule packages from e-Services, built into
+   an official adapter (`officialAdapter` in `lib/efile/package.js`).
+3. The A2A specifications and system credentials, built into an official transport
+   (`OFFICIAL_TRANSPORTS` in `lib/efile/transport.js`), with credentials kept in Secret
+   Manager.
+4. ATS testing with the Pub 1436 scenarios, then the IRS acceptance letter.
+5. Georgia: its own approval and testing for state submissions; federal approval does
+   not cover it.
+
+Status words, never interchangeable: CODE COMPLETE (yes, sandbox), TESTED (unit tests),
+TAX VALIDATED (no), ATS APPROVED (no), PRODUCTION AUTHORIZED (no).

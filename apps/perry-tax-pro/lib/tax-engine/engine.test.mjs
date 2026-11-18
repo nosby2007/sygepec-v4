@@ -26,7 +26,7 @@ test("rule sets name their sources and never claim more than they proved", () =>
 });
 
 test("module statuses follow the ladder", () => {
-  const source = readFileSync(new URL("./engine.test.mjs", import.meta.url), "utf8");
+  const source = ["./engine.test.mjs", "../efile/efile.test.mjs"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join(" ");
   const ids = new Set();
   for (const mod of MODULES) {
     assert.ok(!ids.has(mod.id), mod.id);

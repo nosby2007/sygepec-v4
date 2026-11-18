@@ -46,7 +46,7 @@ export const MODULES = [
   m("GA_OTHER_STATE_CREDIT", "GA", "Georgia credit for tax paid to another state", ["Form 500"], "TESTED", { fixtures: ["Georgia credit for tax paid to another state"], source: "O.C.G.A. 48-7-28" }),
   m("GA_500_NOL", "GA", "Georgia net operating loss carryback claim (separate from the income tax return)", ["Form 500-NOL"], "PENDING"),
   m("GA_CREDITS_IND_CR", "GA", "Georgia individual credits and business credits", ["Form IND-CR", "Schedule 2"], "PENDING"),
-  m("MEF_1040_PACKAGE", "US", "IRS Modernized e-File: return package, validation, submission states", ["MeF"], "IMPLEMENTED", { note: "Works with a sandbox transport only. The IRS schema and business rule packages, ATS testing and production approval are external steps.", dependsOn: ["FED_1040_CORE"] }),
+  m("MEF_1040_PACKAGE", "US", "IRS Modernized e-File: return package, validation, submission states", ["MeF"], "TESTED", { fixtures: ["a valid package is built, validated and keyed deterministically", "schema validation rejects malformed and non-conforming XML", "a network failure can be retried; a timeout must be reconciled first", "foreign, tampered or empty acknowledgements establish nothing"], note: "Works with a sandbox transport only. The IRS schema and business rule packages, ATS testing and production approval are external steps.", dependsOn: ["FED_1040_CORE"] }),
   m("GA_EFILE", "GA", "Georgia electronic filing (through the IRS Fed/State program)", ["MeF state"], "PENDING", { dependsOn: ["MEF_1040_PACKAGE", "GA_500_RESIDENT"] }),
 ];
 

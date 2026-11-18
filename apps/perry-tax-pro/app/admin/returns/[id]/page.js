@@ -12,6 +12,7 @@ import ReviewPanel from "./ReviewPanel";
 import { reviewContext } from "@/lib/return-review";
 import FeeControls from "@/components/FeeControls";
 import ESignPanel from "@/components/ESignPanel";
+import EfilePanel from "@/components/EfilePanel";
 import BankDetailsStaff from "@/components/BankDetailsStaff";
 import { bankStatus } from "@/lib/bank-details";
 import { esignConfigured, signatureView, syncSignature } from "@/lib/esign";
@@ -100,6 +101,7 @@ export default async function Page({ params }) {
       {canEdit && <ReturnControls returnId={r.id} status={r.status} preparerId={r.preparer_id} preparers={preparers} canAssign={isAdmin} />}
       {canEdit && reviewView && <ReviewPanel returnId={r.id} initial={reviewView} taxYear={Number(r.tax_year) || 2026} />}
       {canEdit && <div className="mt"><ESignPanel returnId={r.id} signature={signatureView(signature)} available={esignConfigured() && payments} jointReturn={r.filing_status === "MFJ" || r.intake?.personal?.filingStatus === "MFJ"} /></div>}
+      {canEdit && <div className="mt"><EfilePanel returnId={r.id} /></div>}
       {sensitiveOpen && <div className="mt"><BankDetailsStaff returnId={r.id} status={bank} /></div>}
       {canEdit && <div className="mt"><FeeControls kind="TAX_RETURN" refId={r.id} charge={chargeView(charge, r.status)} available={payments} defaultAmount="149" /></div>}
       <div className="card mt">
