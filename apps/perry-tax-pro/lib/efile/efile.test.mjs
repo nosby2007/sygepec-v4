@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { canTransition, EFILE_STATES, EfileError, transition } from "./states.js";
 import { buildPackage, idempotencyKey, parseAcknowledgement, renderXml, runBusinessRules, sandboxAdapter, schemaPackageStatus, validateXml, buildReturnData } from "./package.js";
 import { afterAck, afterSend, applyEvent, newRecord, readinessIssues, recordView, refreshRecord, returnStatusFor, signatureMatches } from "./submission.js";
-import { efileConfig, memoryStore, productionGaps, sandboxTransport, transportFor } from "./transport.js";
+import { efileConfig, memoryStore, productionGaps, sandboxTransport, transmitterAllowed, transportFor } from "./transport.js";
 import { federalLinkIssue, GEORGIA_PROGRAM, georgiaSandboxAdapter } from "./georgia.js";
 import { sandboxAdapterFor } from "./package.js";
 import { computeReturn } from "../tax-engine/index.js";
@@ -386,4 +386,14 @@ test("Georgia production needs Georgia's own approval on top of every federal it
   assert.equal(transportFor({ jurisdiction: "GA", config: efileConfig({ EFILE_MODE: "sandbox" }) }).id, "INNOVATAX-GA-SANDBOX");
   assert.match(productionGaps(efileConfig({}), "AL")[0], /not supported/);
   assert.throws(() => sandboxTransport({ jurisdiction: "AL" }), (e) => e.code === "EFILE_NO_TRANSPORT");
+});
+
+test("unauthorized transmission attempts are refused: reviewing is not transmitting", () => {
+  const config = efileConfig({ EFILE_MODE: "sandbox", EFILE_TRANSMITTER_UIDS: "tx1" });
+  assert.equal(transmitterAllowed({ role: "PREPARER", uid: "prep1" }, config, false), false, "an ordinary preparer reviews but does not transmit");
+  assert.equal(transmitterAllowed({ role: "PREPARER", uid: "tx1" }, config, false), true);
+  assert.equal(transmitterAllowed({ role: "PREPARER", uid: "boss" }, config, true), true, "the general admin transmits");
+  assert.equal(transmitterAllowed({ role: "CLIENT", uid: "tx1" }, config, true), false, "a client never transmits, whatever the list says");
+  assert.equal(transmitterAllowed(null, config, true), false);
+  assert.equal(transmitterAllowed({ role: "PREPARER", uid: "boss" }, config, "true"), false, "only a real admin check counts");
 });

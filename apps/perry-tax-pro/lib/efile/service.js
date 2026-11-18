@@ -5,7 +5,7 @@ import { federalLinkIssue } from "@/lib/efile/georgia";
 import { buildPackage, sandboxAdapterFor, officialAdapter, schemaPackageStatus } from "@/lib/efile/package";
 import { EfileError, FINAL_STATES, IN_FLIGHT } from "@/lib/efile/states";
 import { afterAck, afterSend, applyEvent, newRecord, readinessIssues, recordView, refreshRecord, returnStatusFor, signatureMatches } from "@/lib/efile/submission";
-import { efileConfig, productionGaps, SANDBOX_SCENARIOS, transportFor } from "@/lib/efile/transport";
+import { efileConfig, productionGaps, SANDBOX_SCENARIOS, transmitterAllowed, transportFor } from "@/lib/efile/transport";
 import { commitWrites, getDocument, isConflict, patchFields, queryCollection, replaceWrite, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { paymentGate } from "@/lib/payments";
 import { reviewContext } from "@/lib/return-review";
@@ -42,7 +42,7 @@ const sandboxStore = {
 
 export async function mayTransmit(session, config = efileConfig()) {
   if (session?.role !== "PREPARER") return false;
-  return config.transmitters.includes(session.uid) || isGeneralAdmin(session);
+  return transmitterAllowed(session, config, (await isGeneralAdmin(session)) === true);
 }
 
 function adapterFor(taxYear, config, jurisdiction = "US") {

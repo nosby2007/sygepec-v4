@@ -67,7 +67,8 @@ export async function sensitiveAllowed(session, r) {
 export async function saveGrant(session, clientUid, reason, nowMs = Date.now()) {
   const expiresAt = new Date(nowMs + GRANT_MINUTES * 60_000).toISOString();
   await setDocument(grantPath(session.uid, clientUid), {
-    tenantId: TAX_TENANT, staffUid: session.uid, clientUid, reason, grantedAt: new Date(nowMs).toISOString(), expiresAt,
+    // expiresAtMs is what the Storage rules compare with the request time.
+    tenantId: TAX_TENANT, staffUid: session.uid, clientUid, reason, grantedAt: new Date(nowMs).toISOString(), expiresAt, expiresAtMs: nowMs + GRANT_MINUTES * 60_000,
   }, await serviceToken());
   return expiresAt;
 }

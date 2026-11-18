@@ -482,19 +482,75 @@ describe("Support files", () => {
 });
 
 describe("Storage", () => {
-  const docsFile = "tax/perry-tax-pro/alice/alice_docs/d1/document.pdf";
-  const filedFile = "tax/perry-tax-pro/alice/alice_filed/f1/document.pdf";
+  // Assigned to prep. alice_docs and alice_filed have no preparer.
+  const docsFile = "tax/perry-tax-pro/alice/alice_sdocs/d1/document.pdf";
+  const filedFile = "tax/perry-tax-pro/alice/alice_sfiled/f1/document.pdf";
+  const unassignedFile = "tax/perry-tax-pro/alice/alice_docs/u1/document.pdf";
+  before(async () => {
+    await seed("taxReturns/alice_sdocs", newReturn("alice", 2023, { status: "DOCS_PENDING", preparerId: "prep", preparerName: "User prep", docCount: 1 }));
+    await seed("taxReturns/alice_sfiled", newReturn("alice", 2022, { status: "FILED", preparerId: "prep", preparerName: "User prep", docCount: 1 }));
+    await seed("taxUsers/prep3", user("prep3", { role: "PREPARER", accountType: null }));
+  });
   test("a client uploads to their own return; others cannot read it", async () => {
     ok(await upload("alice", docsFile));
     ok(await upload("prep", filedFile));
     ok(await download("alice", docsFile));
     ok(await download("prep", docsFile));
     denied(await download("bob", docsFile));
-    denied(await upload("bob", "tax/perry-tax-pro/alice/alice_docs/x/document.pdf"));
+    denied(await upload("bob", "tax/perry-tax-pro/alice/alice_sdocs/x/document.pdf"));
   });
-  test("a client cannot delete files from a filed return; a preparer can", async () => {
+  test("a preparer not assigned to the return cannot reach its files directly", async () => {
+    denied(await download("prep2", docsFile));
+    denied(await upload("prep2", "tax/perry-tax-pro/alice/alice_sdocs/p2/document.pdf"));
+    denied(await remove("prep2", docsFile));
+    ok(await upload("alice", unassignedFile));
+    denied(await download("prep", unassignedFile), "assignment is per return");
+  });
+  test("the general admin opens and adds files on any return", async () => {
+    ok(await download("boss", docsFile));
+    ok(await upload("boss", "tax/perry-tax-pro/alice/alice_docs/b1/document.pdf"));
+  });
+  test("a fresh reason opens the files for reading only, until it expires", async () => {
+    await seed("taxAccessGrants/prep2_alice", { tenantId: T, staffUid: "prep2", clientUid: "alice", reason: "Client called", expiresAtMs: Date.now() + 10 * 60_000 });
+    await seed("taxAccessGrants/prep3_alice", { tenantId: T, staffUid: "prep3", clientUid: "alice", reason: "Old", expiresAtMs: Date.now() - 60_000 });
+    ok(await download("prep2", docsFile));
+    denied(await upload("prep2", "tax/perry-tax-pro/alice/alice_sdocs/p2/document.pdf"));
+    denied(await download("prep3", docsFile));
+    denied(await download("prep2", "tax/perry-tax-pro/bob/bob_x/z/document.pdf"), "a reason covers one client");
+  });
+  test("a client cannot delete files from a filed return; the assigned preparer can", async () => {
     denied(await remove("alice", filedFile));
     assert.ok([200, 204].includes(await remove("alice", docsFile)));
     assert.ok([200, 204].includes(await remove("prep", filedFile)));
+  });
+});
+
+describe("Blocked accounts", () => {
+  const file = "tax/perry-tax-pro/dana/dana_2026/d1/document.pdf";
+  const unblock = () => status(fetch(`${DOCS}/taxAccountBlocks/dana`, { method: "DELETE", headers: headers("owner") }));
+  before(async () => {
+    await seed("taxUsers/dana", user("dana"));
+    await seed("taxReturns/dana_2026", newReturn("dana", 2026, { status: "DOCS_PENDING", preparerId: "prep", preparerName: "User prep" }));
+    ok(await upload("dana", file));
+    await seed("taxAccountBlocks/dana", { tenantId: T, uid: "dana", reason: "Fraud review", at: now, by: "boss" });
+  });
+  test("a blocked client cannot use their own token on Firestore", async () => {
+    denied(await read("dana", "taxReturns/dana_2026"));
+    denied(await read("dana", "taxUsers/dana"));
+    denied(await write("dana", "taxNotes/danaNote", { tenantId: T, returnId: "dana_2026", clientId: "dana", authorId: "dana", authorName: "User dana", authorRole: "CLIENT", message: "hi", createdAt: now }, true));
+  });
+  test("a blocked client cannot use their own token on Storage", async () => {
+    denied(await download("dana", file));
+    denied(await upload("dana", "tax/perry-tax-pro/dana/dana_2026/d2/document.pdf"));
+    denied(await remove("dana", file));
+  });
+  test("staff still reach the blocked client's return", async () => {
+    ok(await read("prep", "taxReturns/dana_2026"));
+    ok(await download("prep", file));
+  });
+  test("unblocking restores access", async () => {
+    assert.ok([200, 204].includes(await unblock()));
+    ok(await read("dana", "taxReturns/dana_2026"));
+    ok(await download("dana", file));
   });
 });

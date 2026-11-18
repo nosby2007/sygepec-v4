@@ -108,6 +108,14 @@ export function efileConfig(env = process.env) {
   };
 }
 
+// Who may transmit: a preparer who is the general admin or is listed in
+// EFILE_TRANSMITTER_UIDS. Reviewing a return never includes it. isGeneralAdmin is passed
+// in (it is read from Firestore by the caller).
+export function transmitterAllowed(session, config, isGeneralAdmin = false) {
+  if (session?.role !== "PREPARER" || !session.uid) return false;
+  return config.transmitters.includes(session.uid) || isGeneralAdmin === true;
+}
+
 // No official MeF transport is implemented: production cannot be reached.
 const OFFICIAL_TRANSPORTS = {};
 export const transportInstalled = (jurisdiction) => Boolean(OFFICIAL_TRANSPORTS[jurisdiction]);

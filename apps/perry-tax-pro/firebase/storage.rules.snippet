@@ -1,10 +1,18 @@
 // Add inside service firebase.storage / match /b/{bucket}/o.
+
+// Signed in and not blocked: a block closes direct Storage access with the account's own
+// token too (the Firebase account itself stays enabled).
+function taxActive() {
+  return request.auth != null
+    && !firestore.exists(/databases/(default)/documents/taxAccountBlocks/$(request.auth.uid));
+}
+
 function taxProfile() {
   return firestore.get(/databases/(default)/documents/taxUsers/$(request.auth.uid)).data;
 }
 
 function taxPreparer() {
-  return request.auth != null
+  return taxActive()
     && firestore.exists(/databases/(default)/documents/taxUsers/$(request.auth.uid))
     && taxProfile().tenantId == 'perry-tax-pro'
     && taxProfile().role == 'PREPARER';
@@ -14,6 +22,37 @@ function validTaxReturn(clientUid, returnId) {
   return firestore.exists(/databases/(default)/documents/taxReturns/$(returnId))
     && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.tenantId == 'perry-tax-pro'
     && firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.clientId == clientUid;
+}
+
+function taxReturnDoc(returnId) {
+  return firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data;
+}
+
+// The general admin: a preparer holding PLATFORM_ADMIN (same test as the Firestore rules).
+function taxGeneralAdmin() {
+  return taxPreparer()
+    && firestore.exists(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid))
+    && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.tenantId == 'perry-tax-pro'
+    && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.role == 'PLATFORM_ADMIN';
+}
+
+// A reason given in the client file opens that client's documents to one preparer for 30
+// minutes (taxAccessGrants/{staff}_{client}, written only by the server).
+function taxFreshGrant(clientUid) {
+  return firestore.exists(/databases/(default)/documents/taxAccessGrants/$(request.auth.uid + '_' + clientUid))
+    && firestore.get(/databases/(default)/documents/taxAccessGrants/$(request.auth.uid + '_' + clientUid)).data.tenantId == 'perry-tax-pro'
+    && request.time.toMillis() < firestore.get(/databases/(default)/documents/taxAccessGrants/$(request.auth.uid + '_' + clientUid)).data.expiresAtMs;
+}
+
+// The same people the app lets in: the assigned preparer or the general admin change a
+// return's files; opening one also works with a fresh reason.
+function taxReturnEditor(returnId) {
+  return taxPreparer() && (taxReturnDoc(returnId).get('preparerId', null) == request.auth.uid || taxGeneralAdmin());
+}
+
+function taxReturnReader(clientUid, returnId) {
+  return taxPreparer()
+    && (taxReturnDoc(returnId).get('preparerId', null) == request.auth.uid || taxGeneralAdmin() || taxFreshGrant(clientUid));
 }
 
 function businessEntry(entryId) {
@@ -35,10 +74,10 @@ function taxSupportCanRead(a) {
 // Ticket attachments. The server writes the record after its checks, and these rules hold to
 // it: no file without a record, the record decides who reads, and quarantine applies here too.
 match /taxsupport/perry-tax-pro/{ticketId}/{visibility}/{attachmentId}/{fileName} {
-  allow read: if request.auth != null
+  allow read: if taxActive()
     && taxSupportAttachment(attachmentId).storagePath == 'taxsupport/perry-tax-pro/' + ticketId + '/' + visibility + '/' + attachmentId + '/' + fileName
     && taxSupportCanRead(taxSupportAttachment(attachmentId));
-  allow create: if request.auth != null
+  allow create: if taxActive()
     && taxSupportAttachment(attachmentId).state == 'UPLOADING'
     && taxSupportAttachment(attachmentId).uploadedBy == request.auth.uid
     && taxSupportAttachment(attachmentId).storagePath == 'taxsupport/perry-tax-pro/' + ticketId + '/' + visibility + '/' + attachmentId + '/' + fileName
@@ -48,31 +87,31 @@ match /taxsupport/perry-tax-pro/{ticketId}/{visibility}/{attachmentId}/{fileName
 }
 
 match /tax/perry-tax-pro/{clientUid}/{returnId}/{documentId}/{fileName} {
-  allow read: if request.auth != null
+  allow read: if taxActive()
     && validTaxReturn(clientUid, returnId)
-    && (request.auth.uid == clientUid || taxPreparer());
-  allow create: if request.auth != null
+    && (request.auth.uid == clientUid || taxReturnReader(clientUid, returnId));
+  allow create: if taxActive()
     && validTaxReturn(clientUid, returnId)
-    && (request.auth.uid == clientUid || taxPreparer())
+    && (request.auth.uid == clientUid || taxReturnEditor(returnId))
     && request.resource.size > 0
     && request.resource.size <= 10 * 1024 * 1024
     && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png|image/webp|image/heic)');
   allow update: if false;
   // Matches the Firestore taxDocuments rule: clients cannot remove files from a filed return.
   // Signed Form 8879 files (signed-*.pdf) are kept for the IRS retention period.
-  allow delete: if request.auth != null
+  allow delete: if taxActive()
     && !fileName.matches('signed-.*')
     && validTaxReturn(clientUid, returnId)
     && (
-      taxPreparer()
+      taxReturnEditor(returnId)
       || (request.auth.uid == clientUid
         && !(firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data.status in ['FILED', 'ACCEPTED']))
     );
 }
 
 match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {
- allow read: if request.auth != null && (request.auth.uid == clientUid || taxPreparer());
- allow create: if request.auth != null && request.auth.uid == clientUid
+ allow read: if taxActive() && (request.auth.uid == clientUid || taxPreparer());
+ allow create: if taxActive() && request.auth.uid == clientUid
   && businessEntry(entryId).tenantId == 'perry-tax-pro'
   && businessEntry(entryId).clientId == clientUid
   && businessEntry(entryId).kind == 'expense'
@@ -85,7 +124,7 @@ match /tax/perry-tax-pro/business/{clientUid}/{entryId}/{receiptFile} {
 // business account itself may upload, images only, 2 MB at most.
 match /biz/{businessId}/public/{fileName} {
   allow read: if true;
-  allow create: if request.auth != null
+  allow create: if taxActive()
     && request.auth.uid == businessId
     && taxProfile().tenantId == 'perry-tax-pro'
     && taxProfile().accountType == 'BUSINESS'
@@ -94,7 +133,7 @@ match /biz/{businessId}/public/{fileName} {
     && request.resource.size <= 2 * 1024 * 1024
     && request.resource.contentType.matches('image/(jpeg|png|webp)');
   allow update: if false;
-  allow delete: if request.auth != null && request.auth.uid == businessId;
+  allow delete: if taxActive() && request.auth.uid == businessId;
 }
 
 // Images for the public site (services, posts, team). Readable by anyone; only
