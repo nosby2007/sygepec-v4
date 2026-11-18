@@ -191,3 +191,160 @@ Rules to follow:
 
 Publications: 3112 (application), 1345 (ERO rules), 4163 (MeF for providers), 4164 (MeF
 for software developers), 1436 (ATS for individual returns), and Circular 230.
+
+---
+
+## 7. Direct transmission (MeF adapter), phase 5
+
+InnovaTax now contains the engineering for Option B, ready for official testing but
+**not able to reach the IRS**. Production stays disabled until every gap below is closed.
+
+Chain: approved calculation snapshot -> return data -> schema adapter -> XML -> schema
+validation -> InnovaTax consistency rules -> package (SHA-256 hash, idempotency key) ->
+transport -> verified acknowledgement -> submission state.
+
+| Piece | Where | Status |
+| --- | --- | --- |
+| Submission states (NOT_READY ... ACCEPTED / REJECTED, FAILED_RETRYABLE, INDETERMINATE) | `lib/efile/states.js` | Code complete, tested |
+| Package, XML, schema check, consistency rules, acknowledgement parsing | `lib/efile/package.js` | Code complete, tested, **sandbox schema only** |
+| Records, readiness (layer 4), Form 8879 bound to the approved fingerprint | `lib/efile/submission.js` | Code complete, tested |
+| Sandbox transport and production gate | `lib/efile/transport.js` | Sandbox only |
+| Firestore records `taxSubmissions/{key}`, audit, return status | `lib/efile/service.js` | Code complete; not run against Firestore yet |
+| Preparer panel, transmission worklist, client status | `components/EfilePanel.js`, `/admin/submissions`, `/portal/returns` | Code complete; not checked in a browser yet |
+
+Rules the code enforces:
+- A receipt or an HTTP success is never an acceptance. Only a verified acknowledgement
+  (matching submission reference and package hash) moves a submission to ACCEPTED or
+  REJECTED, and only an **authoritative** transport changes the return's filing status.
+  A sandbox acceptance never does.
+- One record per return, year, jurisdiction and approved answers. Building the same
+  package again returns the same record. A record with an unknown outcome cannot be sent
+  again until it is reconciled with the receiver.
+- Form 8879 counts only if it was signed for the approved fingerprint. New answers or
+  a reopened review take the submission back to "not ready".
+- Reviewing and transmitting are separate permissions: transmitting takes the general
+  admin role or a uid in `EFILE_TRANSMITTER_UIDS`.
+- In production, every rule module used must be FILING_READY.
+
+Server settings:
+
+| Variable | Meaning |
+| --- | --- |
+| `EFILE_MODE` | `off` (default), `sandbox` or `production` |
+| `EFILE_TRANSMITTER_UIDS` | Comma-separated preparer uids allowed to transmit, besides the general admin |
+| `EFILE_PRODUCTION_AUTHORIZED`, `MEF_EFIN`, `MEF_ETIN`, `MEF_A2A_CERT_SECRET` | Read by the production gate. Even with all of them set, production is refused while no official transport and schema adapter are installed. |
+
+Still needed from the business owner and the IRS before real transmission:
+1. IRS e-file application with the Software Developer and Transmitter roles (an EFIN
+   alone does not allow transmission), then an ETIN.
+2. The tax-year 1040 MeF schema and business rule packages from e-Services, built into
+   an official adapter (`officialAdapter` in `lib/efile/package.js`).
+3. The A2A specifications and system credentials, built into an official transport
+   (`OFFICIAL_TRANSPORTS` in `lib/efile/transport.js`), with credentials kept in Secret
+   Manager.
+4. ATS testing with the Pub 1436 scenarios, then the IRS acceptance letter.
+5. Georgia: its own approval and testing for state submissions; federal approval does
+   not cover it.
+
+Status words, never interchangeable: CODE COMPLETE (yes, sandbox), TESTED (unit tests),
+TAX VALIDATED (no), ATS APPROVED (no), PRODUCTION AUTHORIZED (no).
+
+---
+
+## 8. ATS test package and onboarding, phase 6
+
+**Assurance testing (ATS).** `npm run ats` runs every scenario through the questionnaire,
+the federal and Georgia engines, the package builder, the schema check and the
+consistency rules. It compares the figures with the expected ones and writes the package
+(one XML file per scenario and jurisdiction, `report.md`, `report.json`) to
+`ats-out/<date>/`. It exits with code 1 if any scenario fails.
+
+- InnovaTax reference cases (`lib/efile/ats.js`) always run. Their expected figures are
+  worked by hand in the engine tests. They prove the chain, not IRS approval.
+- The official Pub. 1436 scenarios are released to e-file applicants. They go in
+  `ats/scenarios/*.json` (format in `ats/scenarios/README.md`), entered from the
+  official publication. A scenario marked `IRS_ATS` without its reference is refused.
+- Real ATS means transmitting those returns to the IRS ATS environment with the official
+  schema and transport, and receiving IRS acknowledgements. That is only possible once the
+  onboarding steps below are done.
+
+**Onboarding tracker.** The admin page **E-file readiness** (`/admin/efile`) lists every step,
+who owns it (business owner, IRS, Georgia DOR, engineering) and what it is needed for
+(ATS, production, Georgia):
+- Steps for the owner, the IRS and Georgia are recorded by the general admin, with a note.
+  The record is audited and kept in `taxEfileOnboarding/{tenant}`.
+- Engineering steps (official schema adapter, official transport, Georgia adapter,
+  reference cases) are read from the code and cannot be marked done by hand.
+- A step recorded as done whose server setting is missing (EFIN, ETIN, A2A credentials,
+  production authorization) is flagged.
+- Recording steps never turns transmission on.
+
+The same page shows the tax-year support matrix (every module and its status on the
+PENDING to FILING_READY ladder) and the result of the reference cases.
+
+Order of work for the owner: e-Services accounts -> e-file application (ERO, Software
+Developer, Transmitter) -> suitability -> ETIN in test status -> download the schemas and
+A2A specifications -> engineering builds the official adapter and transport -> enter the
+Pub. 1436 scenarios -> ATS -> communication test -> production status -> security sign-off
+(Pub. 4557, Pub. 1345) -> production switch. Georgia follows with its own approval.
+
+## 9. Georgia e-file adapter, phase 7
+
+**What Georgia publishes** (checked November 2026; confirm every year with Georgia DOR):
+
+- Georgia takes individual income tax returns (Form 500) through the Fed/State
+  Modernized e-File program. Its developer guide is the "Fed/State MeF Individual Income
+  Tax Electronic Filing Guidelines & Information for Software Developers". The newest
+  edition found online was for tax year 2017. Ask Georgia for the current one.
+- Each tax year, a software developer sends Georgia a Letter of Intent and registers its
+  product before testing. Georgia then runs its own testing and approves the product.
+  Georgia sets its deadlines every year.
+- Vendor contact: GA.Vendors@dor.ga.gov.
+- **IRS approval does not include Georgia.** Georgia needs the whole federal path (e-file
+  application, ATS, production status) plus its own approval on top.
+
+**What is built:**
+
+- `lib/efile/georgia.js` has:
+  - the Georgia sandbox schema adapter (`INNOVATAX-GA-SANDBOX-<year>`, with its own
+    namespace, separate from the federal one);
+  - the InnovaTax Georgia checks (IX-GA-001 to 009). These are not Georgia's business
+    rules.
+- **Link to the federal return.** Every Georgia package is linked to the federal
+  submission for the same approved figures (`<LinkedFederal>`). That reference is known
+  before either package is built. A Georgia submission:
+  - can be built at any time;
+  - waits while the federal return has not been sent;
+  - is blocked if the federal return was rejected, or was filed through other software.
+    Georgia-only submissions are not supported.
+- **Separate Georgia sandbox receiver** (`INNOVATAX-GA-SANDBOX`). It rejects a Georgia
+  return whose federal submission never arrived (GA-SBX-LINK-1) or was rejected
+  (GA-SBX-LINK-2). A Georgia rejection points to the screen that fixes it.
+- **Separate production gate.**
+  - `GA_EFILE_AUTHORIZED=true` records Georgia's approval. It is never implied by the
+    federal settings.
+  - Every federal gap is also a Georgia gap.
+  - No Georgia transport or schema adapter is installed, so Georgia production is always
+    refused.
+- **On the return**, Georgia's state is stored apart from the federal one (`efileGa`). It
+  never changes the return's federal filing status. Clients see it only for real (not
+  sandbox) submissions.
+- **Onboarding** now lists these Georgia steps: Letter of Intent, product registration,
+  Georgia schema, Georgia schema adapter (read from the code), Georgia testing, Georgia
+  approval (checked against `GA_EFILE_AUTHORIZED`), and the official transport.
+
+**Not supported yet:**
+
+- correcting a rejected Georgia return after the federal return was accepted (that needs
+  a Georgia-only resubmission);
+- Form 500X;
+- Forms IND-CR and 500-NOL.
+
+**To finish (owner):**
+
+1. Letter of Intent and product registration with Georgia DOR.
+2. Get Georgia's current guide, schema and test cases.
+3. Engineering builds the official Georgia adapter and transport from them.
+4. Georgia testing.
+5. Georgia approval letter.
+6. Set `GA_EFILE_AUTHORIZED=true`. This happens only after the federal production status.

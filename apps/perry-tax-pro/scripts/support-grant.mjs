@@ -68,6 +68,9 @@ async function main() {
   const fields = { tenantId: s(TENANT), uid: s(uid), name: s(user.fields.name?.stringValue || email), email: s(email.toLowerCase()), role: s(role), grantedBy: s("support-grant-script"), grantedAt: s(now) };
   const granted = await fetch(`${FS}/taxSupportRoles/${uid}`, { method: "PATCH", headers, body: JSON.stringify({ fields }) });
   if (!granted.ok) { console.error("Could not save the role."); return void (process.exitCode = 1); }
+  // Mirrored for the Storage rules, which read only the account record and one other document.
+  const mirrored = await fetch(`${FS}/taxUsers/${uid}?updateMask.fieldPaths=platformAdmin&currentDocument.exists=true`, { method: "PATCH", headers, body: JSON.stringify({ fields: { platformAdmin: { booleanValue: role === "PLATFORM_ADMIN" } } }) });
+  if (!mirrored.ok) { console.error("The role is saved, but the general admin flag could not be copied to the account. Run the script again."); return void (process.exitCode = 1); }
   await fetch(`${FS}/taxAudit/${Date.now()}_${crypto.randomUUID()}`, {
     method: "PATCH", headers,
     body: JSON.stringify({ fields: { tenantId: s(TENANT), area: s("SUPPORT"), at: s(now), action: s("SUPPORT_ROLE_CHANGED"), outcome: s("SUCCESS"), actorRole: s("SYSTEM"), target: s(`taxUsers/${uid}`), details: { mapValue: { fields: { to: s(role), via: s("support-grant-script") } } } } }),

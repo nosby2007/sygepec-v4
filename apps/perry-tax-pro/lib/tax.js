@@ -2,7 +2,8 @@
 // (lib/tax-rules.js). It is an estimate, never a filing-ready figure: every result names
 // its rule set and lists what it does not calculate.
 import { federalRules, ruleSummary } from "@/lib/tax-rules";
-import { ageAtYearEnd, incomeTotals, TOPICS } from "@/lib/intake-schema";
+import { TOPICS } from "@/lib/intake-schema";
+import { computeReturn, estimateFromReturn } from "@/lib/tax-engine/index";
 
 const n = (v) => Math.max(0, Number(v) || 0);
 const cents = (v) => Math.round(v * 100) / 100;
@@ -100,38 +101,13 @@ export function computeEstimate(i) {
   };
 }
 
-export function intakeToEstimate(intake = {}, taxYear = 2026) {
-  const t = incomeTotals(intake);
-  const ded = intake.deductions || {};
-  const deps = intake.dependents || [];
-  const p = intake.personal || {}, sp = intake.spouse || {};
-  const joint = ["MFJ", "QSS"].includes(intake.filingStatus);
-  const age65 = [ageAtYearEnd(p.dob, taxYear), joint ? ageAtYearEnd(sp.dob, taxYear) : null].filter((a) => a != null && a >= 65).length;
-  const blind = (p.blind ? 1 : 0) + (joint && sp.blind ? 1 : 0);
-  return computeEstimate({
-    taxYear,
-    filingStatus: intake.filingStatus,
-    wages: t.wages,
-    selfEmployment: t.selfEmployment,
-    otherIncome: t.interest + t.dividends + t.unemployment + t.retirement + t.capitalGains + t.other,
-    withheld: t.withheld,
-    estimatedPayments: ded.estimatedPayments,
-    studentLoan: t.studentLoan,
-    hsa: ded.hsa,
-    ira: ded.ira,
-    mortgageInterest: t.mortgageInterest,
-    salt: t.propertyTax,
-    charity: ded.charity,
-    medical: ded.medical,
-    deductionChoice: intake.deductionChoice,
-    canBeClaimed: intake.canBeClaimed === "yes",
-    age65, blind,
-    childrenUnder17: deps.filter((d) => d.age !== "" && Number(d.age) < 17).length,
-    otherDependents: deps.filter((d) => d.age === "" || Number(d.age) >= 17).length,
-  });
+// Figures for the client file, from the full federal engine (lib/tax-engine). The quick
+// public estimator above stays a rough estimate; this one follows the return line by line.
+export function intakeToEstimate(intake = {}, taxYear = 2026, supplement = {}) {
+  return estimateFromReturn(computeReturn(intake, taxYear, supplement));
 }
 
-const FORM_DOC = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL" };
+const FORM_DOC = { W2: "W2", "1099NEC": "1099NEC", "1099K": "1099NEC", "1099INT": "1099INT", "1099DIV": "1099DIV", "1099B": "1099B", "1099G": "1099G", "1099R": "1099R", SSA1099: "SSA1099", 1098: "1098", "1098E": "1098E", "1098T": "1098T", "1095A": "1095A", K1: "K1", RENTAL: "RENTAL", "1099MISC": "1099MISC" };
 
 // Documents to upload, from the forms entered and the topics picked (version 2), or from
 // the typed totals (version 1).

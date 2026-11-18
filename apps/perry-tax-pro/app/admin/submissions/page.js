@@ -7,11 +7,20 @@ import Icon from "@/components/Icon";
 import { NumberCount } from "@/components/Motion";
 import { HBars, PALETTE } from "@/components/charts";
 import { Avatar, Empty, Kpi, PageHead } from "@/components/ui";
+import { listSubmissions } from "@/lib/efile/service";
+import { efileConfig } from "@/lib/efile/transport";
+
+// Electronic submissions that need someone: rejections first, then unknown outcomes,
+// failed sends, packages waiting for an acknowledgement, and packages ready to send.
+const WORK_ORDER = ["REJECTED", "INDETERMINATE", "FAILED_RETRYABLE", "ACK_PENDING", "READY_TO_TRANSMIT", "SIGNATURE_PENDING"];
 
 const COLORS = { NOT_READY: PALETTE.slate, READY: PALETTE.gold, SUBMITTED: PALETTE.blue, ACCEPTED: PALETTE.green, REJECTED: PALETTE.rose };
 
 export default async function Page() {
-  const returns = await listReturns();
+  const [returns, submissions] = await Promise.all([listReturns(), listSubmissions().catch(() => [])]);
+  const mode = efileConfig().mode;
+  const byReturn = Object.fromEntries(returns.map((x) => [x.id, x]));
+  const work = submissions.filter((s) => WORK_ORDER.includes(s.state)).sort((a, b) => WORK_ORDER.indexOf(a.state) - WORK_ORDER.indexOf(b.state));
   const priority = { REJECTED: 0, READY: 1, SUBMITTED: 2, NOT_READY: 3, ACCEPTED: 4 };
   const rows = returns
     .filter((item) => item.intake.submitted)
@@ -26,7 +35,7 @@ export default async function Page() {
       <PageHead kicker="Controlled e-file tracking" icon="send" title="Submission Center" desc="Record filing readiness and IRS acknowledgements." />
       <div className="alert alert-info" style={{ marginBottom: 20 }}>
         <Icon name="info" size={16} />
-        <span>This workspace records filing readiness and IRS acknowledgements. It does not directly transmit tax returns to the IRS.</span>
+        <span>{mode === "production" ? "Electronic filing is in production." : mode === "sandbox" ? "Electronic filing runs in sandbox mode: packages go to a test receiver, never to the IRS or Georgia. Returns filed through professional software are recorded below." : "This workspace records filing readiness and IRS acknowledgements. Electronic filing is turned off on this server."}</span>
       </div>
       <div className="grid-main">
         <div className="grid-3 stagger" style={{ alignContent: "start" }}>
@@ -39,6 +48,26 @@ export default async function Page() {
           <HBars items={funnel} max={Math.max(1, rows.length)} />
         </div>
       </div>
+      {mode !== "off" && (
+        <div className="card mt">
+          <div className="card-title"><div><h3>Transmission worklist</h3><div className="sub">Rejections, unknown outcomes and failed sends first</div></div><span className="pill">{work.length}</span></div>
+          <div className="workflow-list">
+            {work.map((s) => {
+              const r = byReturn[s.returnId];
+              return (
+                <article key={s.key} className={`workflow-row workflow-row-wide ${["REJECTED", "INDETERMINATE", "FAILED_RETRYABLE"].includes(s.state) ? "alarm" : ""}`}>
+                  <div className="workflow-person">
+                    <Link href={`/admin/returns/${s.returnId}#efile-panel`} className="person"><Avatar name={r?.client_name || "Client"} size="sm" /><b>{r?.client_name || s.returnId}</b></Link>
+                    <span className="hint">{s.jurisdiction === "US" ? "Federal" : s.jurisdiction} · {s.submissionRef}{s.sandbox ? " · sandbox" : ""} · updated {fmtDate(s.updatedAt)}</span>
+                  </div>
+                  <div className="small"><b>{s.stateLabel}</b>{s.ack?.errors?.length ? <span className="hint" style={{ display: "block" }}>{s.ack.errors.map((e) => e.code).join(", ")}</span> : null}</div>
+                </article>
+              );
+            })}
+            {work.length === 0 && <Empty icon="send" title="Nothing waiting">No electronic submission needs attention.</Empty>}
+          </div>
+        </div>
+      )}
       <div className="card mt">
         <div className="card-title"><div><h3>Return submission queue</h3><div className="sub">Exceptions first, then returns ready to file</div></div><span className="pill">{rows.length} returns</span></div>
         <div className="workflow-list">

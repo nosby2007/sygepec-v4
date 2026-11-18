@@ -8,6 +8,7 @@ import { serviceToken } from "@/lib/service-identity";
 import { audit } from "@/lib/audit";
 import { scanFile, scanMessage } from "@/lib/file-scan";
 import { cleanEmail, cleanText, safeId } from "@/lib/security";
+import { isGeneralAdmin } from "@/lib/staff";
 
 // Online signing of Form 8879 through DocuSeal, with third-party knowledge-based
 // authentication (KBA) for each signer, as IRS Publication 1345 requires for remote
@@ -112,6 +113,10 @@ export async function sendForSignature(session, rawReturnId, input) {
   if ((spouseEmail && !spouseName) || (!spouseEmail && spouseName)) throw new SignError("Enter both the spouse's name and email, or neither.");
   if (spouseEmail && spouseEmail === String(r.client_email).toLowerCase()) throw new SignError("The spouse needs their own email address.");
 
+  // The approved figures this Form 8879 is for. E-file accepts the signature only while
+  // the approval fingerprint is unchanged (lib/efile/submission.js).
+  const review = await getDocument(`taxReviews/${r.id}`, await serviceToken()).catch(() => null);
+  const approved = review?.snapshot?.fingerprint || null;
   const roles = spouseEmail ? ["Taxpayer", "Spouse"] : ["Taxpayer"];
   const signers = [
     { role: "Taxpayer", name: r.client_name, email: r.client_email },
@@ -132,7 +137,7 @@ export async function sendForSignature(session, rawReturnId, input) {
   const now = new Date().toISOString();
   const record = {
     tenantId: TAX_TENANT, returnId: r.id, clientId: r.client_id, taxYear: r.tax_year, provider: "DocuSeal",
-    submissionId: submission.id, status: "SENT", createdAt: now, createdBy: session.uid, createdByName: session.name,
+    submissionId: submission.id, status: "SENT", fingerprint: approved, createdAt: now, createdBy: session.uid, createdByName: session.name,
     signers: signers.map((s) => ({ ...s, submitterId: byRole[s.role]?.id || null, embedSrc: byRole[s.role]?.embed_src || null, status: byRole[s.role]?.status || "sent", completedAt: null })),
   };
   await setDocument(`taxSignatures/${r.id}`, record, await serviceToken());
@@ -216,7 +221,15 @@ export async function syncSignature(session, rawReturnId) {
     return { ...sig, signers, status };
   }
 
-  // Everyone signed: keep the signed form and the audit trail with the return.
+  // Everyone signed. The signed form is saved with the caller's own Storage access, which
+  // only the client, the assigned preparer and the general admin have on this return. Anyone
+  // else leaves the request as it is, and the next of those to open the return completes it,
+  // so the signed form is never lost.
+  if (session.uid !== sig.clientId) {
+    const ret = await getDocument(`taxReturns/${id}`, token).catch(() => null);
+    if (ret?.preparerId !== session.uid && !await isGeneralAdmin(session)) return { ...sig, signers };
+  }
+  // Keep the signed form and the audit trail with the return.
   const evidence = {};
   const signedUrl = submission.combined_document_url || submission.documents?.[0]?.url;
   if (signedUrl) evidence.signedDocumentId = await storeDocument(session, sig, "SIGNED_8879", `Form 8879 ${sig.taxYear} (signed).pdf`, await download(signedUrl)).catch(() => null);
