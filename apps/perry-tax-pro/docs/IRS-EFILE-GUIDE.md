@@ -248,3 +248,42 @@ Still needed from the business owner and the IRS before real transmission:
 
 Status words, never interchangeable: CODE COMPLETE (yes, sandbox), TESTED (unit tests),
 TAX VALIDATED (no), ATS APPROVED (no), PRODUCTION AUTHORIZED (no).
+
+---
+
+## 8. ATS test package and onboarding, phase 6
+
+**Assurance testing (ATS).** `npm run ats` runs every scenario through the questionnaire,
+the federal and Georgia engines, the package builder, the schema check and the
+consistency rules. It compares the figures with the expected ones and writes the package
+(one XML file per scenario and jurisdiction, `report.md`, `report.json`) to
+`ats-out/<date>/`. It exits with code 1 if any scenario fails.
+
+- InnovaTax reference cases (`lib/efile/ats.js`) always run. Their expected figures are
+  worked by hand in the engine tests. They prove the chain, not IRS approval.
+- The official Pub. 1436 scenarios are released to e-file applicants. They go in
+  `ats/scenarios/*.json` (format in `ats/scenarios/README.md`), entered from the
+  official publication. A scenario marked `IRS_ATS` without its reference is refused.
+- Real ATS means transmitting those returns to the IRS ATS environment with the official
+  schema and transport, and receiving IRS acknowledgements. That is only possible once the
+  onboarding steps below are done.
+
+**Onboarding tracker.** The admin page **E-file readiness** (`/admin/efile`) lists every step,
+who owns it (business owner, IRS, Georgia DOR, engineering) and what it is needed for
+(ATS, production, Georgia):
+- Steps for the owner, the IRS and Georgia are recorded by the general admin, with a note.
+  The record is audited and kept in `taxEfileOnboarding/{tenant}`.
+- Engineering steps (official schema adapter, official transport, Georgia adapter,
+  reference cases) are read from the code and cannot be marked done by hand.
+- A step recorded as done whose server setting is missing (EFIN, ETIN, A2A credentials,
+  production authorization) is flagged.
+- Recording steps never turns transmission on.
+
+The same page shows the tax-year support matrix (every module and its status on the
+PENDING to FILING_READY ladder) and the result of the reference cases.
+
+Order of work for the owner: e-Services accounts -> e-file application (ERO, Software
+Developer, Transmitter) -> suitability -> ETIN in test status -> download the schemas and
+A2A specifications -> engineering builds the official adapter and transport -> enter the
+Pub. 1436 scenarios -> ATS -> communication test -> production status -> security sign-off
+(Pub. 4557, Pub. 1345) -> production switch. Georgia follows with its own approval.

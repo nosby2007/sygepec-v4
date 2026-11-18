@@ -91,6 +91,7 @@ export function efileConfig(env = process.env) {
 
 // No official MeF transport is implemented: production cannot be reached.
 const OFFICIAL_TRANSPORTS = {};
+export const transportInstalled = (jurisdiction) => Boolean(OFFICIAL_TRANSPORTS[jurisdiction]);
 
 export function productionGaps(config, jurisdiction = "US") {
   const gaps = [];

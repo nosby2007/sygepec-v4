@@ -50,6 +50,7 @@ export const AUDIT_LABELS = {
   EFILE_ACK_UNVERIFIED: "Ignored an unverified acknowledgement",
   EFILE_RECONCILED: "Reconciled a submission with an unknown outcome",
   EFILE_REFUSED: "Refused an e-file transmission",
+  EFILE_ONBOARDING: "Recorded an e-file onboarding step",
   RETENTION_RUN: "Data retention clean-up",
   ACCOUNT_DELETED: "Deleted their account",
   ACCOUNT_DELETION_REQUESTED: "Asked to delete their account",
