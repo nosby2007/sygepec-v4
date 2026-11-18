@@ -89,6 +89,16 @@ export function refreshRecord(record, { signaturesComplete, blocking, by, at }) 
   return next;
 }
 
+// A send claim is abandoned when it stays TRANSMITTING longer than any send can take
+// (the server stopped, or saving the result failed). It is then reconciled with the
+// receiver before anything is sent again.
+export const CLAIM_TIMEOUT_MS = 10 * 60_000;
+export function claimAbandoned(record, nowMs = Date.now(), timeoutMs = CLAIM_TIMEOUT_MS) {
+  if (record?.state !== "TRANSMITTING") return false;
+  const since = Date.parse(record.updatedAt);
+  return Number.isFinite(since) && nowMs - since > timeoutMs;
+}
+
 // What a send attempt produced, as the next record.
 export function afterSend(record, result, transport, { by, at }) {
   const changes = { attempts: (record.attempts || 0) + 1, transportId: transport.id, authoritative: Boolean(transport.authoritative) };
@@ -123,6 +133,7 @@ export function recordView(record, { staff = false } = {}) {
   return {
     ...view, returnId: record.returnId, adapterId: record.adapterId, forms: record.forms, attempts: record.attempts, receiptId: record.receiptId,
     transportId: record.transportId, scenario: record.scenario, supersedes: record.supersedes, validationErrors: record.validationErrors, hash: record.hash,
+    claimAbandoned: claimAbandoned(record),
     history: (record.history || []).slice(-30),
   };
 }

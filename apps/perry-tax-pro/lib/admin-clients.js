@@ -3,7 +3,7 @@ import { audit } from "@/lib/audit";
 import { AdminError, answersFrozen, applyCorrection, cleanReason, diagnose } from "@/lib/admin-rules";
 import { STATUSES } from "@/lib/constants";
 import {
-  commitWrites, createWrite, deleteDocument, getDocument, isConflict, mergeDocument, queryCollection, replaceWrite, sendPasswordResetEmail, setDocument, TAX_TENANT,
+  commitWrites, createWrite, deleteDocument, getDocument, isConflict, mergeDocument, patchFields, queryCollection, replaceWrite, sendPasswordResetEmail, setDocument, TAX_TENANT,
 } from "@/lib/firebase";
 import { mailerConfigured } from "@/lib/mailer";
 import { mfaStatus, resetByPreparer } from "@/lib/mfa";
@@ -171,9 +171,12 @@ export async function clientAction(session, isAdmin, rawUid, body) {
     const reason = cleanReason(body.reason);
     if (action === "block") {
       await setDocument(`taxAccountBlocks/${uid}`, { tenantId: TAX_TENANT, uid, reason, at: new Date().toISOString(), by: session.uid, byName: session.name }, token);
+      // Mirrored on the account record, which is what the Storage rules can read.
+      await patchFields(`taxUsers/${uid}`, { blocked: true }, token);
       await audit(session, "CLIENT_BLOCKED", { target, details: { reason } });
     } else {
       await deleteDocument(`taxAccountBlocks/${uid}`, token);
+      await patchFields(`taxUsers/${uid}`, { blocked: false }, token);
       await audit(session, "CLIENT_UNBLOCKED", { target, details: { reason } });
     }
     return { ok: true };

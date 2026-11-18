@@ -318,8 +318,11 @@ export function computeFederal(model = {}) {
   const agi = L("1040.11", "Adjusted gross income", totalIncome - adjustments);
 
   // -- Deductions --------------------------------------------------------------------------
-  const earnedByPerson = Object.fromEntries(people.map((who) => [who, sum(owned(w2, who), (x) => x.wages) + Math.max(0, seByPerson[who].profit - seByPerson[who].tax / 2)]));
-  const earned = r(wages + Math.max(0, businessIncome + farmIncome + sum(k1, (k) => k.selfEmployment) - halfSeTax));
+  // Earned income combines wages with the signed self-employment result: a business loss
+  // reduces it, and only the total is floored at zero (EIC Worksheet B; standard deduction
+  // worksheet for dependents).
+  const earnedByPerson = Object.fromEntries(people.map((who) => [who, Math.max(0, sum(owned(w2, who), (x) => x.wages) + seByPerson[who].profit - seByPerson[who].tax / 2)]));
+  const earned = r(Math.max(0, wages + businessIncome + farmIncome + sum(k1, (k) => k.selfEmployment) - halfSeTax));
   const age65 = people.filter((who) => n(ageOf(who)) >= 65).length;
   const blind = people.filter((who) => (who === "spouse" ? sp.blind : tp.blind)).length;
   const std = standardDeduction({ filingStatus: fs, canBeClaimed: model.canBeClaimed, earned, age65, blind }, rules);
@@ -505,7 +508,12 @@ export function computeFederal(model = {}) {
   const sv = rules.saversCredit;
   const saverLimits = pick(sv.limits, jk);
   const saverRate = model.canBeClaimed ? 0 : agi <= saverLimits[0] ? 0.5 : agi <= saverLimits[1] ? 0.2 : agi <= saverLimits[2] ? 0.1 : 0;
-  const contributions = sum(people, (who) => Math.min(sv.maxContribution, pos((cr.retirementContributions || {})[who]) + pos(iraIn[who]) + sum(owned(w2, who), (x) => x.retirementDeferrals)));
+  // Each contributor must be at least 18 at the end of the year (and not a full-time
+  // student, which the questionnaire does not ask: the preparer confirms it).
+  const saverEligible = (who) => { const age = ageOf(who); return age == null || n(age) >= 18; };
+  const contributions = sum(people.filter(saverEligible), (who) => Math.min(sv.maxContribution, pos((cr.retirementContributions || {})[who]) + pos(iraIn[who]) + sum(owned(w2, who), (x) => x.retirementDeferrals)));
+  if (people.some((who) => !saverEligible(who))) notes.push("Retirement savings credit: contributions of a person under 18 do not count.");
+  if (saverRate && contributions) notes.push("Retirement savings credit: not allowed for a full-time student. The preparer confirms this.");
   if (saverRate && contributions) forms.add("Form 8880");
   take("S3.4", "Retirement savings contributions credit", contributions * saverRate, "10%, 20% or 50% of up to $2,000 per person", "IRC 25B; Notice 2025-67");
 

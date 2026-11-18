@@ -71,7 +71,7 @@ before(async () => {
   await seed("taxUsers/bob", user("bob"));
   await seed("taxUsers/prep", user("prep", { role: "PREPARER", accountType: null }));
   await seed("taxUsers/prep2", user("prep2", { role: "PREPARER", accountType: null }));
-  await seed("taxUsers/boss", user("boss", { role: "PREPARER", accountType: null }));
+  await seed("taxUsers/boss", user("boss", { role: "PREPARER", accountType: null, platformAdmin: true }));
   await seed("taxSupportRoles/boss", { tenantId: T, uid: "boss", role: "PLATFORM_ADMIN" });
   await seed("taxSupportRoles/prep2", { tenantId: T, uid: "prep2", role: "SUPPORT_SUPERVISOR" });
   await seed("taxReturns/alice_mine", newReturn("alice", 2024, { status: "IN_REVIEW", preparerId: "prep", preparerName: "User prep", docCount: 1 }));
@@ -511,8 +511,9 @@ describe("Storage", () => {
     ok(await upload("boss", "tax/perry-tax-pro/alice/alice_docs/b1/document.pdf"));
   });
   test("a fresh reason opens the files for reading only, until it expires", async () => {
-    await seed("taxAccessGrants/prep2_alice", { tenantId: T, staffUid: "prep2", clientUid: "alice", reason: "Client called", expiresAtMs: Date.now() + 10 * 60_000 });
-    await seed("taxAccessGrants/prep3_alice", { tenantId: T, staffUid: "prep3", clientUid: "alice", reason: "Old", expiresAtMs: Date.now() - 60_000 });
+    // Mirrored on the preparer's account record, the only place the Storage rules can read it.
+    await seed("taxUsers/prep2", user("prep2", { role: "PREPARER", accountType: null, fileGrants: { alice: Date.now() + 10 * 60_000 } }));
+    await seed("taxUsers/prep3", user("prep3", { role: "PREPARER", accountType: null, fileGrants: { alice: Date.now() - 60_000 } }));
     ok(await download("prep2", docsFile));
     denied(await upload("prep2", "tax/perry-tax-pro/alice/alice_sdocs/p2/document.pdf"));
     denied(await download("prep3", docsFile));
@@ -527,12 +528,16 @@ describe("Storage", () => {
 
 describe("Blocked accounts", () => {
   const file = "tax/perry-tax-pro/dana/dana_2026/d1/document.pdf";
-  const unblock = () => status(fetch(`${DOCS}/taxAccountBlocks/dana`, { method: "DELETE", headers: headers("owner") }));
+  const unblock = async () => {
+    await seed("taxUsers/dana", user("dana", { blocked: false }));
+    return status(fetch(`${DOCS}/taxAccountBlocks/dana`, { method: "DELETE", headers: headers("owner") }));
+  };
   before(async () => {
     await seed("taxUsers/dana", user("dana"));
     await seed("taxReturns/dana_2026", newReturn("dana", 2026, { status: "DOCS_PENDING", preparerId: "prep", preparerName: "User prep" }));
     ok(await upload("dana", file));
     await seed("taxAccountBlocks/dana", { tenantId: T, uid: "dana", reason: "Fraud review", at: now, by: "boss" });
+    await seed("taxUsers/dana", user("dana", { blocked: true }));
   });
   test("a blocked client cannot use their own token on Firestore", async () => {
     denied(await read("dana", "taxReturns/dana_2026"));

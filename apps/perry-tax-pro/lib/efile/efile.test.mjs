@@ -397,3 +397,18 @@ test("unauthorized transmission attempts are refused: reviewing is not transmitt
   assert.equal(transmitterAllowed(null, config, true), false);
   assert.equal(transmitterAllowed({ role: "PREPARER", uid: "boss" }, config, "true"), false, "only a real admin check counts");
 });
+
+test("an abandoned send claim is reconciled, never resent blindly", async () => {
+  const { claimAbandoned, CLAIM_TIMEOUT_MS } = await import("./submission.js");
+  const claimed = applyEvent(readyRecord(), "SEND_STARTED", { by: "tx", at: "2027-02-02T10:00:00.000Z" });
+  const at = Date.parse("2027-02-02T10:00:00.000Z");
+  assert.equal(claimAbandoned(claimed, at + 60_000), false, "a send in progress is left alone");
+  assert.equal(claimAbandoned(claimed, at + CLAIM_TIMEOUT_MS + 1), true);
+  assert.equal(claimAbandoned(readyRecord(), at + CLAIM_TIMEOUT_MS * 10), false, "only TRANSMITTING records");
+  const expired = applyEvent(claimed, "CLAIM_EXPIRED", opts);
+  assert.equal(expired.state, "INDETERMINATE");
+  assert.equal(canTransition("INDETERMINATE", "SEND_STARTED"), false, "it must be reconciled first");
+  assert.equal(applyEvent(expired, "RECONCILED_RECEIVED", opts).state, "ACK_PENDING");
+  const old = applyEvent(readyRecord(), "SEND_STARTED", { by: "tx", at: "2020-01-01T00:00:00.000Z" });
+  assert.equal(recordView(old, { staff: true }).claimAbandoned, true, "the panel offers to reconcile it");
+});

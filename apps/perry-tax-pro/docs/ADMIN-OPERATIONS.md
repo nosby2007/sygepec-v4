@@ -27,8 +27,9 @@ The server checks each rule. The Firestore rules repeat the return, message and 
 preparer's own token can reach Firestore directly.
 
 The Storage rules hold to the same rule as the app: a preparer opens a return's files only when assigned to
-it, as the general admin, or within 30 minutes of giving a reason for that client (`expiresAtMs` on the
-grant). Only the assigned preparer and the general admin add or delete files. (Until the InnovaTax
+it, as the general admin, or within 30 minutes of giving a reason for that client. Storage rules may read
+only two documents, so the general admin flag, the block and the reasons are mirrored on the person's own
+`taxUsers` record (`platformAdmin`, `blocked`, `fileGrants`), written only by the server. Only the assigned preparer and the general admin add or delete files. (Until the InnovaTax
 security phase, any preparer's token could reach any return's files directly.)
 
 ## Data

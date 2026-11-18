@@ -11,7 +11,7 @@ and some items need outside parties (IRS, Georgia DOR, an outside scanner).
 
 | Area | Before | Now | Proof |
 |---|---|---|---|
-| Storage access to return files | Any preparer's token could read, add or delete files on any return | Only the client, the assigned preparer, the general admin, or a preparer within 30 minutes of giving a reason (read only) | Rules tests "a preparer not assigned to the return cannot reach its files directly", "a fresh reason opens the files for reading only, until it expires" |
+| Storage access to return files | Any preparer's token could read, add or delete files on any return | Only the client, the assigned preparer, the general admin, or a preparer within 30 minutes of giving a reason (read only). Fits Storage's two-document limit through fields mirrored on the account record | Rules tests "a preparer not assigned to the return cannot reach its files directly", "a fresh reason opens the files for reading only, until it expires" |
 | Blocked accounts | A block ended the app session, but the account's own token still reached its Firestore records | The Firestore and Storage rules refuse every request from a blocked account. Unblocking restores access | Rules tests "Blocked accounts" (4 tests) |
 | Client field injection | Client update rules used `changedKeys()`, which ignores *added* fields, so a client could add fields such as `reviewStatus` or `efileState` to their own return. The rules test for this was already failing on the old rules | Every `hasOnly` check in the tax rules uses `affectedKeys()`, which counts added and removed fields too (12 rules) | Rules test "answers approved by the preparer review are frozen for the client" now passes |
 | Signed Form 8879 saving | Any preparer opening a return could complete a signature and save the signed PDF with their own token | Only the client, the assigned preparer or the general admin complete it. Anyone else leaves the request open, and the next authorized person to open the return completes it, so the signed form is never lost | Code review (`lib/esign.js`). Not covered by an automated test |
@@ -24,10 +24,28 @@ the new ones (both runs were done).
 files are not in git. Fetch the live rules, merge only the tax block, review the result, and
 deploy rules only. Nothing here was deployed.
 
-**Storage lookups per request:** a preparer reading a file now costs up to five Firestore
-lookups (account, return, block, admin role, reason). The emulator accepts this. Current
-Firebase documentation gives a limit of 10 per request, and an older announcement mentioned
-2. Check that a preparer can open a file right after deploying the rules.
+**Storage lookups per request:** Firebase's Storage rules may read **at most two** Firestore
+documents per request, and the emulator does not enforce that limit. So the Storage rules
+read only the caller's own `taxUsers/{uid}` record and the return (or the support
+attachment). What they need about the caller is mirrored on that record by the server:
+
+- `blocked`, written with `taxAccountBlocks` when the general admin blocks or unblocks;
+- `platformAdmin`, written when a support role is set (Support settings or
+  `scripts/support-grant.mjs`);
+- `fileGrants` (`{clientUid: expiry in ms}`), written when a preparer gives a reason.
+
+The lookups for each rule were counted by hand (at most two on every path).
+
+**Before release:**
+
+- Re-run `scripts/support-grant.mjs` for each existing general admin, so the
+  `platformAdmin` flag is set.
+- Block and unblock each account blocked before this change, or set `blocked: true` on
+  its record.
+
+Until then, those admins reach unassigned files only with a reason, and those blocked
+accounts are refused by Firestore but not yet by Storage. Check that a preparer can open a
+file right after deploying the rules.
 
 ## Checklist (spec section 10)
 
@@ -92,7 +110,7 @@ professionals):
 
 | Suite | Result |
 |---|---|
-| Unit tests (`npm test`) | 279 / 279 pass |
+| Unit tests (`npm test`) | 284 / 284 pass |
 | Rules tests on the Firebase emulators (`npm run test:rules`) | 54 / 54 pass |
 | Integration tests on the emulators (`npm run test:integration`) | 36 / 36 pass |
 | Lint | Clean |

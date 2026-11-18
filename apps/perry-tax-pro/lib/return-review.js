@@ -12,7 +12,7 @@ import { buildChecklist, intakeToEstimate } from "@/lib/tax";
 import { doubleCheck, filingBlockers } from "@/lib/tax-engine/checks";
 import { computeReturn, estimateFromReturn } from "@/lib/tax-engine/index";
 import { sanitizeSupplement } from "@/lib/tax-engine/model";
-import { answersFingerprintSource, approvalProblems, checklistFor, transitionError } from "@/lib/review-rules";
+import { approvalFingerprintSource, approvalProblems, checklistFor, transitionError } from "@/lib/review-rules";
 
 // Preparer review of an individual return.
 //
@@ -28,7 +28,9 @@ export class ReviewError extends Error {
   }
 }
 
-export const fingerprint = (intake) => crypto.createHash("sha256").update(answersFingerprintSource(intake)).digest("hex");
+// Covers the answers and the preparer's facts: a correction to either changes the figures,
+// so it needs a new approval, a new Form 8879 and a new e-file package.
+export const fingerprint = (intake, supplement = {}) => crypto.createHash("sha256").update(approvalFingerprintSource(intake, supplement)).digest("hex");
 
 async function getReview(returnId) {
   return (await getDocument(`taxReviews/${returnId}`, await serviceToken()).catch(() => null)) || null;
@@ -65,7 +67,7 @@ export async function reviewContext(r) {
     snapshot: stored?.snapshot || null,
     history: stored?.history || [],
   };
-  const changedSinceApproval = review.snapshot && FROZEN_REVIEW.includes(review.status) ? review.snapshot.fingerprint !== fingerprint(intake) : false;
+  const changedSinceApproval = review.snapshot && FROZEN_REVIEW.includes(review.status) ? review.snapshot.fingerprint !== fingerprint(intake, supplement) : false;
   return {
     intake, taxYear, estimate, comparison, issues, documents, checklist, review, changedSinceApproval,
     states: result.states,
@@ -145,7 +147,7 @@ export async function updateReview(session, r, body) {
     if (freezing) {
       const e = ctx.estimate;
       next.snapshot = {
-        fingerprint: fingerprint(ctx.intake), rev: ctx.intake.rev, ruleSet: e.ruleSet, at: now, by: session.uid, byName: session.name || "Preparer",
+        fingerprint: fingerprint(ctx.intake, ctx.supplement), rev: ctx.intake.rev, ruleSet: e.ruleSet, at: now, by: session.uid, byName: session.name || "Preparer",
         figures: { agi: e.agi, deduction: e.deduction, taxable: e.taxable, totalTax: e.totalTax, credits: e.credits, payments: e.payments, refund: e.refund },
         // The whole calculation as approved: never recomputed, even when rules change later.
         calculation: {

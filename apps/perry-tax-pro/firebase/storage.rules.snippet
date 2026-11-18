@@ -1,14 +1,22 @@
 // Add inside service firebase.storage / match /b/{bucket}/o.
+//
+// Storage rules may read at most TWO Firestore documents per request. So everything these
+// rules need about the caller is on their own taxUsers/{uid} record, written only by the
+// server: role and tenant, `blocked` (mirrors taxAccountBlocks), `platformAdmin` (mirrors a
+// PLATFORM_ADMIN support role) and `fileGrants` ({clientUid: expiry in ms}, mirrors the
+// reasons given in client files). A return-file request reads that record and the return:
+// two documents, whoever asks.
+
+function taxProfile() {
+  return firestore.get(/databases/(default)/documents/taxUsers/$(request.auth.uid)).data;
+}
 
 // Signed in and not blocked: a block closes direct Storage access with the account's own
 // token too (the Firebase account itself stays enabled).
 function taxActive() {
   return request.auth != null
-    && !firestore.exists(/databases/(default)/documents/taxAccountBlocks/$(request.auth.uid));
-}
-
-function taxProfile() {
-  return firestore.get(/databases/(default)/documents/taxUsers/$(request.auth.uid)).data;
+    && (!firestore.exists(/databases/(default)/documents/taxUsers/$(request.auth.uid))
+      || taxProfile().get('blocked', false) != true);
 }
 
 function taxPreparer() {
@@ -16,6 +24,17 @@ function taxPreparer() {
     && firestore.exists(/databases/(default)/documents/taxUsers/$(request.auth.uid))
     && taxProfile().tenantId == 'perry-tax-pro'
     && taxProfile().role == 'PREPARER';
+}
+
+// The general admin (a preparer holding PLATFORM_ADMIN), from the mirrored flag.
+function taxGeneralAdmin() {
+  return taxPreparer() && taxProfile().get('platformAdmin', false) == true;
+}
+
+// A reason given in the client file opens that client's documents to that preparer for 30
+// minutes.
+function taxFreshGrant(clientUid) {
+  return request.time.toMillis() < taxProfile().get('fileGrants', {}).get(clientUid, 0);
 }
 
 function validTaxReturn(clientUid, returnId) {
@@ -26,22 +45,6 @@ function validTaxReturn(clientUid, returnId) {
 
 function taxReturnDoc(returnId) {
   return firestore.get(/databases/(default)/documents/taxReturns/$(returnId)).data;
-}
-
-// The general admin: a preparer holding PLATFORM_ADMIN (same test as the Firestore rules).
-function taxGeneralAdmin() {
-  return taxPreparer()
-    && firestore.exists(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid))
-    && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.tenantId == 'perry-tax-pro'
-    && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.role == 'PLATFORM_ADMIN';
-}
-
-// A reason given in the client file opens that client's documents to one preparer for 30
-// minutes (taxAccessGrants/{staff}_{client}, written only by the server).
-function taxFreshGrant(clientUid) {
-  return firestore.exists(/databases/(default)/documents/taxAccessGrants/$(request.auth.uid + '_' + clientUid))
-    && firestore.get(/databases/(default)/documents/taxAccessGrants/$(request.auth.uid + '_' + clientUid)).data.tenantId == 'perry-tax-pro'
-    && request.time.toMillis() < firestore.get(/databases/(default)/documents/taxAccessGrants/$(request.auth.uid + '_' + clientUid)).data.expiresAtMs;
 }
 
 // The same people the app lets in: the assigned preparer or the general admin change a
@@ -63,8 +66,11 @@ function taxSupportAttachment(attachmentId) {
   return firestore.get(/databases/(default)/documents/taxSupportAttachments/$(attachmentId)).data;
 }
 
+// Two documents per branch: the attachment and the client's own record, or the attachment
+// and the staff member's support role. The client's record is read last, only once every
+// other client condition holds.
 function taxSupportCanRead(a) {
-  return (a.visibility == 'EXTERNAL' && a.customerUid == request.auth.uid && (a.state == 'AVAILABLE' || a.uploadedBy == request.auth.uid))
+  return (a.visibility == 'EXTERNAL' && a.customerUid == request.auth.uid && (a.state == 'AVAILABLE' || a.uploadedBy == request.auth.uid) && taxActive())
     || (firestore.exists(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid))
       && firestore.get(/databases/(default)/documents/taxSupportRoles/$(request.auth.uid)).data.tenantId == 'perry-tax-pro'
       && (a.state == 'AVAILABLE'
@@ -74,15 +80,16 @@ function taxSupportCanRead(a) {
 // Ticket attachments. The server writes the record after its checks, and these rules hold to
 // it: no file without a record, the record decides who reads, and quarantine applies here too.
 match /taxsupport/perry-tax-pro/{ticketId}/{visibility}/{attachmentId}/{fileName} {
-  allow read: if taxActive()
+  allow read: if request.auth != null
     && taxSupportAttachment(attachmentId).storagePath == 'taxsupport/perry-tax-pro/' + ticketId + '/' + visibility + '/' + attachmentId + '/' + fileName
     && taxSupportCanRead(taxSupportAttachment(attachmentId));
-  allow create: if taxActive()
+  allow create: if request.auth != null
     && taxSupportAttachment(attachmentId).state == 'UPLOADING'
     && taxSupportAttachment(attachmentId).uploadedBy == request.auth.uid
     && taxSupportAttachment(attachmentId).storagePath == 'taxsupport/perry-tax-pro/' + ticketId + '/' + visibility + '/' + attachmentId + '/' + fileName
     && request.resource.size == taxSupportAttachment(attachmentId).size
-    && request.resource.contentType == taxSupportAttachment(attachmentId).mime;
+    && request.resource.contentType == taxSupportAttachment(attachmentId).mime
+    && taxActive();
   allow update, delete: if false;
 }
 

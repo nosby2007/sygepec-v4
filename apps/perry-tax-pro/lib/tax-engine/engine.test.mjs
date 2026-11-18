@@ -499,3 +499,20 @@ test("Georgia credit for tax paid to another state", () => {
   const small = ga(computeReturn(intake({ forms: [{ type: "W2", wages: "100000", state: "GA" }] }), 2026, { otherStateTaxPaid: "300", otherStateIncome: "20000" }));
   assert.equal(small.lines["500.18"], 300);
 });
+
+test("a business loss reduces earned income before any floor (EIC Worksheet B)", () => {
+  // $10,000 of wages and a $20,000 Schedule C loss: earned income is $10,000 - $20,000, below zero, so no credit.
+  const f = fed({ filingStatus: "SINGLE", taxpayer: { age: 40 }, w2: [w2(10000)], business: [{ gross: 0, expenses: 20000 }] });
+  assert.equal(f.lines["1040.27"], 0);
+  // Wages alone still earn the credit.
+  assert.ok(fed({ filingStatus: "SINGLE", taxpayer: { age: 40 }, w2: [w2(10000)] }).lines["1040.27"] > 0);
+});
+
+test("the saver's credit skips contributors under 18", () => {
+  // A 17-year-old with $20,000 of wages and $2,000 of deferrals: no credit.
+  const young = fed({ filingStatus: "SINGLE", taxpayer: { age: 17 }, w2: [w2(20000, { retirementDeferrals: 2000 })] });
+  assert.equal(young.lines["S3.4"], 0);
+  assert.ok(young.notes.some((x) => /under 18/.test(x)));
+  // At 18 the same return gets it.
+  assert.ok(fed({ filingStatus: "SINGLE", taxpayer: { age: 18 }, w2: [w2(20000, { retirementDeferrals: 2000 })] }).lines["S3.4"] > 0);
+});

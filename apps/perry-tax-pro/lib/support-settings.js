@@ -1,5 +1,5 @@
 import "server-only";
-import { getDocument, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
+import { getDocument, patchFields, queryCollection, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { serviceToken } from "@/lib/service-identity";
 import { requirePermission, supportAudit } from "@/lib/support-access";
 import { PERMISSIONS as P, SUPPORT_ROLES, SupportError } from "@/lib/support-rules";
@@ -71,6 +71,9 @@ export async function setSupportRole(session, input, correlationId) {
       grantedBy: session.uid, grantedAt: new Date().toISOString(),
     }, token);
   }
+  // The Storage rules read the general admin flag from the account record (they may read
+  // only two documents per request), so it is mirrored there.
+  await patchFields(`taxUsers/${user.uid}`, { platformAdmin: role === "PLATFORM_ADMIN" }, token);
   await supportAudit(session, "SUPPORT_ROLE_CHANGED", { target: `taxUsers/${user.uid}`, correlationId, details: { from: before?.role || "none", to: role || "none" } });
   return { uid: user.uid, role };
 }

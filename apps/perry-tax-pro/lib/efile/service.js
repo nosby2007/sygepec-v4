@@ -4,7 +4,7 @@ import { getSignature } from "@/lib/esign";
 import { federalLinkIssue } from "@/lib/efile/georgia";
 import { buildPackage, sandboxAdapterFor, officialAdapter, schemaPackageStatus } from "@/lib/efile/package";
 import { EfileError, FINAL_STATES, IN_FLIGHT } from "@/lib/efile/states";
-import { afterAck, afterSend, applyEvent, newRecord, readinessIssues, recordView, refreshRecord, returnStatusFor, signatureMatches } from "@/lib/efile/submission";
+import { afterAck, afterSend, applyEvent, claimAbandoned, newRecord, readinessIssues, recordView, refreshRecord, returnStatusFor, signatureMatches } from "@/lib/efile/submission";
 import { efileConfig, productionGaps, SANDBOX_SCENARIOS, transmitterAllowed, transportFor } from "@/lib/efile/transport";
 import { commitWrites, getDocument, isConflict, patchFields, queryCollection, replaceWrite, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { paymentGate } from "@/lib/payments";
@@ -256,9 +256,15 @@ export async function pollAcknowledgement(session, r, key) {
 
 export async function reconcileSubmission(session, r, key) {
   if (!await mayTransmit(session)) throw new EfileError("Only a transmitter can reconcile a submission.", 403, "EFILE_FORBIDDEN");
-  const record = await getRecord(key);
+  let record = await getRecord(key);
   if (record.returnId !== r.id) throw new EfileError("Unknown submission.", 404, "EFILE_NOT_FOUND");
-  if (record.state !== "INDETERMINATE") throw new EfileError("Only a submission with an unknown outcome is reconciled.", 409, "EFILE_BAD_TRANSITION");
+  // An abandoned send claim becomes an unknown outcome first, and is reconciled the same way.
+  if (claimAbandoned(record)) {
+    const expired = applyEvent(record, "CLAIM_EXPIRED", { by: session.uid, at: now(), detail: "The send was claimed but its result was never recorded." });
+    await saveRecord(record, expired);
+    record = await getRecord(key);
+  }
+  if (record.state !== "INDETERMINATE") throw new EfileError(record.state === "TRANSMITTING" ? "This submission is being sent. If it stays like this for more than 10 minutes, reconcile it then." : "Only a submission with an unknown outcome is reconciled.", 409, "EFILE_BAD_TRANSITION");
   const transport = transportFor({ jurisdiction: record.jurisdiction, scenario: record.scenario || undefined, store: sandboxStore });
   const found = await transport.lookup({ submissionRef: record.submissionRef, hash: record.hash }).catch(() => "UNKNOWN");
   if (found === "UNKNOWN") return { unresolved: true, submission: recordView(record, { staff: true }) };

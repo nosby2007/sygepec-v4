@@ -128,8 +128,9 @@ export default function EfilePanel({ returnId }) {
                     </>
                   )}
                   {s.state === "ACK_PENDING" && <button className="btn btn-ghost btn-sm" disabled={Boolean(state.busy)} onClick={() => act("poll", { key: s.key }, "Acknowledgement recorded.")}><Icon name="refresh" size={14} /> {busy(`poll:${s.key}`) ? "Checking…" : "Check acknowledgement"}</button>}
-                  {data.canTransmit && s.state === "INDETERMINATE" && <button className="btn btn-ghost btn-sm" disabled={Boolean(state.busy)} onClick={() => act("reconcile", { key: s.key }, "Reconciled with the receiver.")}><Icon name="search" size={14} /> {busy(`reconcile:${s.key}`) ? "Asking…" : "Reconcile"}</button>}
+                  {data.canTransmit && (s.state === "INDETERMINATE" || s.claimAbandoned) && <button className="btn btn-ghost btn-sm" disabled={Boolean(state.busy)} onClick={() => act("reconcile", { key: s.key }, "Reconciled with the receiver.")}><Icon name="search" size={14} /> {busy(`reconcile:${s.key}`) ? "Asking…" : "Reconcile"}</button>}
                 </div>
+                {s.claimAbandoned && <p className="hint">This send was started more than 10 minutes ago and its result was never recorded. Reconcile it with the receiver; it is never sent again blindly.</p>}
                 {s.state === "INDETERMINATE" && <p className="hint">Nobody knows whether the receiver got this package. It cannot be sent again until reconciled, so the return is never filed twice.</p>}
               </article>
             ))}
