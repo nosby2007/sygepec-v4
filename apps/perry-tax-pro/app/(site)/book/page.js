@@ -5,6 +5,8 @@ import BookForm from "./BookForm";
 export const metadata = {
   title: "Book an Appointment",
   description: "Schedule an in-person or virtual tax preparation appointment with InnovaCare Tax.",
+  alternates: { canonical: "/book" },
+  openGraph: { images: [{ url: "/photos/consult.jpg", alt: "Tax preparation appointment" }] },
 };
 
 export default async function Page() {

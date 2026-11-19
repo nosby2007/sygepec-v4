@@ -5,7 +5,7 @@ import { getEntitlement } from "@/lib/entitlements";
 import { growthFacts, growthLevels } from "@/lib/growth-levels";
 import { listPortfolio } from "@/lib/portfolio";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 
 // Everything the Marketing and Profile tabs show, in one pass.
 export async function loadBusinessHome(session) {

@@ -1,6 +1,8 @@
 export const metadata = {
   title: "2026 Federal Refund Estimator",
   description: "Estimate your 2026 federal tax refund or balance due in seconds with the free InnovaCare Tax refund calculator.",
+  alternates: { canonical: "/estimator" },
+  openGraph: { images: [{ url: "/photos/paperwork.jpg", alt: "Tax forms and calculator" }] },
 };
 import Estimator from "./Estimator";
 

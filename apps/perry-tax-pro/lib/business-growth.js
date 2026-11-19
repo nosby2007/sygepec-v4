@@ -11,7 +11,7 @@ import { cleanEmail, cleanText, safeId } from "@/lib/security";
 import { seal, unseal } from "@/lib/sealed";
 import { formatInZone, zonedParts } from "@/lib/timezone";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://perry-tax-pro-sygepec-v4.web.app";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://innovacaresoftware.com";
 const OPT_OUT = "marketing-opt-out";
 const DAY = 86_400_000;
 export const emailHash = (email) => crypto.createHash("sha256").update(normEmail(email)).digest("hex");

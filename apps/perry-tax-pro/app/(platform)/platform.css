@@ -4,6 +4,12 @@
 .plat-hero h1 { color: #fff; margin: 12px 0 14px; max-width: 760px; }
 .plat-hero p { color: rgba(255,255,255,.86); font-size: 1.15rem; max-width: 640px; margin: 0 0 24px; }
 .plat-hero .eyebrow { color: var(--pub-amber); }
+.plat-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(340px, .95fr); gap: clamp(32px, 6vw, 76px); align-items: center; }
+.plat-hero-copy { min-width: 0; }
+.plat-hero-media { position: relative; min-height: 360px; margin: 0; overflow: hidden; border-radius: 24px; border: 1px solid rgba(255,255,255,.22); box-shadow: 0 30px 70px -34px rgba(0,0,0,.75); background: #0b1f3a; }
+.plat-hero-media::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(4,17,32,.8) 100%); pointer-events: none; }
+.plat-hero-media img { object-fit: cover; }
+.plat-hero-media figcaption { position: absolute; z-index: 1; left: 24px; right: 24px; bottom: 20px; color: #fff; font-size: .92rem; font-weight: 700; letter-spacing: .01em; }
 
 .plat-head { margin-bottom: 24px; }
 .plat-head h2 { margin: 0 0 6px; }
@@ -32,8 +38,15 @@
 
 @media (max-width: 640px) {
   .plat-hero { padding: 56px 0 48px; }
+  .plat-hero-grid { grid-template-columns: 1fr; }
+  .plat-hero-media { min-height: 260px; border-radius: 18px; }
   .plat-search { flex-wrap: wrap; }
   .plat-search .btn { width: 100%; }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .plat-hero-grid { grid-template-columns: 1fr; }
+  .plat-hero-media { min-height: 380px; }
 }
 
 /* Software services */
