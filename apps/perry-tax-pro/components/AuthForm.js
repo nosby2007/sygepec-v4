@@ -3,17 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
-
-const score = (pw) => {
-  if (!pw) return 0;
-  let s = 0;
-  if (pw.length >= 12) s++;
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
-  if (/\d/.test(pw)) s++;
-  if (/[^A-Za-z0-9]/.test(pw) || pw.length >= 16) s++;
-  return Math.max(1, s);
-};
-const STRENGTH = ["", "Weak", "Fair", "Good", "Strong"];
+import { STRENGTH_LABELS as STRENGTH, passwordStrength as score } from "@/lib/password-policy";
 
 export default function AuthForm({ mode, accountType = "TAX", next = null }) {
   const isReg = mode === "register";
@@ -79,7 +69,9 @@ export default function AuthForm({ mode, accountType = "TAX", next = null }) {
             <div className="input-icon"><Icon name="mail" size={17} /><input id="auth-email" type="email" className="input" required autoComplete="email" value={f.email} onChange={set("email")} /></div>
           </div>
           <div className="field">
-            <label htmlFor="auth-password">Password</label>
+            {isReg ? <label htmlFor="auth-password">Password</label> : (
+              <div className="label-row"><label htmlFor="auth-password">Password</label><Link href="/forgot-password" className="grad-text">Forgot password?</Link></div>
+            )}
             <div className="pw-wrap">
               <input id="auth-password" type={show ? "text" : "password"} className="input" required minLength={isReg ? 12 : undefined} autoComplete={isReg ? "new-password" : "current-password"} value={f.password} onChange={set("password")} />
               <button type="button" className="pw-toggle" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"}>{show ? "Hide" : "Show"}</button>

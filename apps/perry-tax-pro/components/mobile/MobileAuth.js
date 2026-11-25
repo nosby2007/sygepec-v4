@@ -45,6 +45,7 @@ export default function MobileAuth({ mode, next, business = false }) {
           </div>
           {isReg && <small className="m-sub">At least 12 characters</small>}
         </label>
+        {!isReg && <p className="m-auth-alt" style={{ marginTop: 0, textAlign: "right" }}><Link href="/forgot-password">Forgot password?</Link></p>}
         {state.error && <div className="m-alert">{state.error}</div>}
         <button className="m-btn teal" disabled={state.busy}>{state.busy ? "Please wait…" : isReg ? "Create account" : "Sign in"}</button>
       </form>

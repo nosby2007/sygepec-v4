@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDocument, refreshIdToken } from "@/lib/firebase";
 import { APP_MODES, appSignIn } from "@/lib/app-mode";
-import { COOKIE, appMarker, cookieOptions, idleExpired, mfaPending, openSession, sealSession } from "@/lib/session-token";
+import { COOKIE, appMarker, cookieOptions, idleExpired, mfaPending, openSession, sealSession, sessionRevoked } from "@/lib/session-token";
 
 // mfa: "ok", or "verify" / "setup" while the second sign-in step is still owed.
 export async function createSession(firebaseAuth, profile, mfa = "ok") {
@@ -22,6 +22,9 @@ export async function createSession(firebaseAuth, profile, mfa = "ok") {
     refreshToken: firebaseAuth.refreshToken || firebaseAuth.refresh_token,
     expiresAt,
     lastSeen: Date.now(),
+    // When the password was proven. Kept as is when the session is resealed, so a password
+    // reset can end every session opened before it (see loadSession).
+    authAt: Date.now(),
     mfa,
   });
   (await cookies()).set(COOKIE, token, cookieOptions());
@@ -109,6 +112,7 @@ async function loadSession(roles) {
     // The second sign-in step was decided for the role held at sign-in. If the role has changed
     // since (a client made support staff), this session must not carry over: sign in again.
     if (session.role !== profile.role) return null;
+    if (sessionRevoked(session, profile)) return null;
     if (await accountBlocked(session.uid)) return null;
     return {
       id: session.uid,

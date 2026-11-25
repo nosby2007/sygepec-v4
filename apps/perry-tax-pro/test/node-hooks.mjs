@@ -1,6 +1,7 @@
 // Lets `node --test` import the app's server modules outside Next.js:
 // - "server-only" (supplied by Next itself) becomes an empty module;
-// - the "@/..." alias from jsconfig.json resolves to the app root.
+// - the "@/..." alias from jsconfig.json resolves to the app root;
+// - "next/headers" and similar resolve to their ".js" file.
 import { registerHooks } from "node:module";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -11,6 +12,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,export {};", shortCircuit: true };
+    // Next's subpath entry points (next/headers, next/navigation) are CommonJS files
+    // without an "exports" map, so plain Node needs the ".js".
+    if (/^next\/[a-z-]+$/.test(specifier)) return next(`${specifier}.js`, context);
     if (specifier.startsWith("@/")) {
       const base = join(root, specifier.slice(2));
       const file = existsSync(base) && !existsSync(`${base}.js`) ? base : `${base}.js`;

@@ -1,9 +1,10 @@
 import "server-only";
 import crypto from "node:crypto";
 import { BusinessError } from "@/lib/business-booking";
-import { deleteDocument, deleteObject, getDocument, queryCollection, setDocument, TAX_TENANT, uploadObject } from "@/lib/firebase";
+import { deleteDocument, deleteObject, getDocument, patchFields, queryCollection, setDocument, TAX_TENANT, uploadObject } from "@/lib/firebase";
 import { scanFile, scanMessage } from "@/lib/file-scan";
 import { cleanText, safeId } from "@/lib/security";
+import { serviceToken } from "@/lib/service-identity";
 import { audit } from "@/lib/audit";
 
 //   bizPortfolio/{id}   one photo of the business's work: { businessId, path, caption }
@@ -38,6 +39,18 @@ export async function addPortfolioPhoto(session, file, caption) {
   await setDocument(`bizPortfolio/${id}`, doc, session.idToken, { createOnly: true });
   await audit(session, "PORTFOLIO_ADDED", { target: `bizPortfolio/${id}` });
   return view({ id, ...doc });
+}
+
+// The rules give owners no update on bizPortfolio, so the caption is changed by the server
+// identity, only after checking with the owner's own token that the photo is theirs.
+export async function updatePortfolioCaption(session, rawId, caption) {
+  const id = safeId(rawId);
+  const row = id ? await getDocument(`bizPortfolio/${id}`, session.idToken).catch(() => null) : null;
+  if (!row || row.businessId !== session.uid || row.tenantId !== TAX_TENANT) throw new BusinessError("Photo not found.", 404);
+  const clean = cleanText(caption, 120);
+  await patchFields(`bizPortfolio/${id}`, { caption: clean }, await serviceToken());
+  await audit(session, "PORTFOLIO_CAPTION_CHANGED", { target: `bizPortfolio/${id}` });
+  return view({ ...row, id, caption: clean });
 }
 
 export async function removePortfolioPhoto(session, rawId) {

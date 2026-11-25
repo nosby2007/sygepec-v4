@@ -98,6 +98,32 @@ export async function sendPasswordResetEmail(email) {
   });
 }
 
+// ---- Account administration with the server identity --------------------------------
+// Needs the runtime account to hold firebaseauth.users.get and firebaseauth.users.update
+// (the "Perry Tax account reset" custom role). Used only by lib/password-reset.js, after
+// a single-use reset link has been checked.
+const adminIdentityUrl = (method) => `${AUTH_EMULATOR ? `http://${AUTH_EMULATOR}/` : "https://"}identitytoolkit.googleapis.com/v1/projects/${firebaseConfig().projectId}/accounts${method}`;
+
+export async function adminLookupAccount(uid, serviceAccessToken) {
+  const body = await jsonRequest(adminIdentityUrl(":lookup"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceAccessToken}` },
+    body: JSON.stringify({ localId: [uid] }),
+  });
+  const user = body.users?.[0];
+  return user ? { uid: user.localId, email: user.email || null, disabled: Boolean(user.disabled) } : null;
+}
+
+// Setting the password also makes Firebase reject every refresh token issued before now,
+// so other devices are signed out the next time their session refreshes.
+export async function adminSetPassword(uid, password, serviceAccessToken) {
+  return jsonRequest(adminIdentityUrl(":update"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceAccessToken}` },
+    body: JSON.stringify({ localId: uid, password }),
+  });
+}
+
 export async function deleteFirebaseAccount(idToken) {
   const { apiKey } = firebaseConfig();
   return jsonRequest(`${identityUrl("delete")}?key=${apiKey}`, {
