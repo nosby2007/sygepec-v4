@@ -26,8 +26,11 @@ Appointments stay shared: any preparer can act on any appointment, because sched
 The server checks each rule. The Firestore rules repeat the return, message and document rules, because a
 preparer's own token can reach Firestore directly.
 
-**Known limit:** a preparer's token can still reach Storage directly for a file on any return, since the
-Storage rules still treat every preparer alike. The reason screen and the assignment are checked by the app.
+The Storage rules hold to the same rule as the app: a preparer opens a return's files only when assigned to
+it, as the general admin, or within 30 minutes of giving a reason for that client. Storage rules may read
+only two documents, so the general admin flag, the block and the reasons are mirrored on the person's own
+`taxUsers` record (`platformAdmin`, `blocked`, `fileGrants`), written only by the server. Only the assigned preparer and the general admin add or delete files. (Until the InnovaTax
+security phase, any preparer's token could reach any return's files directly.)
 
 ## Data
 
@@ -61,6 +64,7 @@ only the status can. The last four SSN digits and bank details cannot be changed
 ## Limits
 
 - The sign-in email cannot be changed here. It needs `roles/firebaseauth.admin` on the server identity.
-- A block ends the app session, but the Firebase account stays enabled. A blocked client who calls Firestore
-  directly with their own token can still reach their own records.
+- A block ends the app session. The Firebase account itself stays enabled (disabling it needs
+  `roles/firebaseauth.admin`), but the Firestore and Storage rules refuse every request from a blocked
+  account, so its own token reaches nothing either. Unblocking restores access.
 - The account check reads sign-ins from the log and cannot see the Firebase account itself.

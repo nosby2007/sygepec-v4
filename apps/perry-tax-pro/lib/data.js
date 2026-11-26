@@ -35,6 +35,12 @@ function returnDto(row) {
     submission_notes: row.submissionNotes || null,
     submitted_at: row.submittedAt || null,
     accepted_at: row.acceptedAt || null,
+    efile_state: row.efileState || null,
+    efile_jurisdiction: row.efileJurisdiction || null,
+    efile_sandbox: row.efileSandbox !== false,
+    efile_updated_at: row.efileUpdatedAt || null,
+    efile_rejections: Array.isArray(row.efileRejections) ? row.efileRejections : [],
+    efile_ga: row.efileGa && typeof row.efileGa === "object" ? { state: row.efileGa.state || null, sandbox: row.efileGa.sandbox !== false, status: row.efileGa.status || "", updated_at: row.efileGa.updatedAt || null, rejections: Array.isArray(row.efileGa.rejections) ? row.efileGa.rejections : [] } : null,
     carry_forward_from_return_id: row.carryForwardFromReturnId || null,
     carry_forward_from_tax_year: row.carryForwardFromTaxYear || null,
     intake: row.intake || {},
@@ -57,6 +63,7 @@ function documentDto(row) {
     size: row.size,
     uploaded_by: row.uploadedBy,
     created_at: row.createdAt,
+    reading: row.reading ? { formType: row.reading.formType, taxYear: row.reading.taxYear || "", confidence: row.reading.confidence || "", values: row.reading.values || {} } : null,
   };
 }
 

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { FROZEN_REVIEW, REVIEW_STATUSES, money } from "@/lib/constants";
 import { LEVEL_LABEL } from "@/lib/intake-checks";
+import ReviewCalculation from "./ReviewCalculation";
 
 const label = (k) => REVIEW_STATUSES.find((s) => s.key === k)?.label || k;
 const when = (iso) => (iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
@@ -40,7 +41,7 @@ export default function ReviewPanel({ returnId, initial, taxYear }) {
   return (
     <section className="card mt ix-review" aria-labelledby="review-title">
       <div className="card-title">
-        <div className="row nowrap"><span className="kpi-icon"><Icon name="clipboard" size={18} /></span><div><h3 id="review-title">Preparer review</h3><div className="sub">Rules {e.ruleSet.id} v{e.ruleSet.version} · estimate only</div></div></div>
+        <div className="row nowrap"><span className="kpi-icon"><Icon name="clipboard" size={18} /></span><div><h3 id="review-title">Preparer review</h3><div className="sub">Rules {e.ruleSet.id} v{e.ruleSet.version} · {(v.calculation?.readiness.calculationStatus || "estimate").replace("_", " ").toLowerCase()}, not approved for filing</div></div></div>
         <span className={`badge ${frozen ? "s-ACCEPTED" : status === "CHANGES_REQUESTED" ? "s-READY_TO_SIGN" : "s-IN_REVIEW"}`}>{label(status)}</span>
       </div>
 
@@ -91,8 +92,10 @@ export default function ReviewPanel({ returnId, initial, taxYear }) {
         </div>
       </div>
 
+      <ReviewCalculation key={JSON.stringify(v.supplement || {})} v={v} act={act} frozen={frozen} busy={state.busy} taxYear={taxYear} />
+
       <div>
-        <h4>Double-check ({issues.length})</h4>
+        <h4>Double-check ({issues.length}){v.filingBlockers?.length ? ` · ${v.filingBlockers.length} block filing` : ""}</h4>
         {issues.length === 0 ? <p className="small muted">Nothing raised.</p> : (
           <ul className="ix-issues">
             {issues.map((x) => {
@@ -101,7 +104,8 @@ export default function ReviewPanel({ returnId, initial, taxYear }) {
                 <li key={x.code} className={`lvl-${x.level}`}>
                   <div>
                     <b>{LEVEL_LABEL[x.level]}: {x.message}</b>
-                    <small>{x.why}</small>
+                    <small>{x.why}{x.action ? ` ${x.action}` : ""}</small>
+                    <small className="muted">{[x.layerLabel, x.form, x.field, x.source, x.blocksFiling ? "Blocks filing" : "", x.code].filter(Boolean).join(" · ")}</small>
                     {res && <small>{res.status === "IGNORED" ? "Explained" : "Resolved"} by {res.byName} {when(res.at)}{res.note ? `: ${res.note}` : ""}</small>}
                   </div>
                   {x.level !== "BLOCKER" && !frozen && (
@@ -131,7 +135,7 @@ export default function ReviewPanel({ returnId, initial, taxYear }) {
               <div className="row between"><b>{s.name}</b><span className="small">{s.kind.replace("_", "-").toLowerCase()}</span></div>
               <ul className="small">{s.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
               <div className="small">Wages {money(s.wages)} · withheld {money(s.withheld)}</div>
-              <div className="ix-pending"><Icon name="info" size={14} />Calculation pending validated rules.</div>
+              {s.calculation !== "AVAILABLE" && <div className="ix-pending"><Icon name="info" size={14} />No engine for this state.</div>}
             </div>
           ))}
         </div>
@@ -163,7 +167,7 @@ export default function ReviewPanel({ returnId, initial, taxYear }) {
           {v.review.history.length === 0 ? <p className="small muted">No changes yet.</p> : (
             <ul className="small" style={{ paddingLeft: 18 }}>
               {v.review.history.slice(-10).reverse().map((h, k) => (
-                <li key={k}>{when(h.at)} · {h.byName}: {h.type === "STATUS" ? `${label(h.from)} → ${label(h.to)}${h.reason ? ` (${h.reason})` : ""}` : h.type === "CHECKLIST" ? `${h.done ? "checked" : "unchecked"} ${h.key.toLowerCase()}` : `${h.status.toLowerCase()} ${h.code}`}</li>
+                <li key={k}>{when(h.at)} · {h.byName}: {h.type === "STATUS" ? `${label(h.from)} → ${label(h.to)}${h.reason ? ` (${h.reason})` : ""}` : h.type === "SUPPLEMENT" ? "saved preparer entries" : h.type === "CHECKLIST" ? `${h.done ? "checked" : "unchecked"} ${h.key.toLowerCase()}` : `${h.status.toLowerCase()} ${h.code}`}</li>
               ))}
             </ul>
           )}

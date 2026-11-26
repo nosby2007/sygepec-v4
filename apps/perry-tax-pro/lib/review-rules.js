@@ -38,6 +38,15 @@ export function answersFingerprintSource(intake) {
   return stable(answers(intake));
 }
 
+// What the approval fingerprint covers: the client's answers and the facts the preparer
+// added (carryovers, allocations...), since both change the figures. Without preparer facts
+// it is exactly the answers' source, so approvals made before this existed still match.
+export function approvalFingerprintSource(intake, supplement = {}) {
+  const facts = supplement && typeof supplement === "object" ? supplement : {};
+  if (!Object.keys(facts).length) return answersFingerprintSource(intake);
+  return stable({ answers: answers(intake), preparerFacts: facts });
+}
+
 // What must be true before the figures can be frozen for signature.
 export function approvalProblems({ intake, issues, resolved = {}, checklist = {} }) {
   const problems = [];
