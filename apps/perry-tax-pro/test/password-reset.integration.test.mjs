@@ -87,6 +87,18 @@ describe("password reset", () => {
     assert.equal(await reset.checkResetToken(second), true);
   });
 
+  test("two requests at the same moment: exactly one link is sent, and it works", async () => {
+    const email = `race.${RUN}@example.test`;
+    const raceUid = await account(email);
+    const count = sent.length;
+    await Promise.all([1, 2].map((n) => reset.requestPasswordReset({ email, ip: ip(40 + n) })));
+    const mails = sent.slice(count).filter((m) => m.to[0] === email);
+    assert.equal(mails.length, 1, "the losing request sends nothing");
+    assert.equal(await reset.checkResetToken(tokenFrom(mails[0])), true);
+    const state = await fb.getDocument(`taxPasswordResetState/${raceUid}`, "owner");
+    assert.equal(state.currentHash, reset.hashResetToken(tokenFrom(mails[0])));
+  });
+
   test("weak or breached passwords are refused without using the link up", async () => {
     const token = tokenFrom(sent[1]);
     await assert.rejects(reset.completePasswordReset({ token, password: "short", ip: ip(3) }), /12 characters/);

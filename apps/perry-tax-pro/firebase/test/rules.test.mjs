@@ -559,3 +559,20 @@ describe("Blocked accounts", () => {
     ok(await download("dana", file));
   });
 });
+
+describe("Password reset sign-out", () => {
+  // The server sets sessionsValidAfter after a reset (lib/password-reset.js). An old token
+  // must not be able to remove or lower it, or old app sessions would open again.
+  const after = 1_800_000_000_000;
+  before(async () => {
+    await seed("taxUsers/erin", user("erin", { sessionsValidAfter: after }));
+  });
+  test("the account holder cannot remove, lower or raise sessionsValidAfter", async () => {
+    denied(await write("erin", "taxUsers/erin", user("erin", { name: "Erin New" })), "removing it");
+    denied(await write("erin", "taxUsers/erin", user("erin", { sessionsValidAfter: 0 })), "lowering it");
+    denied(await write("erin", "taxUsers/erin", user("erin", { sessionsValidAfter: after + 1 })));
+  });
+  test("the usual profile edit still works and keeps it", async () => {
+    ok(await write("erin", "taxUsers/erin", user("erin", { name: "Erin New", sessionsValidAfter: after })));
+  });
+});

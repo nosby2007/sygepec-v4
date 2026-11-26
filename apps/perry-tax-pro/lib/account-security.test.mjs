@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { passwordProblems, passwordStrength } from "./password-policy.js";
-import { STEPS, einLast4, parseBusinessRegistration, parseRegistrationUpdate, slugValid, slugify, stepErrors, zoneForState } from "./business-registration.js";
+import { STEPS, einLast4, slugTyping, parseBusinessRegistration, parseRegistrationUpdate, slugValid, slugify, stepErrors, zoneForState } from "./business-registration.js";
 import { sessionRevoked } from "./session-token.js";
 
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||= "demo-perry-tax";
@@ -46,6 +46,18 @@ test("only the first 5 hash characters leave the server, and a match is counted"
   assert.equal(await breachCount("Tr4vel-Kettle-Orbit", async () => ({ ok: true, text: async () => "0018A45C4D1DEF81644B54AB7F969B88D65:1" })), 0);
   assert.equal(await breachCount("x", async () => { throw new Error("offline"); }), null, "an outage skips the check");
   assert.equal(await breachCount("x", async () => ({ ok: false })), null);
+});
+
+test("a service that sends headers and then stalls is skipped after the deadline", async () => {
+  let aborted = false;
+  const stalled = async (_url, init) => {
+    init.signal.addEventListener("abort", () => { aborted = true; });
+    return { ok: true, text: () => new Promise(() => {}) };
+  };
+  const started = Date.now();
+  assert.equal(await breachCount("password", stalled, { deadlineMs: 150 }), null);
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(aborted, true, "the request is aborted");
 });
 
 // ---- Reset links ------------------------------------------------------------------------
@@ -154,6 +166,10 @@ test("EIN, slug and time-zone helpers", () => {
   assert.equal(einLast4("111111111").ok, false);
   assert.equal(einLast4("12-34567").ok, false);
   assert.equal(slugify("  Café Ñandú & Sons!! "), "cafe-nandu-sons");
+  assert.equal(slugTyping("My-"), "my-", "a dash being typed stays");
+  assert.equal(slugTyping("my--sh"), "my-sh");
+  assert.equal(slugTyping("-my shop"), "my-shop");
+  assert.equal(slugify(slugTyping("my-")), "my", "trimmed when the field is left");
   assert.ok(slugValid("abc"));
   for (const bad of ["ab", "-abc", "abc-", "ABC", "register", "a".repeat(41)]) assert.equal(slugValid(bad), false, bad);
   assert.equal(zoneForState("ca"), "America/Los_Angeles");

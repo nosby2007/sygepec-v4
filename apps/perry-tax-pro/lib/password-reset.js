@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { audit } from "@/lib/audit";
 import { breachCount } from "@/lib/breached-password";
 import {
-  adminLookupAccount, adminSetPassword, commitWrites, deleteDocument, getDocument, isConflict, patchFields, queryCollection, replaceWrite, setDocument, TAX_TENANT,
+  adminLookupAccount, adminSetPassword, commitWrites, createWrite, deleteDocument, getDocument, isConflict, patchFields, queryCollection, replaceWrite, TAX_TENANT,
 } from "@/lib/firebase";
 import { mailerConfigured, sendEmail } from "@/lib/mailer";
 import { passwordProblems } from "@/lib/password-policy";
@@ -14,6 +14,12 @@ import { serviceToken } from "@/lib/service-identity";
 // Password reset run entirely by this server.
 //
 //   taxPasswordResets/{sha256 of the token}   server-only: { uid, expiresAtMs, usedAt }
+//   taxPasswordResetState/{uid}               server-only: { currentHash } — the one link
+//                                             of this account that may still work
+//
+// A new link and the account's state are written in one commit that fails if the state
+// changed meanwhile, so two requests at the same moment cannot cancel each other's link:
+// one wins and sends its email, the other sends nothing.
 //
 // - The link carries 32 random bytes. Only their SHA-256 hash is stored, so a copy of the
 //   database cannot be turned into working links.
@@ -110,11 +116,23 @@ export async function requestPasswordReset({ email: rawEmail, ip, origin }) {
     const resetToken = newResetToken();
     const id = hashResetToken(resetToken);
     const now = Date.now();
-    await setDocument(`taxPasswordResets/${id}`, {
-      tenantId: TAX_TENANT, uid: profile.uid, createdAt: new Date(now).toISOString(),
-      expiresAtMs: now + RESET_TTL_MS, expiresAt: new Date(now + RESET_TTL_MS).toISOString(), usedAt: null,
-    }, token, { createOnly: true });
-    await cancelOpenResets(profile.uid, token, id);
+    const statePath = `taxPasswordResetState/${profile.uid}`;
+    const state = await getDocument(statePath, token).catch(() => null);
+    const nextState = { tenantId: TAX_TENANT, uid: profile.uid, currentHash: id, updatedAt: new Date(now).toISOString() };
+    try {
+      await commitWrites([
+        createWrite(`taxPasswordResets/${id}`, {
+          tenantId: TAX_TENANT, uid: profile.uid, createdAt: new Date(now).toISOString(),
+          expiresAtMs: now + RESET_TTL_MS, expiresAt: new Date(now + RESET_TTL_MS).toISOString(), usedAt: null,
+        }),
+        state ? replaceWrite(statePath, nextState, state.updateTime) : createWrite(statePath, nextState),
+      ], token);
+    } catch (error) {
+      // Another request for this account got there first: its link is the one that works.
+      if (isConflict(error)) return;
+      throw error;
+    }
+    if (state?.currentHash) await deleteDocument(`taxPasswordResets/${state.currentHash}`, token).catch(() => null);
     // The token travels in the fragment (#), which browsers never send to a server or
     // put in a Referer header, so it stays out of logs.
     const link = `${siteOrigin(origin)}/reset-password#token=${resetToken}`;
@@ -128,8 +146,12 @@ export async function requestPasswordReset({ email: rawEmail, ip, origin }) {
 // Whether a link can still be used, so the page can say so before the person types.
 export async function checkResetToken(token) {
   if (!tokenShapeValid(token)) return false;
-  const record = await getDocument(`taxPasswordResets/${hashResetToken(token)}`, await serviceToken()).catch(() => null);
-  return resetUsable(record);
+  const service = await serviceToken();
+  const id = hashResetToken(token);
+  const record = await getDocument(`taxPasswordResets/${id}`, service).catch(() => null);
+  if (!resetUsable(record)) return false;
+  const state = await getDocument(`taxPasswordResetState/${record.uid}`, service).catch(() => null);
+  return state?.currentHash === id;
 }
 
 const EXPIRED = "This link is invalid or has expired. Ask for a new one.";
@@ -139,9 +161,13 @@ export async function completePasswordReset({ token: resetToken, password, ip })
   await limitAttempts(ip, "reset-complete-ip", { limit: 10, seconds: 900 });
   if (!tokenShapeValid(resetToken)) throw new ResetError(EXPIRED, 410);
   const token = await serviceToken();
-  const path = `taxPasswordResets/${hashResetToken(resetToken)}`;
+  const id = hashResetToken(resetToken);
+  const path = `taxPasswordResets/${id}`;
   const record = await getDocument(path, token).catch(() => null);
   if (!resetUsable(record)) throw new ResetError(EXPIRED, 410);
+  const statePath = `taxPasswordResetState/${record.uid}`;
+  const state = await getDocument(statePath, token).catch(() => null);
+  if (state?.currentHash !== id) throw new ResetError(EXPIRED, 410);
 
   const profile = await getDocument(`taxUsers/${record.uid}`, token).catch(() => null);
   if (!profile || profile.tenantId !== TAX_TENANT || !ROLES.includes(profile.role)) throw new ResetError(EXPIRED, 410);
@@ -151,10 +177,16 @@ export async function completePasswordReset({ token: resetToken, password, ip })
   const blocked = await getDocument(`taxAccountBlocks/${record.uid}`, token).catch(() => null);
   if (blocked?.tenantId === TAX_TENANT) throw new ResetError("This account is blocked. Please contact the office.", 403);
 
-  // Use the link up first, atomically: two requests with the same link cannot both pass.
+  // Use the link up first, atomically with the account's state: two requests with the same
+  // link, or a new link asked for meanwhile, cannot both pass.
   const { id: _id, createTime: _c, updateTime, ...data } = record;
+  const { id: _sid, createTime: _sc, updateTime: stateTime, ...stateData } = state;
+  const usedAt = new Date().toISOString();
   try {
-    await commitWrites([replaceWrite(path, { ...data, usedAt: new Date().toISOString() }, updateTime)], token);
+    await commitWrites([
+      replaceWrite(path, { ...data, usedAt }, updateTime),
+      replaceWrite(statePath, { ...stateData, currentHash: null, updatedAt: usedAt }, stateTime),
+    ], token);
   } catch (error) {
     if (isConflict(error)) throw new ResetError(EXPIRED, 410);
     throw error;

@@ -80,6 +80,10 @@ const pick = (list, v) => (keys(list).includes(v) ? v : "");
 const emailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 export const slugify = (value) => String(value || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+// While the owner types the link: the same cleaning, but a dash at the end stays, so
+// "my-" can become "my-shop". slugify() trims it when the field is left or sent.
+export const slugTyping = (value) => String(value || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 40);
+
 // Same rule and reserved words as the server (lib/business-booking.js cleanSlug).
 const RESERVED = ["directory", "register", "admin", "portal", "api", "new", "book", "booking"];
 export const slugValid = (slug) => /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(slug) && !RESERVED.includes(slug);

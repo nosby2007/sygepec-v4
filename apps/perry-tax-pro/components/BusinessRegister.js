@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import {
-  ENTITY_TYPES, INDUSTRIES, SERVICE_MODES, STEPS, TEAM_SIZES, TIME_ZONES, US_STATES, labelOf, slugify, slugValid, stepErrors, zoneForState,
+  ENTITY_TYPES, INDUSTRIES, SERVICE_MODES, STEPS, TEAM_SIZES, TIME_ZONES, US_STATES, labelOf, slugTyping, slugify, slugValid, stepErrors, zoneForState,
 } from "@/lib/business-registration";
 import { PASSWORD_MIN, STRENGTH_LABELS, passwordProblems, passwordStrength } from "@/lib/password-policy";
 
@@ -61,7 +61,7 @@ export default function BusinessRegister() {
     let cancelled = false;
     Promise.resolve().then(() => {
       if (cancelled) return;
-      if (saved?.f) setF((cur) => ({ ...cur, ...saved.f, terms: false }));
+      if (saved?.f) setF((cur) => ({ ...cur, ...saved.f, terms: false, ein: "" }));
       if (Number.isInteger(saved?.step)) setStep(Math.min(saved.step, STEPS.length - 1));
       loaded.current = true;
     });
@@ -69,7 +69,8 @@ export default function BusinessRegister() {
   }, []);
   useEffect(() => {
     if (!loaded.current) return;
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ f: { ...f, terms: false }, step })); } catch { /* ignore */ }
+    // Never the password or the EIN: they are typed again after a reload.
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ f: { ...f, terms: false, ein: "" }, step })); } catch { /* ignore */ }
   }, [f, step]);
 
   const set = (key) => (e) => {
@@ -81,7 +82,7 @@ export default function BusinessRegister() {
         if (!cur.slugTouched) next.slug = slugify(value);
       }
       if (key === "sameLegal" && value) next.legalName = cur.displayName;
-      if (key === "slug") { next.slug = slugify(value); next.slugTouched = true; }
+      if (key === "slug") { next.slug = slugTyping(value); next.slugTouched = true; }
       if (key === "state") next.timeZone = zoneForState(value);
       return next;
     });
@@ -107,7 +108,7 @@ export default function BusinessRegister() {
   const pwProblems = useMemo(() => (pw ? passwordProblems(pw, { email: f.email, name: f.ownerName, businessName: f.displayName }) : []), [pw, f.email, f.ownerName, f.displayName]);
 
   const checkStep = (name) => {
-    const e = stepErrors(name, f);
+    const e = stepErrors(name, { ...f, slug: slugify(f.slug) });
     if (name === "owner" && (!pw || pwProblems.length)) e.password = pw ? pwProblems.join(" ") : `Choose a password of at least ${PASSWORD_MIN} characters.`;
     if (name === "page" && slugState.taken) e.slug = "This link is already taken. Try another one.";
     return e;
@@ -133,7 +134,7 @@ export default function BusinessRegister() {
 
   const submit = async () => {
     setState({ busy: true });
-    const res = await fetch("/api/auth/register/business", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, password: pw }) }).catch(() => null);
+    const res = await fetch("/api/auth/register/business", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, slug: slugify(f.slug), password: pw }) }).catch(() => null);
     const data = res ? await res.json().catch(() => ({})) : {};
     if (!res?.ok) {
       const fields = data.fields || {};
@@ -312,7 +313,7 @@ export default function BusinessRegister() {
             <Field id="r-slug" label="Your public link" error={errors.slug}>
               <div className="breg-slug">
                 <span>innovacaresoftware.com/business/</span>
-                <input id="r-slug" className="input" autoCapitalize="none" spellCheck={false} value={f.slug} onChange={set("slug")} aria-invalid={!!errors.slug} aria-describedby="r-slug-state" />
+                <input id="r-slug" className="input" autoCapitalize="none" spellCheck={false} value={f.slug} onChange={set("slug")} onBlur={() => setF((cur) => ({ ...cur, slug: slugify(cur.slug) }))} aria-invalid={!!errors.slug} aria-describedby="r-slug-state" />
               </div>
               {!errors.slug && (
                 <span id="r-slug-state" className={`hint slug-${slugState.available ? "ok" : slugState.taken ? "taken" : "idle"}`} aria-live="polite">
