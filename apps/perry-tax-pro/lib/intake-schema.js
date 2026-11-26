@@ -32,6 +32,7 @@ export const TOPICS = {
     { key: "RENTAL", label: "Rental property or royalties", hint: "Rent received, or royalties from patents, books or resources.", form: "RENTAL" },
     { key: "K1", label: "Partner or shareholder in a business", hint: "Schedule K-1 from a partnership, S corporation or trust.", form: "K1" },
     { key: "FARM", label: "Farming", hint: "Livestock, crops or produce you raised or bought to resell.", form: "OTHER" },
+    { key: "MISC_1099", label: "A Form 1099-MISC", hint: "Rents, royalties, prizes or other payments reported on 1099-MISC.", form: "1099MISC" },
     { key: "OTHER_INCOME", label: "Other income", hint: "Alimony from a divorce before 2019, gambling winnings, jury duty, prizes.", form: "OTHER" },
   ],
   investments: [
@@ -66,6 +67,8 @@ export const FORM_TYPES = {
   W2: {
     label: "W-2", title: "Wage and tax statement", issuerLabel: "Employer name", main: "wages", state: true,
     fields: [["wages", "Wages, tips, other pay (box 1)"], ["fedWithheld", "Federal income tax withheld (box 2)"], ["stateWages", "State wages (box 16)"], ["stateWithheld", "State income tax withheld (box 17)"]],
+    more: [["ssWages", "Social Security wages (box 3)"], ["ssWithheld", "Social Security tax withheld (box 4)"], ["medicareWages", "Medicare wages (box 5)"], ["medicareWithheld", "Medicare tax withheld (box 6)"], ["dependentCare", "Dependent care benefits (box 10)"], ["retirementDeferrals", "Retirement plan contributions (box 12, codes D, E, G, AA or BB)"], ["hsaEmployer", "Employer HSA contributions (box 12, code W)"], ["tips", "Qualified tips (from your employer's statement)"], ["overtime", "Qualified overtime premium pay (from your employer's statement)"]],
+    flags: [["retirementPlan", "The Retirement plan box is checked (box 13)"]],
   },
   "1099NEC": {
     label: "1099-NEC", title: "Self-employment income", issuerLabel: "Payer name", main: "compensation", state: true,
@@ -79,10 +82,12 @@ export const FORM_TYPES = {
   "1099INT": {
     label: "1099-INT", title: "Interest income", issuerLabel: "Bank or payer", main: "interest",
     fields: [["interest", "Interest income (box 1)"], ["fedWithheld", "Federal income tax withheld (box 4)"]],
+    more: [["penalty", "Early withdrawal penalty (box 2)"], ["usInterest", "Interest on U.S. Savings Bonds and Treasury obligations (box 3)"], ["taxExempt", "Tax-exempt interest (box 8)"]],
   },
   "1099DIV": {
     label: "1099-DIV", title: "Dividends", issuerLabel: "Broker or fund", main: "ordinary",
     fields: [["ordinary", "Total ordinary dividends (box 1a)"], ["qualified", "Qualified dividends (box 1b)"], ["fedWithheld", "Federal income tax withheld (box 4)"]],
+    more: [["capitalGain", "Total capital gain distributions (box 2a)"], ["section199A", "Section 199A dividends (box 5)"], ["foreignTax", "Foreign tax paid (box 7)"], ["taxExempt", "Exempt-interest dividends (box 12)"]],
   },
   "1099B": {
     label: "1099-B", title: "Sales of stocks, funds or digital assets", issuerLabel: "Broker or exchange", main: "proceeds",
@@ -96,6 +101,7 @@ export const FORM_TYPES = {
   "1099R": {
     label: "1099-R", title: "Retirement distributions", issuerLabel: "Plan or payer", main: "gross", state: true,
     text: [["code", "Distribution code (box 7)", 4]],
+    flags: [["ira", "The IRA/SEP/SIMPLE box is checked"]],
     fields: [["gross", "Gross distribution (box 1)"], ["taxable", "Taxable amount (box 2a)"], ["fedWithheld", "Federal income tax withheld (box 4)"], ["stateWithheld", "State tax withheld"]],
   },
   SSA1099: {
@@ -113,10 +119,15 @@ export const FORM_TYPES = {
   "1098T": {
     label: "1098-T", title: "Tuition statement", issuerLabel: "School", main: null,
     fields: [["tuition", "Payments for tuition (box 1)"], ["scholarships", "Scholarships or grants (box 5)"]],
+    flags: [["firstFourYears", "This student is in the first four years of college, at least half-time"]],
   },
   "1095A": {
     label: "1095-A", title: "Marketplace health insurance", issuerLabel: "Marketplace", main: null,
     fields: [["premium", "Total enrollment premiums (column A)"], ["slcsp", "Second lowest cost silver plan (column B)"], ["aptc", "Advance premium tax credit (column C)"]],
+  },
+  "1099MISC": {
+    label: "1099-MISC", title: "Miscellaneous income", issuerLabel: "Payer name", main: "otherIncome", state: true,
+    fields: [["rents", "Rents (box 1)"], ["royalties", "Royalties (box 2)"], ["otherIncome", "Other income (box 3)"], ["fedWithheld", "Federal income tax withheld (box 4)"], ["stateWithheld", "State tax withheld"]],
   },
   K1: {
     label: "K-1", title: "Partnership, S corporation or trust", issuerLabel: "Entity name", main: "amount", state: true,
@@ -144,7 +155,13 @@ export const MONEY_DEDUCTIONS = [
   ["hsa", "Your own HSA contributions"],
   ["ira", "IRA contributions"],
   ["estimatedPayments", "Estimated tax payments you sent the IRS"],
+  ["stateEstimatedPayments", "Estimated tax payments you sent your state"],
+  ["carLoanInterest", "Interest on a loan for a new car bought in 2025 or later"],
+  ["educator", "Classroom supplies you paid for as a teacher"],
 ];
+
+// Every amount box of a form type: the main boxes, then the less common ones.
+export const formAmounts = (def) => [...def.fields, ...(def.more || [])];
 
 const LEGACY_INCOME = ["w2Wages", "w2Withheld", "selfEmployment", "interest", "dividends", "unemployment", "retirement", "other"];
 
@@ -182,7 +199,7 @@ function cleanForm(raw) {
     state: def.state ? stateCode(f.state) : "",
     documentId: safeKey(f.documentId),
   };
-  for (const [k] of def.fields) out[k] = moneyText(f[k]);
+  for (const [k] of formAmounts(def)) out[k] = moneyText(f[k]);
   for (const [k] of def.flags || []) out[k] = bool(f[k]);
   for (const [k, , max] of def.text || []) out[k] = text(f[k], max);
   return out;
@@ -338,7 +355,7 @@ export function incomeTotals(intake = {}) {
     capitalGains: gains,
     socialSecurity: sum(forms, "SSA1099", "benefits"),
     stateRefund: sum(forms, "1099G", "stateRefund"),
-    other: personalSales + rental + sum(forms, "K1", "amount") + sum(forms, "OTHER", "amount"),
+    other: personalSales + rental + sum(forms, "K1", "amount") + sum(forms, "OTHER", "amount") + sum(forms, "1099MISC", "rents") + sum(forms, "1099MISC", "royalties") + sum(forms, "1099MISC", "otherIncome"),
     withheld: forms.reduce((t, f) => t + num(f.fedWithheld), 0),
     stateWithheld: forms.reduce((t, f) => t + num(f.stateWithheld), 0),
     mortgageInterest: sum(forms, "1098", "interest") + num(ded.mortgageInterest),

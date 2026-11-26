@@ -50,3 +50,4 @@ next-env.d.ts
 # Emulator output (rules generated from the snippets, debug logs)
 firebase/test/.generated/
 *-debug.log
+/ats-out

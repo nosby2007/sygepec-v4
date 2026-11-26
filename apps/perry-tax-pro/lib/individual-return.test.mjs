@@ -12,7 +12,7 @@ const R = federalRules(2026);
 
 test("2026 rule set names its source and status", () => {
   assert.equal(R.id, "US-FED-2026");
-  assert.equal(R.status, "ESTIMATE");
+  assert.equal(R.status, "TESTED");
   assert.match(R.sources[0].url, /rp-25-32\.pdf$/);
   assert.equal(federalRules(2019), null);
 });
@@ -387,4 +387,24 @@ test("save: submission needs no blockers and the attestation, then moves to docu
   const again = prepareClientSave({ returnStatus: "DOCS_PENDING", storedIntake: ok.intake, body: { intake: { ...ok.intake, submitted: false } } });
   assert.equal(again.intake.submitted, true);
   assert.equal(again.submitting, false);
+});
+
+test("the approval fingerprint covers the preparer's facts, and older approvals still match", async () => {
+  const { answersFingerprintSource, approvalFingerprintSource } = await import("./review-rules.js");
+  const intake = sanitizeIntake({ personal: { firstName: "A", lastName: "B" }, filingStatus: "SINGLE" });
+  // No preparer facts: the same text as before, so existing approvals are not invalidated.
+  assert.equal(approvalFingerprintSource(intake, {}), answersFingerprintSource(intake));
+  // A carryover added by the preparer changes what was approved.
+  const withCarryover = approvalFingerprintSource(intake, { capitalLossCarryover: 3000 });
+  assert.notEqual(withCarryover, answersFingerprintSource(intake));
+  assert.notEqual(withCarryover, approvalFingerprintSource(intake, { capitalLossCarryover: 2000 }));
+  assert.equal(withCarryover, approvalFingerprintSource(intake, { capitalLossCarryover: 3000 }));
+});
+
+test("file access reasons mirrored for the Storage rules drop expired entries", async () => {
+  const { nextFileGrants } = await import("./file-grants.js");
+  const now = 1_000_000;
+  assert.deepEqual(nextFileGrants(null, "alice", now + 5, now), { alice: now + 5 });
+  assert.deepEqual(nextFileGrants({ bob: now - 1, carol: now + 9, alice: now + 1 }, "alice", now + 7, now), { carol: now + 9, alice: now + 7 });
+  assert.deepEqual(nextFileGrants(["x"], "a", now + 1, now), { a: now + 1 });
 });

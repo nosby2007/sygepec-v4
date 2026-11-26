@@ -3,7 +3,8 @@ import crypto from "node:crypto";
 import { audit } from "@/lib/audit";
 import { getFirebaseSession } from "@/lib/auth";
 import { AdminError } from "@/lib/admin-rules";
-import { getDocument, setDocument, TAX_TENANT } from "@/lib/firebase";
+import { nextFileGrants } from "@/lib/file-grants";
+import { getDocument, patchFields, setDocument, TAX_TENANT } from "@/lib/firebase";
 import { mutationGuard, privateHeaders, safeId } from "@/lib/security";
 import { serviceToken } from "@/lib/service-identity";
 import { RATES, correlationIdOf, rateLimit, reply } from "@/lib/support-access";
@@ -64,11 +65,21 @@ export async function sensitiveAllowed(session, r) {
   return r?.preparer_id === session.uid || hasFreshGrant(session, r?.client_id);
 }
 
+// Mirrored on the preparer's account record for the Storage rules (lib/file-grants.js).
+async function mirrorFileGrant(staffUid, clientUid, expiresAtMs, nowMs) {
+  const token = await serviceToken();
+  const user = await getDocument(`taxUsers/${staffUid}`, token).catch(() => null);
+  if (!user) return;
+  await patchFields(`taxUsers/${staffUid}`, { fileGrants: nextFileGrants(user.fileGrants, clientUid, expiresAtMs, nowMs) }, token);
+}
+
 export async function saveGrant(session, clientUid, reason, nowMs = Date.now()) {
   const expiresAt = new Date(nowMs + GRANT_MINUTES * 60_000).toISOString();
   await setDocument(grantPath(session.uid, clientUid), {
-    tenantId: TAX_TENANT, staffUid: session.uid, clientUid, reason, grantedAt: new Date(nowMs).toISOString(), expiresAt,
+    // expiresAtMs is what the Storage rules compare with the request time.
+    tenantId: TAX_TENANT, staffUid: session.uid, clientUid, reason, grantedAt: new Date(nowMs).toISOString(), expiresAt, expiresAtMs: nowMs + GRANT_MINUTES * 60_000,
   }, await serviceToken());
+  await mirrorFileGrant(session.uid, clientUid, nowMs + GRANT_MINUTES * 60_000, nowMs);
   return expiresAt;
 }
 

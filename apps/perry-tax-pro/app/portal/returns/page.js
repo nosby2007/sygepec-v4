@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireTaxClient } from "@/lib/auth";
 import { listClientReturns } from "@/lib/data";
 import { fmtDate } from "@/lib/constants";
+import { EFILE_LABEL } from "@/lib/efile/states";
 import { StatusBadge, statusProgress } from "@/components/Status";
 import { SignatureBadge, SubmissionBadge } from "@/components/WorkflowStatus";
 import NewTaxYearButton from "@/components/NewTaxYearButton";
@@ -46,6 +47,22 @@ export default async function TaxYearsPage() {
                 <div className="row between"><span className="muted">Return</span><StatusBadge status={item.status} /></div>
                 <div className="row between"><span className="muted">Form 8879</span><SignatureBadge status={item.signature_status} /></div>
                 <div className="row between"><span className="muted">E-file</span><SubmissionBadge status={item.submission_status} /></div>
+                {item.efile_state && !item.efile_sandbox && <div className="row between"><span className="muted">Transmission</span><b>{EFILE_LABEL[item.efile_state] || item.efile_state}</b></div>}
+                {item.efile_state === "REJECTED" && !item.efile_sandbox && item.efile_rejections.length > 0 && (
+                  <div className="alert alert-error small">
+                    <span>The IRS rejected this return. Your preparer is correcting it.
+                      {item.efile_rejections.map((e) => <span key={e.code} style={{ display: "block" }}>{e.message}{e.step && current && <> · <Link href={`/portal/intake?step=${encodeURIComponent(e.step)}`}>review this answer</Link></>}</span>)}
+                    </span>
+                  </div>
+                )}
+                {item.efile_ga?.state && !item.efile_ga.sandbox && <div className="row between"><span className="muted">Georgia transmission</span><b>{EFILE_LABEL[item.efile_ga.state] || item.efile_ga.state}</b></div>}
+                {item.efile_ga?.state === "REJECTED" && !item.efile_ga.sandbox && item.efile_ga.rejections.length > 0 && (
+                  <div className="alert alert-error small">
+                    <span>Georgia rejected the state return. Your preparer is correcting it.
+                      {item.efile_ga.rejections.map((e) => <span key={e.code} style={{ display: "block" }}>{e.message}</span>)}
+                    </span>
+                  </div>
+                )}
                 <div className="row between"><span className="muted">Updated</span><b>{fmtDate(item.updated_at)}</b></div>
                 {item.carry_forward_from_tax_year && <p className="hint"><Icon name="refresh" size={12} /> Started from your {item.carry_forward_from_tax_year} return.</p>}
               </div>

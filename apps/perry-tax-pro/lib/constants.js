@@ -65,6 +65,7 @@ export const DOC_TYPES = {
   "1095A": "1095-A (Marketplace Health Insurance)",
   K1: "Schedule K-1",
   RENTAL: "Rental or Royalty Records",
+  "1099MISC": "1099-MISC (Miscellaneous Income)",
   "1099G": "1099-G (Unemployment)",
   "1099R": "1099-R (Retirement / Pension)",
   "1098": "1098 (Mortgage Interest)",
