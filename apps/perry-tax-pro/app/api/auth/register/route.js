@@ -2,6 +2,9 @@ import { createSession } from "@/lib/auth";
 import { indexCustomer } from "@/lib/support-customers";
 import { createDocuments, deleteFirebaseAccount, signUpWithPassword, TAX_TENANT } from "@/lib/firebase";
 import { cleanEmail, cleanText, mutationGuard, privateHeaders } from "@/lib/security";
+import { breachCount } from "@/lib/breached-password";
+import { passwordProblems } from "@/lib/password-policy";
+import { clientIp, limitAttempts, RateLimitError } from "@/lib/rate-limit";
 
 export async function POST(req) {
   const blocked = mutationGuard(req);
@@ -13,6 +16,14 @@ export async function POST(req) {
   const accountType = body.accountType === "BUSINESS" ? "BUSINESS" : "TAX";
   if (!name || !email || typeof body.password !== "string" || body.password.length < 12)
     return Response.json({ error: "Name, valid email and a password of 12+ characters are required." }, { status: 400, headers: privateHeaders });
+  try {
+    await limitAttempts(clientIp(req), "register-ip", { limit: 10, seconds: 3600 });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: error instanceof RateLimitError ? error.status : 503, headers: privateHeaders });
+  }
+  const problems = passwordProblems(body.password, { email, name });
+  if (problems.length) return Response.json({ error: problems.join(" ") }, { status: 400, headers: privateHeaders });
+  if ((await breachCount(body.password)) > 0) return Response.json({ error: "This password appears in known data breaches. Choose another one." }, { status: 400, headers: privateHeaders });
   let auth;
   try {
     auth = await signUpWithPassword(email, body.password, name);

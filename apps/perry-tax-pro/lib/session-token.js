@@ -54,3 +54,10 @@ export const mfaPending = (session) => (session?.mfa ? session.mfa !== "ok" : se
 
 export const idleExpired = (session, nowMs = Date.now()) =>
   Number.isFinite(session?.lastSeen) && nowMs - session.lastSeen > SERVER_IDLE_MS;
+
+// A password reset sets taxUsers.sessionsValidAfter: sessions whose password was proven
+// before it no longer open. Sessions sealed before authAt existed count as old.
+export function sessionRevoked(session, profile) {
+  const after = Number(profile?.sessionsValidAfter || 0);
+  return after > 0 && Number(session?.authAt || 0) < after;
+}

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
+import PublicGallery from "@/components/PublicGallery";
 import { Empty } from "@/components/ui";
 import { publicServices, publicStaff, resolveBusiness } from "@/lib/business-booking";
 import { publicFeedback } from "@/lib/business-growth";
@@ -14,11 +15,14 @@ export async function generateMetadata({ params }) {
   const profile = await resolveBusiness((await params).slug);
   if (!profile) return { title: "Business not found", robots: { index: false } };
   const description = profile.tagline || profile.description.slice(0, 155) || `Book with ${profile.name} online.`;
+  // The cover, or else the newest photo of their work, for link previews.
+  const firstPhoto = profile.coverPath ? null : (await listPortfolio(profile.businessId))[0];
+  const shareImage = profile.coverPath ? mediaUrl(profile.coverPath) : firstPhoto ? mediaUrl(firstPhoto.path) : null;
   return {
     title: profile.name,
     description,
     alternates: { canonical: `/business/${profile.slug}` },
-    openGraph: { title: profile.name, description, url: `/business/${profile.slug}`, type: "website", ...(profile.coverPath ? { images: [mediaUrl(profile.coverPath)] } : {}) },
+    openGraph: { title: profile.name, description, url: `/business/${profile.slug}`, type: "website", ...(shareImage ? { images: [shareImage] } : {}) },
   };
 }
 
@@ -39,6 +43,7 @@ export default async function BusinessProfilePage({ params }) {
     ...(profile.description ? { description: profile.description } : {}),
     ...(profile.phone ? { telephone: profile.phone } : {}),
     ...(profile.email ? { email: profile.email } : {}),
+    ...(photos.length ? { image: photos.slice(0, 10).map((ph) => new URL(mediaUrl(ph.path), SITE).toString()) } : {}),
     ...(address ? { address: { "@type": "PostalAddress", streetAddress: profile.address, addressLocality: profile.city, addressRegion: profile.state, postalCode: profile.zip } } : {}),
   };
 
@@ -66,6 +71,12 @@ export default async function BusinessProfilePage({ params }) {
             {profile.description && (
               <div className="card"><h2>About</h2><p style={{ whiteSpace: "pre-line" }}>{profile.description}</p></div>
             )}
+            {photos.length > 0 && (
+              <div className="card stack-sm" id="work">
+                <div className="card-title"><h2>Our work</h2><span className="pill"><Icon name="image" size={12} /> {photos.length} photo{photos.length === 1 ? "" : "s"}</span></div>
+                <PublicGallery photos={photos.map((ph) => ({ id: ph.id, caption: ph.caption, url: mediaUrl(ph.path) }))} businessName={profile.name} />
+              </div>
+            )}
             <div className="card">
               <div className="card-title"><h2>Services</h2><span className="pill">{services.length}</span></div>
               {services.length === 0 && <Empty icon="layers" title="Services coming soon">Contact the business to book.</Empty>}
@@ -88,17 +99,6 @@ export default async function BusinessProfilePage({ params }) {
                 ))}
               </div>
             </div>
-            {photos.length > 0 && (
-              <div className="card">
-                <div className="card-title"><h2>Our work</h2><span className="pill">{photos.length}</span></div>
-                <div className="biz-portfolio">
-                  {photos.slice(0, 24).map((ph) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={ph.id} src={mediaUrl(ph.path)} alt={ph.caption || `Work by ${profile.name}`} loading="lazy" />
-                  ))}
-                </div>
-              </div>
-            )}
             {reviews.length > 0 && (
               <div className="card">
                 <div className="card-title"><h2>What customers say</h2><span className="pill"><Icon name="star" size={12} /> {average.toFixed(1)} from {reviews.length} featured review{reviews.length === 1 ? "" : "s"}</span></div>
